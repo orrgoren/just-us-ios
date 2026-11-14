@@ -67,6 +67,11 @@ final class SessionModel {
     PushRouter.shared.handler = { [weak self] route in
       Task { await self?.follow(route) }
     }
+    if let type = Launch.argument(after: "-JustUsPush") {
+      let payload = ["type": type]
+      PushRouter.shared.route(payload, id: "launch-\(type)")
+      await follow(DeepLinks.route(userInfo: payload))
+    }
     poll = Task { [weak self] in
       while !Task.isCancelled {
         try? await Task.sleep(for: .seconds(15))

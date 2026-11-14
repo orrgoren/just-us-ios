@@ -7,7 +7,8 @@ final class FakeFlowTests: XCTestCase {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     _ = try await backend.sendCode(email: "blair@couple-a.test")
     _ = try await backend.verify(email: "blair@couple-a.test", code: "000000")
-    let ritual = try XCTUnwrap(try await backend.ritual())
+    let loaded = try await backend.ritual()
+    let ritual = try XCTUnwrap(loaded)
     XCTAssertFalse(ritual.isPlanner)
     XCTAssertNil(ritual.plan)
     XCTAssertFalse(RitualPrivacy.containsSecret(ritual, secret: "A table for two"))
@@ -20,7 +21,8 @@ final class FakeFlowTests: XCTestCase {
     _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
     try await backend.setMood(.fun)
     await backend.injectPartnerMood()
-    let ritual = try XCTUnwrap(try await backend.ritual())
+    let loaded = try await backend.ritual()
+    let ritual = try XCTUnwrap(loaded)
     XCTAssertEqual(ritual.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
     XCTAssertEqual(ritual.moods.first { $0.userId == SeedID.blair }?.mood, .chill)
   }
@@ -56,7 +58,8 @@ final class FakeFlowTests: XCTestCase {
     _ = try await backend.sendCode(email: "sam@solo.test")
     _ = try await backend.verify(email: "sam@solo.test", code: "000000")
     try await backend.redeem(token: SeedID.validToken, replaceEmpty: true)
-    let ritual = try XCTUnwrap(try await backend.ritual())
+    let loaded = try await backend.ritual()
+    let ritual = try XCTUnwrap(loaded)
     XCTAssertEqual(ritual.coupleId, SeedID.coupleJordan)
   }
 
@@ -83,7 +86,8 @@ final class FakeFlowTests: XCTestCase {
     }
     backend.setOffline(false)
     try await backend.setMood(.chill)
-    let ritual = try XCTUnwrap(try await backend.ritual())
+    let loaded = try await backend.ritual()
+    let ritual = try XCTUnwrap(loaded)
     XCTAssertEqual(ritual.moods.first { $0.userId == SeedID.alex }?.mood, .chill)
   }
 
