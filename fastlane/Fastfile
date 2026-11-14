@@ -80,7 +80,7 @@ def archive_release(api_key)
     project: "JustUs.xcodeproj",
     scheme: "JustUs",
     configuration: "Release",
-    export_method: "app-store-connect",
+    export_method: "app-store",
     export_team_id: team_id,
     codesigning_identity: "Apple Distribution",
     skip_profile_detection: true,
