@@ -94,14 +94,18 @@ def archive_release(api_key)
     code_sign_identity: "Apple Distribution",
     profile_name: profile_name
   )
-  build_app(
+  # Fastlane's working directory is fastlane/, so a relative ./build expands to
+  # fastlane/build. Gym writes the ipa next to the project. Use the absolute
+  # path build_app returns instead of expanding a relative path here.
+  output_directory = File.expand_path("../build", __dir__)
+  ipa = build_app(
     project: "JustUs.xcodeproj",
     scheme: "JustUs",
     configuration: "Release",
     export_method: "app-store",
     export_team_id: team_id,
     skip_profile_detection: true,
-    output_directory: "./build",
+    output_directory: output_directory,
     output_name: "JustUs.ipa",
     clean: true,
     export_options: {
@@ -113,8 +117,8 @@ def archive_release(api_key)
       }
     }
   )
-  ipa = File.expand_path("./build/JustUs.ipa")
-  UI.user_error!("Archive did not produce #{ipa}") unless File.exist?(ipa)
+  ipa = Actions.lane_context[SharedValues::IPA_OUTPUT_PATH] if ipa.to_s.empty?
+  UI.user_error!("Archive did not produce #{ipa}") if ipa.to_s.empty? || !File.exist?(ipa)
   ipa
 end
 
