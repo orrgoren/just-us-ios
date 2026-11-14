@@ -72,7 +72,7 @@ jobs:
           TEST_RUNNER_SCREENSHOT_PREFIX: se
         run: |
           set -euo pipefail
-          UDID=$(python3 scripts/select-simulator.py se)
+          UDID=$(python3 scripts/select-simulator.py se | tail -n 1)
           printf '%s' "se" > /tmp/justus-screenshot-prefix.txt
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b || true
@@ -135,7 +135,7 @@ jobs:
           TEST_RUNNER_SCREENSHOT_PREFIX: promax
         run: |
           set -euo pipefail
-          UDID=$(python3 scripts/select-simulator.py promax)
+          UDID=$(python3 scripts/select-simulator.py promax | tail -n 1)
           printf '%s' "promax" > /tmp/justus-screenshot-prefix.txt
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b || true

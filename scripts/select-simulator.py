@@ -121,9 +121,10 @@ def ensure_compact_se(listing):
         return listing
     runtime = sorted(available, key=lambda item: item.get("identifier", ""))[-1]
     try:
-        subprocess.check_call([
+        created = subprocess.check_output([
             "xcrun", "simctl", "create", "iPhone SE (3rd generation)", device_type, runtime["identifier"],
-        ])
+        ], text=True).strip()
+        print(f"created 375pt simulator {created}", file=sys.stderr)
     except subprocess.CalledProcessError:
         print("Could not create a 375pt iPhone SE; using the compact iPhone", file=sys.stderr)
         return listing
