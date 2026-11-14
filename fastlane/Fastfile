@@ -132,8 +132,6 @@ def install_app_store_signing(api_key, team_id)
     api_key: api_key,
     app_identifier: BUNDLE_IDENTIFIER,
     team_id: team_id,
-    development: false,
-    adhoc: false,
     platform: "ios",
     cert_id: cert_id,
     provisioning_name: "Just Us App Store",
