@@ -1,78 +1,32 @@
 -- PROPOSED ONLY. Do not apply until Tom verifies.
 -- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
+-- Deploy order: this file first, then the delete-couple-photos edge
+-- function, then the TestFlight build. The build calls leave_couple or
+-- delete_my_account and only then the function. Shipping the build first
+-- calls an RPC shape that is not live yet.
+--
 -- Depends on nothing new. Replaces app_private.guard_date_update and
 -- public.leave_couple. The live copies stay in place until this is applied.
 --
--- leave_couple closes the whole couple for both people. It does not hand the
--- space to the partner and it does not delete either login. The other person
--- gets a space_closures row. Photos stay in storage.objects: a direct delete
--- raises 42501 and does not remove the file. The iOS client calls the
--- proposed delete-couple-photos function, which uses the Storage API, before
--- this RPC.
+-- leave_couple closes the whole couple for both people. It does not hand
+-- the space to anyone and it does not delete either login. It returns the
+-- couple id it closed and records that id. The other person gets a
+-- space_closures row. Photos stay in storage.objects. A direct delete
+-- raises 42501 and does not remove the file. The edge function runs after
+-- this RPC and deletes photos only for a returned id whose couple row is
+-- already gone.
 --
--- Two additions to the live date guard:
---   1. A completed date may change memory_photo_path only, and only to
---      {couple_id}/{date_id}.jpg. Skipped and canceled dates stay locked.
---      The planner, snapshots, and every other column stay locked.
---   2. A handoff may change planner_user_id only. The old planner must be
---      the caller, the new planner must already be a member, and the
---      transaction must hold a row in app_private.handoff_tickets whose
---      nonce matches the transaction-local GUC. Setting the GUC alone,
---      including via set_config, does nothing: the ticket table is not in
---      the API schema and is revoked from anon and authenticated.
+-- One addition to the live date guard: a completed date may change
+-- memory_photo_path only, and only to {couple_id}/{date_id}.jpg. Skipped
+-- and canceled dates stay locked. The planner, snapshots, and every other
+-- column stay locked.
 --
 -- set_memory_photo_path is the write the iOS app uses after the storage
 -- upload. A direct update of that one column is also accepted by the guard,
 -- so the web app's other date rules are unchanged.
 
-create table if not exists app_private.handoff_tickets (
-  nonce text primary key
-);
-
-revoke all on table app_private.handoff_tickets from public, anon, authenticated;
-
-create or replace function app_private.handoff_active()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, app_private
-as $$
-  select exists (
-    select 1
-    from app_private.handoff_tickets
-    where nonce = current_setting('app.membership_handoff', true)
-  );
-$$;
-
-create or replace function app_private.begin_handoff()
-returns void
-language plpgsql
-security definer
-set search_path = public, app_private
-as $$
-declare
-  v_nonce text := gen_random_uuid()::text;
-begin
-  insert into app_private.handoff_tickets (nonce) values (v_nonce);
-  perform set_config('app.membership_handoff', v_nonce, true);
-end;
-$$;
-
-create or replace function app_private.end_handoff()
-returns void
-language plpgsql
-security definer
-set search_path = public, app_private
-as $$
-declare
-  v_nonce text := current_setting('app.membership_handoff', true);
-begin
-  delete from app_private.handoff_tickets where nonce = v_nonce;
-  perform set_config('app.membership_handoff', '', true);
-end;
-$$;
+drop function if exists public.couples_touching_me();
 
 -- Photos are removed by the Storage API in delete-couple-photos, not here.
 create table if not exists public.space_closures (
@@ -93,6 +47,12 @@ drop policy if exists space_closures_ack on public.space_closures;
 create policy space_closures_ack on public.space_closures
   for delete to authenticated
   using (user_id = auth.uid());
+
+-- Orphan ops would make the new foreign key fail. Remove them first.
+delete from app_private.internal_ops as op
+where not exists (
+  select 1 from public.couples as couple where couple.id = op.couple_id
+);
 
 do $$
 begin
@@ -134,23 +94,21 @@ as $$
   where invite.created_by = p_uid or invite.redeemed_by = p_uid
 $$;
 
-create or replace function public.couples_touching_me()
-returns setof uuid
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select touched.id
-  from app_private.couples_touched_by(auth.uid()) as touched(id)
-  where auth.uid() is not null
-$$;
+-- The couple ids close_couple actually removed. Not every couple the
+-- caller ever touched. authenticated cannot read this table.
+create table if not exists app_private.closed_couples (
+  couple_id uuid primary key,
+  closed_by uuid not null,
+  closed_at timestamptz not null default now()
+);
+revoke all on table app_private.closed_couples from public, anon, authenticated;
 
--- Deletes the couple and the rows that reference it. Explicit deletes match
--- the live foreign keys from scripts/sql/live-fk-dump.sql, so this does not
--- depend on ON DELETE CASCADE. storage.objects is not touched.
+-- Deletes the couple and the rows that reference it. Returns that id only
+-- when the couple row was removed. Explicit deletes match the live foreign
+-- keys from scripts/sql/live-fk-dump.sql. storage.objects is not touched.
+drop function if exists app_private.close_couple(uuid, uuid);
 create or replace function app_private.close_couple(p_couple uuid, p_actor uuid)
-returns void
+returns uuid
 language plpgsql
 security definer
 set search_path = public
@@ -159,9 +117,12 @@ declare
   v_members uuid[];
 begin
   if not exists (select 1 from public.couples where id = p_couple) then
-    return;
+    return null;
   end if;
   perform 1 from public.couples where id = p_couple for update;
+  if not exists (select 1 from public.couples where id = p_couple) then
+    return null;
+  end if;
 
   select coalesce(array_agg(user_id), '{}') into v_members
   from public.couple_members
@@ -198,16 +159,71 @@ begin
   end if;
   delete from app_private.internal_ops where couple_id = p_couple;
   delete from public.couples where id = p_couple;
+
+  insert into app_private.closed_couples (couple_id, closed_by)
+  values (p_couple, p_actor)
+  on conflict (couple_id) do update
+    set closed_by = excluded.closed_by,
+        closed_at = now();
+  return p_couple;
 end;
 $$;
 
-revoke all on function app_private.handoff_active() from public, anon, authenticated;
-revoke all on function app_private.begin_handoff() from public, anon, authenticated;
-revoke all on function app_private.end_handoff() from public, anon, authenticated;
+-- Ids this caller closed whose couple row is gone. A couple they merely
+-- touched, and a couple that still exists, is not returned.
+create or replace function public.closed_couple_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select recorded.couple_id
+  from app_private.closed_couples as recorded
+  where recorded.closed_by = auth.uid()
+    and not exists (
+      select 1 from public.couples as couple
+      where couple.id = recorded.couple_id
+    )
+$$;
+
+create or replace function public.ack_closed_couples(p_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or p_ids is null then
+    return;
+  end if;
+  delete from app_private.closed_couples as recorded
+  where recorded.closed_by = auth.uid()
+    and recorded.couple_id = any (p_ids)
+    and not exists (
+      select 1 from public.couples as couple
+      where couple.id = recorded.couple_id
+    );
+end;
+$$;
+
+create or replace function app_private.photo_delete_allowed(p_couple uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select not exists (select 1 from public.couples where id = p_couple)
+$$;
+
 revoke all on function app_private.couples_touched_by(uuid) from public, anon, authenticated;
 revoke all on function app_private.close_couple(uuid, uuid) from public, anon, authenticated;
-revoke all on function public.couples_touching_me() from public, anon, authenticated;
-grant execute on function public.couples_touching_me() to authenticated;
+revoke all on function app_private.photo_delete_allowed(uuid) from public, anon, authenticated;
+revoke all on function public.closed_couple_ids() from public, anon, authenticated;
+revoke all on function public.ack_closed_couples(uuid[]) from public, anon, authenticated;
+grant execute on function public.closed_couple_ids() to authenticated;
+grant execute on function public.ack_closed_couples(uuid[]) to authenticated;
 
 create or replace function app_private.guard_date_update()
 returns trigger
@@ -231,41 +247,6 @@ begin
     or new.created_at is distinct from old.created_at
   then
     raise exception 'forbidden';
-  end if;
-
-  -- Unlink and account deletion. The ticket, not the GUC string, is what
-  -- allows the write. The old planner must be the caller. Every column
-  -- except planner_user_id is compared from the row image, so a new column
-  -- cannot slip through a handwritten list. This is ahead of the membership
-  -- check because delete_my_account still moves finished nights after the
-  -- login has already left.
-  if app_private.handoff_active()
-    and old.planner_user_id = v_uid
-    and new.planner_user_id is distinct from old.planner_user_id
-    and (to_jsonb(new) - 'planner_user_id' - 'updated_at')
-      is not distinct from (to_jsonb(old) - 'planner_user_id' - 'updated_at')
-    and exists (
-      select 1 from public.couple_members
-      where couple_id = new.couple_id and user_id = new.planner_user_id
-    )
-  then
-    new.updated_at := now();
-    return new;
-  end if;
-
-  -- Cancel an unrevealed night the caller still plans, including after they
-  -- have left and are no longer a member. Status is the only change.
-  if app_private.handoff_active()
-    and old.planner_user_id = v_uid
-    and old.status = 'scheduled'
-    and new.status = 'canceled'
-    and old.revealed_at is null
-    and (to_jsonb(new) - 'status' - 'skipped_at' - 'updated_at')
-      is not distinct from (to_jsonb(old) - 'status' - 'skipped_at' - 'updated_at')
-  then
-    new.skipped_at := now();
-    new.updated_at := now();
-    return new;
   end if;
 
   if not public.is_couple_member(new.couple_id) then
@@ -454,8 +435,9 @@ begin
 end;
 $$;
 
+drop function if exists public.leave_couple();
 create or replace function public.leave_couple()
-returns void
+returns setof uuid
 language plpgsql
 security definer
 set search_path = public
@@ -463,6 +445,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_couple uuid;
+  v_closed uuid;
 begin
   if v_uid is null then
     raise exception 'not_authenticated';
@@ -476,7 +459,7 @@ begin
   end if;
 
   -- One couple row lock. Two people leaving at once take this in order.
-  -- The second finds the couple already gone and returns.
+  -- The second finds the couple already gone and returns no id.
   perform 1 from public.couples where id = v_couple for update;
   if not exists (
     select 1 from public.couple_members
@@ -485,7 +468,10 @@ begin
     return;
   end if;
 
-  perform app_private.close_couple(v_couple, v_uid);
+  v_closed := app_private.close_couple(v_couple, v_uid);
+  if v_closed is not null then
+    return next v_closed;
+  end if;
 end;
 $$;
 

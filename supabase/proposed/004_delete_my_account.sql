@@ -14,15 +14,17 @@
 -- mood votes, planned nights, or created_by pointing at the old couple.
 -- Those foreign keys are NO ACTION and author_user_id is NOT NULL, so this
 -- function closes each leftover couple instead of handing it off or nulling
--- the author. It does not drop NOT NULL. Photos are not deleted here. The
--- client calls delete-couple-photos before this RPC.
+-- the author. It does not drop NOT NULL. It returns only the couple ids it
+-- closed. Photos are not deleted here. The client calls
+-- delete-couple-photos after this RPC, and only for those ids.
 --
 -- A second call, after the login is already gone, deletes nothing and
 -- does not raise. Two deletes of the same couple take the couple row lock
 -- in close_couple, in couple-id order.
 
+drop function if exists public.delete_my_account();
 create or replace function public.delete_my_account()
-returns void
+returns setof uuid
 language plpgsql
 security definer
 set search_path = public
@@ -30,6 +32,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_couple uuid;
+  v_closed uuid;
 begin
   if v_uid is null then
     raise exception 'not_authenticated';
@@ -40,7 +43,10 @@ begin
     from app_private.couples_touched_by(v_uid) as touched(id)
     order by touched.id
   loop
-    perform app_private.close_couple(v_couple, v_uid);
+    v_closed := app_private.close_couple(v_couple, v_uid);
+    if v_closed is not null then
+      return next v_closed;
+    end if;
   end loop;
 
   -- Rows that no longer sit on a couple. These foreign keys are NO ACTION

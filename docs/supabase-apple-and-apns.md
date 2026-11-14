@@ -49,13 +49,13 @@ Already live: `device_tokens`, `notification_preferences`, `memory_notes.author_
 Not applied, and waiting for review:
 
 - `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs.
-- `supabase/proposed/003_memory_photo_and_leave_handoff.sql` — photo path on a completed date. Unlink closes the whole couple for both people. Not applied.
+- `supabase/proposed/003_memory_photo_and_close.sql` — photo path on a completed date. Unlink closes the whole couple for both people and returns that couple id. Not applied.
 - `supabase/proposed/004_delete_my_account.sql` — account deletion. Either partner closes every couple they still touch. The other person stays unpaired. Not applied.
-- `supabase/proposed/functions/delete-couple-photos/index.ts` — Storage API delete of that couple's photos. Not deployed. The app calls it before unlink and account deletion.
+- `supabase/proposed/functions/delete-couple-photos/index.ts` — Storage API delete of photos for couples the RPC just closed. Not deployed. The app calls it after unlink and account deletion.
 - `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. It does not redeploy send-push. Not applied.
 - `supabase/proposed/006_push_claim_and_outbox.sql` — the push claim, the outbox, and a sandbox or production token column. Not applied.
 
-The iOS client calls `delete-couple-photos`, then `delete_my_account` or `leave_couple`, and `set_memory_photo_path`. Until a function exists, that action says nothing changed. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
+Deploy order for closing a space: apply `003_memory_photo_and_close.sql` (and `004` for account deletion), then deploy `delete-couple-photos`, then ship the TestFlight build. The build calls `leave_couple` or `delete_my_account` first and the function second. The function deletes photos only for couple ids those RPCs closed, and only when that couple row is already gone. `005_rollback.sql` restores the live `leave_couple` and does not remove the edge function, so ship the previous build and delete the function before running it. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
 
 ## What GitHub Actions already has
 

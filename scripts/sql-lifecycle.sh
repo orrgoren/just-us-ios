@@ -30,7 +30,7 @@ run -f supabase/proposed/live/touch_memory.sql
 run -f supabase/proposed/live/guard_couple_update.sql
 run -f supabase/proposed/live/guard_invite_update.sql
 run -f supabase/proposed/live/leave_couple.sql
-run -f supabase/proposed/003_memory_photo_and_leave_handoff.sql
+run -f supabase/proposed/003_memory_photo_and_close.sql
 run -f supabase/proposed/004_delete_my_account.sql
 run -f supabase/proposed/006_push_claim_and_outbox.sql
 run -f scripts/sql/lifecycle.sql

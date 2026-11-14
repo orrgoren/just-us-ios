@@ -4,7 +4,7 @@
 -- are live on vowmukhhnfhtnjlswkun. Applying this file again would replace
 -- leave_couple with the version that leaves an open date stuck on the leaver,
 -- and it would create the delete_my_account that fails on the live foreign
--- keys. The replacements are 003_memory_photo_and_leave_handoff.sql and
+-- keys. The replacements are 003_memory_photo_and_close.sql and
 -- 004_delete_my_account.sql. Neither of those is applied.
 
 create table if not exists public.device_tokens (

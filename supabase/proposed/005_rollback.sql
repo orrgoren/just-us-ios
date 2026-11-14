@@ -1,6 +1,17 @@
 -- PROPOSED ROLLBACK. Do not apply to vowmukhhnfhtnjlswkun unless Tom is
 -- undoing 003, 004, and 006.
 --
+-- Dependencies, in order:
+--   1. Ship the previous TestFlight build first if the current build calls
+--      leave_couple or delete_my_account and then delete-couple-photos.
+--      This file restores the live leave_couple, which returns nothing.
+--   2. Delete the delete-couple-photos edge function in the dashboard if
+--      it was deployed. This file does not remove it.
+--   3. Then run this file. It unschedules justus-push-flush only when 007
+--      created that job, and it drops push_outbox and push_deliveries only
+--      because 002 and 006 created them.
+-- The deployed send-push is still v1. This file does not redeploy it.
+--
 -- One transaction. Paste this whole file into the Supabase SQL editor.
 -- The live function bodies are inlined below, copied from
 -- supabase/proposed/live/. This file has no include directive.
@@ -42,7 +53,7 @@ end $$;
 
 -- LIVE SNAPSHOT of app_private.guard_date_update on vowmukhhnfhtnjlswkun.
 -- Read on 2026-11-14 with pg_get_functiondef. Do not apply except as rollback.
--- This is the body before the photo-path and handoff exceptions in 003.
+-- This is the body before the photo-path exception in 003.
 
 CREATE OR REPLACE FUNCTION app_private.guard_date_update()
  RETURNS trigger
@@ -273,6 +284,11 @@ begin
 end;
 $function$;
 
+-- 003 replaces leave_couple with a set-returning function. Drop it before
+-- restoring the live void function. CREATE OR REPLACE cannot change the
+-- return type.
+drop function if exists public.leave_couple();
+
 -- LIVE SNAPSHOT of public.leave_couple on vowmukhhnfhtnjlswkun.
 -- Read on 2026-11-14 with pg_get_functiondef. Do not apply this to change
 -- production. 005_rollback.sql runs it only to undo the proposed replacement.
@@ -304,8 +320,12 @@ $function$;
 
 drop function if exists public.delete_my_account();
 drop function if exists public.couples_touching_me();
+drop function if exists public.closed_couple_ids();
+drop function if exists public.ack_closed_couples(uuid[]);
 drop function if exists app_private.close_couple(uuid, uuid);
 drop function if exists app_private.couples_touched_by(uuid);
+drop function if exists app_private.photo_delete_allowed(uuid);
+drop table if exists app_private.closed_couples;
 drop function if exists public.set_memory_photo_path(uuid, text);
 drop function if exists public.claim_push_delivery(uuid, text, text);
 drop function if exists app_private.delete_couple_photos(uuid);

@@ -306,7 +306,6 @@ extension SessionModel {
       deleteConfirm = L10n.deleteWord
       await deleteAccount()
       await signedIn("blair@couple-a.test")
-      screen = .setup
     case "notificationTap":
       await signedIn("alex@couple-a.test")
       focusReveal = true

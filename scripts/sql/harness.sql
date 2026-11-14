@@ -159,10 +159,15 @@ create table if not exists public.import_fingerprints (
   primary key (couple_id, fingerprint)
 );
 
+-- No foreign key yet. Live internal_ops.couple_id has none. 003 deletes
+-- orphans, then adds the key. An orphan here is how that cleanup is tested.
 create table if not exists app_private.internal_ops (
-  couple_id uuid not null references public.couples (id) on delete cascade,
+  couple_id uuid not null,
   op text not null
 );
+
+insert into app_private.internal_ops (couple_id, op)
+values ('00000000-0000-4000-8000-000000000099', 'orphan');
 
 create or replace function public.is_couple_member(p_couple uuid)
 returns boolean

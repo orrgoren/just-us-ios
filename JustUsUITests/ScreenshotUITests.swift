@@ -43,6 +43,8 @@ final class ScreenshotUITests: XCTestCase {
     app.launch()
     if screen == "login" || screen == "postDeletion" {
       _ = app.textFields["emailField"].waitForExistence(timeout: 10)
+    } else if screen == "spaceClosed" {
+      XCTAssertTrue(app.staticTexts["spaceClosed"].waitForExistence(timeout: 10))
     } else {
       _ = app.staticTexts["Just Us"].waitForExistence(timeout: 10)
     }

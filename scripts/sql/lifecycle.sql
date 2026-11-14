@@ -83,7 +83,7 @@ begin
   end if;
 end $$;
 
--- A client-set GUC is not a handoff ticket.
+-- A client-set GUC cannot reassign created_by.
 do $$
 begin
   perform set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', false);
@@ -121,8 +121,11 @@ reset role;
 
 -- A unlinks. The whole couple goes. B is told. Neither login is deleted.
 -- The photo row stays, because SQL cannot delete storage.objects.
+-- The return value is only the couple that was closed. Couple 222 still
+-- exists, so its photos are not eligible for deletion.
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', false);
-select public.leave_couple();
+create temporary table leave_closed (id uuid);
+insert into leave_closed select public.leave_couple();
 
 do $$
 begin
@@ -148,6 +151,32 @@ begin
     where name = '11111111-1111-4111-8111-111111111111/aaaa1111-1111-4111-8111-111111111111.jpg'
   ) then
     raise exception 'sql_removed_the_photo';
+  end if;
+  if (select count(*) from leave_closed) <> 1
+     or not exists (
+       select 1 from leave_closed where id = '11111111-1111-4111-8111-111111111111'
+     )
+  then
+    raise exception 'leave_returned_the_wrong_couples';
+  end if;
+  if exists (
+    select 1 from app_private.closed_couples
+    where couple_id <> '11111111-1111-4111-8111-111111111111'
+  ) then
+    raise exception 'closed_couples_recorded_an_extra_id';
+  end if;
+  if not app_private.photo_delete_allowed('11111111-1111-4111-8111-111111111111') then
+    raise exception 'closed_couple_photo_not_allowed';
+  end if;
+  if app_private.photo_delete_allowed('22222222-2222-4222-8222-222222222222') then
+    raise exception 'living_couple_photo_was_allowed';
+  end if;
+  if exists (
+    select 1 from pg_proc as proc
+    join pg_namespace as nsp on nsp.oid = proc.pronamespace
+    where nsp.nspname = 'public' and proc.proname = 'couples_touching_me'
+  ) then
+    raise exception 'couples_touching_me_still_exists';
   end if;
 end $$;
 
@@ -277,6 +306,79 @@ begin
   end if;
   if not exists (select 1 from auth.users where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') then
     raise exception 'leave_deleted_the_user';
+  end if;
+  if exists (
+    select 1 from app_private.internal_ops
+    where couple_id = '00000000-0000-4000-8000-000000000099'
+  ) then
+    raise exception 'orphan_internal_op_remained';
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'internal_ops_couple_id_fkey'
+  ) then
+    raise exception 'internal_ops_fk_missing';
+  end if;
+end $$;
+
+-- Sam created an older couple and is a member of a current one.
+-- leave_couple closes only the current couple. The older couple, and its
+-- photo, stay. closed_couple_ids does not list the older couple.
+insert into auth.users (id) values
+  ('40404040-4040-4040-8040-404040404040'),
+  ('50505050-5050-4050-8050-505050505050'),
+  ('60606060-6060-4060-8060-606060606060');
+insert into public.couples (id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name) values
+  ('04040404-0404-4040-8040-040404040404', '40404040-4040-4040-8040-404040404040', 4, '20:30', 'Asia/Jerusalem', 90, 'Old'),
+  ('05050505-0505-4050-8050-050505050505', '40404040-4040-4040-8040-404040404040', 4, '20:30', 'Asia/Jerusalem', 90, 'Now');
+insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+  ('04040404-0404-4040-8040-040404040404', '50505050-5050-4050-8050-505050505050', 'Old', 0),
+  ('05050505-0505-4050-8050-050505050505', '40404040-4040-4040-8040-404040404040', 'Sam', 0),
+  ('05050505-0505-4050-8050-050505050505', '60606060-6060-4060-8060-606060606060', 'Now', 1);
+insert into storage.objects (bucket_id, name) values
+  ('date-photos', '04040404-0404-4040-8040-040404040404/keep.jpg');
+
+select set_config('request.jwt.claim.sub', '40404040-4040-4040-8040-404040404040', false);
+create temporary table sam_closed (id uuid);
+insert into sam_closed select public.leave_couple();
+
+do $$
+begin
+  if (select count(*) from sam_closed) <> 1
+     or not exists (select 1 from sam_closed where id = '05050505-0505-4050-8050-050505050505')
+  then
+    raise exception 'leave_returned_an_old_couple';
+  end if;
+  if not exists (select 1 from public.couples where id = '04040404-0404-4040-8040-040404040404') then
+    raise exception 'older_couple_was_closed_by_leave';
+  end if;
+  if app_private.photo_delete_allowed('04040404-0404-4040-8040-040404040404') then
+    raise exception 'older_couple_photo_was_allowed';
+  end if;
+  if not app_private.photo_delete_allowed('05050505-0505-4050-8050-050505050505') then
+    raise exception 'current_couple_photo_not_allowed';
+  end if;
+  if exists (
+    select 1 from public.closed_couple_ids()
+    where closed_couple_ids <> '05050505-0505-4050-8050-050505050505'
+  ) or (select count(*) from public.closed_couple_ids()) <> 1
+  then
+    raise exception 'closed_couple_ids_leaked';
+  end if;
+  if not exists (
+    select 1 from storage.objects
+    where name = '04040404-0404-4040-8040-040404040404/keep.jpg'
+  ) then
+    raise exception 'sql_removed_the_photo';
+  end if;
+end $$;
+
+select public.ack_closed_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
+
+do $$
+begin
+  if exists (select 1 from public.closed_couple_ids()) then
+    raise exception 'ack_left_a_closed_couple';
   end if;
 end $$;
 

@@ -208,10 +208,11 @@ final class LiveBackend: DateBackend {
   }
 
   func unlink() async throws {
-    try await deleteCouplePhotos()
-    try await run { client in
-      try await client.rpc("leave_couple").execute()
+    let closed = try await run { client in
+      let response: PostgrestResponse<[UUID]> = try await client.rpc("leave_couple").execute()
+      return response.value
     }
+    try await deleteCouplePhotos(closed)
   }
 
   func takeSpaceClosed() async -> Bool {
@@ -235,18 +236,25 @@ final class LiveBackend: DateBackend {
   }
 
   func deleteAccount() async throws {
-    try await deleteCouplePhotos()
-    try await run { client in
-      try await client.rpc("delete_my_account").execute()
+    let closed = try await run { client in
+      let response: PostgrestResponse<[UUID]> = try await client.rpc("delete_my_account").execute()
+      return response.value
+    }
+    do {
+      try await deleteCouplePhotos(closed)
+    } catch {
+      await signOut()
+      throw error
     }
     await signOut()
   }
 
-  private func deleteCouplePhotos() async throws {
+  private func deleteCouplePhotos(_ coupleIds: [UUID]) async throws {
+    guard coupleIds.isEmpty == false else { return }
     try await run { client in
       let _: PhotoDeleteAck = try await client.functions.invoke(
         "delete-couple-photos",
-        options: FunctionInvokeOptions(body: PhotoDeleteRequest())
+        options: FunctionInvokeOptions(body: PhotoDeleteRequest(coupleIds: coupleIds))
       )
     }
   }
@@ -387,7 +395,9 @@ struct PushKindBody: Encodable {
   var kind: String
 }
 
-private struct PhotoDeleteRequest: Encodable {}
+private struct PhotoDeleteRequest: Encodable {
+  var coupleIds: [UUID]
+}
 
 private struct PhotoDeleteAck: Decodable {
   var deleted: Int
