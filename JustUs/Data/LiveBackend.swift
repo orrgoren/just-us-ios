@@ -213,6 +213,26 @@ final class LiveBackend: DateBackend {
     }
   }
 
+  func takeSpaceClosed() async -> Bool {
+    guard let client, let user = cachedUser else { return false }
+    struct ClosureRow: Decodable {
+      var userId: UUID
+      enum CodingKeys: String, CodingKey { case userId = "user_id" }
+    }
+    do {
+      let response: PostgrestResponse<[ClosureRow]> = try await client
+        .from("space_closures")
+        .select("user_id")
+        .eq("user_id", value: user.uuidString)
+        .execute()
+      guard response.value.isEmpty == false else { return false }
+      _ = try? await client.from("space_closures").delete().eq("user_id", value: user.uuidString).execute()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   func deleteAccount() async throws {
     try await run { client in
       try await client.rpc("delete_my_account").execute()

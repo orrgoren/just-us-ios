@@ -133,29 +133,22 @@ extension FakeBackend {
     guard let userId = store.world.sessionUserId else { throw AppError.notAuthenticated }
     if let mine = member(userId) {
       let coupleId = mine.coupleId
-      let others = store.world.members.filter { $0.coupleId == coupleId && $0.userId != userId }
-      if others.isEmpty {
-        removeCouple(coupleId)
-      } else {
-        reassign(coupleId: coupleId, from: userId, to: others[0].userId, name: mine.displayName)
-        store.world.members.removeAll { $0.userId == userId }
+      let partners = store.world.members.filter { $0.coupleId == coupleId && $0.userId != userId }
+      for partner in partners {
+        store.markSpaceClosed(partner.userId)
       }
+      removeCouple(coupleId)
     }
     store.world.users.removeAll { $0.id == userId }
     store.world.sessionUserId = nil
     store.world.preferences[userId.uuidString] = nil
     store.save()
-    _ = AccountDeletionPolicy.partnerKeepsSharedHistory
+    _ = AccountDeletionPolicy.closesTheSharedSpace
   }
 
-  private func reassign(coupleId: UUID, from userId: UUID, to partnerId: UUID, name: String) {
-    for index in store.world.dates.indices where store.world.dates[index].coupleId == coupleId && store.world.dates[index].plannerUserId == userId {
-      store.world.dates[index].plannerUserId = partnerId
-    }
-    for index in store.world.notes.indices where store.world.notes[index].authorUserId == userId {
-      store.world.notes[index].authorName = name
-      store.world.notes[index].authorUserId = nil
-    }
+  func takeSpaceClosed() async -> Bool {
+    guard let userId = store.world.sessionUserId else { return false }
+    return store.takeSpaceClosed(userId)
   }
 
   private func memberOfSession() -> FakeMember? {

@@ -18,6 +18,7 @@
 \ir live/leave_couple.sql
 
 drop function if exists public.delete_my_account();
+drop table if exists public.space_closures;
 drop function if exists public.set_memory_photo_path(uuid, text);
 drop function if exists public.claim_push_delivery(uuid, text, text);
 drop function if exists app_private.delete_couple_photos(uuid);

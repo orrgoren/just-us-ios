@@ -27,6 +27,9 @@ extension SessionModel {
         privateNotes = ""
         planDay = ""
         planTime = ""
+        if await backend.takeSpaceClosed() {
+          spaceClosed = true
+        }
       }
       offline = false
     } catch {
@@ -292,6 +295,12 @@ extension SessionModel {
       await signedIn("demo@justus.app")
       deleteConfirm = L10n.deleteWord
       await deleteAccount()
+    case "spaceClosed":
+      await signedIn("alex@couple-a.test")
+      deleteConfirm = L10n.deleteWord
+      await deleteAccount()
+      await signedIn("blair@couple-a.test")
+      screen = .setup
     case "notificationTap":
       await signedIn("alex@couple-a.test")
       focusReveal = true

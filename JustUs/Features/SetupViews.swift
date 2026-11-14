@@ -5,6 +5,9 @@ struct SetupScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
+      if model.spaceClosed {
+        StatusBanner(message: L10n.spaceClosed, identifier: A11y.spaceClosed)
+      }
       VStack(alignment: .leading, spacing: Theme.Space.stack) {
         RoleLine(waiting: false, text: L10n.yourTurn)
         Text(L10n.setupTitle).font(Theme.display)

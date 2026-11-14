@@ -43,6 +43,7 @@ enum A11y {
   static let swap = "swapPlanner"
   static let signOut = "signOut"
   static let deleteAccount = "deleteAccount"
+  static let spaceClosed = "spaceClosed"
   static let deleteConfirm = "deleteConfirm"
   static let unlink = "unlink"
   static let offline = "offlineBanner"

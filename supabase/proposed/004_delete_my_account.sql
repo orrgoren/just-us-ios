@@ -1,13 +1,16 @@
 -- PROPOSED ONLY. Do not apply until Tom verifies.
 -- This file is not a migration and CI never runs it.
 --
--- Apply 003_memory_photo_and_leave_handoff.sql first. Account deletion
--- reassigns dates.planner_user_id, and the live date guard rejects that on
--- a completed or scheduled night. 003 adds the handoff ticket. The caller
--- must be the old owner. An unrevealed scheduled night is canceled, matching
--- leave_couple. If the caller is the last member, the couple is deleted even
--- when created_by is someone who already unlinked, and date-photos objects
--- under that couple folder are deleted with it.
+-- Apply 002, 003, and 006 first. If either partner deletes their account,
+-- the whole couple goes: the couple row, scheduled and planned dates,
+-- memories, date-photos, invites, both members' device tokens, push
+-- deliveries, and pending push_outbox rows. The shared idea catalog is not
+-- couple data and stays. The other partner's login stays. A space_closures
+-- row tells their next launch that the space was closed.
+--
+-- Someone who already unlinked is not closing that couple. The leftover
+-- updates only detach foreign keys so their login can be removed. 003's
+-- handoff ticket is what lets those updates pass the guards.
 -- Live memory_notes.author_user_id is still NOT NULL. The drop below is
 -- proposed, not already applied.
 --
@@ -21,14 +24,27 @@
 --   changing it.
 --   The date guard rejects planner changes on completed and scheduled nights
 --   and rejects every later update of a finished night.
---
--- The partner keeps the couple, the dates, the snapshots, the photos, and
--- the notes. Notes keep author_name (filled from the member's display name
--- when it is empty) and author_user_id is detached. The leaver's mood rows
--- are deleted because the primary key cannot outlive the user. The partner's
--- mood rows stay. Unrevealed draft and scheduled plans are not transferred.
 
 alter table public.memory_notes alter column author_user_id drop not null;
+
+create table if not exists public.space_closures (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  closed_at timestamptz not null default now()
+);
+
+alter table public.space_closures enable row level security;
+revoke all on table public.space_closures from public, anon, authenticated;
+grant select, delete on table public.space_closures to authenticated;
+
+drop policy if exists space_closures_read on public.space_closures;
+create policy space_closures_read on public.space_closures
+  for select to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists space_closures_ack on public.space_closures;
+create policy space_closures_ack on public.space_closures
+  for delete to authenticated
+  using (user_id = auth.uid());
 
 create or replace function app_private.touch_memory()
 returns trigger
@@ -193,16 +209,13 @@ declare
   v_uid uuid := auth.uid();
   v_name text;
   v_couple uuid;
-  v_partner uuid;
 begin
   if v_uid is null then
     raise exception 'not_authenticated';
   end if;
 
-  -- Leave can run first. The login is then no longer a member, but the
-  -- couple row can still name them as created_by. The last remaining member
-  -- must be able to delete that couple. A partner who is still a member
-  -- keeps the shared history.
+  -- A current member closes the whole space. Someone who already left only
+  -- detaches leftover foreign keys, further down, so their login can go.
   select display_name, couple_id into v_name, v_couple
   from public.couple_members
   where user_id = v_uid
@@ -210,74 +223,43 @@ begin
 
   if v_couple is not null then
     perform 1 from public.couples where id = v_couple for update;
-    select user_id into v_partner
-    from public.couple_members
-    where couple_id = v_couple
-      and user_id <> v_uid
-    order by member_index
-    limit 1;
+
+    insert into public.space_closures (user_id)
+    select member.user_id
+    from public.couple_members as member
+    where member.couple_id = v_couple
+      and member.user_id <> v_uid
+    on conflict (user_id) do update
+      set closed_at = excluded.closed_at;
+
+    perform app_private.delete_couple_photos(v_couple);
+
+    if to_regclass('public.push_outbox') is not null then
+      delete from public.push_outbox as pending
+      where pending.caller_user_id in (
+          select member.user_id from public.couple_members as member where member.couple_id = v_couple
+        )
+        or pending.recipient_user_id in (
+          select member.user_id from public.couple_members as member where member.couple_id = v_couple
+        );
+    end if;
+
+    if to_regclass('public.push_deliveries') is not null then
+      delete from public.push_deliveries as delivery
+      where delivery.recipient_user_id in (
+        select member.user_id from public.couple_members as member where member.couple_id = v_couple
+      );
+    end if;
+
+    delete from public.device_tokens as device
+    where device.user_id in (
+      select member.user_id from public.couple_members as member where member.couple_id = v_couple
+    );
+
+    delete from public.couples where id = v_couple;
   end if;
 
-  if v_partner is not null then
-    delete from public.private_date_plans as plan
-    using public.dates as night
-    where plan.date_id = night.id
-      and night.couple_id = v_couple
-      and night.planner_user_id = v_uid
-      and night.status = 'scheduled'
-      and night.revealed_at is null;
-
-    update public.dates
-    set status = 'canceled'
-    where couple_id = v_couple
-      and planner_user_id = v_uid
-      and status = 'scheduled'
-      and revealed_at is null;
-
-    delete from public.private_date_plans as plan
-    using public.dates as night
-    where plan.date_id = night.id
-      and night.couple_id = v_couple
-      and night.planner_user_id = v_uid
-      and night.status = 'draft'
-      and night.revealed_at is null;
-
-    perform app_private.begin_handoff();
-    update public.couples
-    set created_by = v_partner
-    where id = v_couple
-      and created_by = v_uid;
-    update public.couple_invites
-    set created_by = v_partner
-    where couple_id = v_couple
-      and created_by = v_uid;
-    update public.couple_invites
-    set redeemed_by = null
-    where couple_id = v_couple
-      and redeemed_by = v_uid;
-    update public.dates
-    set planner_user_id = v_partner
-    where couple_id = v_couple
-      and planner_user_id = v_uid;
-    update public.memory_notes
-    set author_name = coalesce(
-          nullif(btrim(author_name), ''),
-          nullif(btrim(v_name), ''),
-          'Just Us'
-        ),
-        author_user_id = null
-    where author_user_id = v_uid;
-    perform app_private.end_handoff();
-
-    delete from public.mood_votes where user_id = v_uid;
-    delete from public.couple_members where user_id = v_uid;
-  elsif v_couple is not null then
-    -- Last member. Delete the couple even when created_by is the person who
-    -- already unlinked and is no longer a member. Cascades clear the foreign
-    -- keys that would otherwise roll back the auth.users delete.
-    perform app_private.delete_couple_photos(v_couple);
-    delete from public.couples where id = v_couple;
-  else
+  if v_couple is null then
     -- Already left, and someone else may still be there.
     perform app_private.begin_handoff();
     update public.couples as owned

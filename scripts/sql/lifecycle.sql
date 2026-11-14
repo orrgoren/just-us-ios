@@ -145,38 +145,74 @@ begin
   end if;
 end $$;
 
--- C deletes while D stays. The night is canceled, not handed over as scheduled.
+-- C deletes while D is still a partner. The couple and everything tied to it go.
+-- D's login stays, with a notice for the next launch. The idea catalog stays.
+insert into public.ideas (id, title_he) values ('h1', 'catalog');
+insert into public.couple_invites (id, couple_id, created_by, token_hash, expires_at) values
+  ('c2222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'hash', now() + interval '1 day');
+insert into public.device_tokens (user_id, token, platform) values
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'token-c', 'ios'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'token-d', 'ios');
+insert into public.push_deliveries (recipient_user_id, kind, transactional) values
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'planReady', true),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'weeklyReminder', false);
+insert into public.push_outbox (caller_user_id, recipient_user_id, kind, not_before) values
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'planReady', now());
+insert into storage.objects (bucket_id, name) values
+  ('date-photos', '22222222-2222-4222-8222-222222222222/cccc2222-2222-4222-8222-222222222222.jpg');
+
 select set_config('request.jwt.claim.sub', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', false);
 select public.delete_my_account();
 
 do $$
 declare
-  owner uuid;
-  night text;
-  planner uuid;
-  author uuid;
-  named text;
+  closed uuid;
 begin
-  select created_by into owner from public.couples where id = '22222222-2222-4222-8222-222222222222';
-  if owner <> 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' then
-    raise exception 'partner_did_not_keep_couple:%', owner;
+  if exists (select 1 from public.couples where id = '22222222-2222-4222-8222-222222222222') then
+    raise exception 'couple_remained_after_partner_delete';
   end if;
-  select status, planner_user_id into night, planner from public.dates where id = 'cccc2222-2222-4222-8222-222222222222';
-  if night <> 'canceled' or planner <> 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' then
-    raise exception 'delete_did_not_cancel:% %', night, planner;
+  if exists (select 1 from public.dates where id = 'cccc2222-2222-4222-8222-222222222222') then
+    raise exception 'scheduled_date_remained';
   end if;
   if exists (select 1 from public.private_date_plans where date_id = 'cccc2222-2222-4222-8222-222222222222') then
-    raise exception 'delete_left_the_sealed_plan';
+    raise exception 'planned_idea_remained';
   end if;
-  select author_user_id, author_name into author, named from public.memory_notes where id = 'a1111111-1111-4111-8111-111111111111';
-  if author is not null or named <> 'Casey' then
-    raise exception 'note_not_detached:% %', author, named;
+  if exists (select 1 from public.memory_notes where id = 'a1111111-1111-4111-8111-111111111111') then
+    raise exception 'memory_remained';
+  end if;
+  if exists (select 1 from public.couple_invites where couple_id = '22222222-2222-4222-8222-222222222222') then
+    raise exception 'invite_remained';
+  end if;
+  if exists (select 1 from storage.objects where name like '22222222-2222-4222-8222-222222222222/%') then
+    raise exception 'couple_photo_remained';
+  end if;
+  if exists (select 1 from public.device_tokens where token in ('token-c', 'token-d')) then
+    raise exception 'push_device_remained';
+  end if;
+  if exists (
+    select 1 from public.push_deliveries
+    where recipient_user_id in (
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+  ) then
+    raise exception 'push_delivery_remained';
+  end if;
+  if exists (select 1 from public.push_outbox) then
+    raise exception 'pending_push_remained';
+  end if;
+  if not exists (select 1 from public.ideas where id = 'h1') then
+    raise exception 'idea_catalog_was_deleted';
   end if;
   if exists (select 1 from auth.users where id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
     raise exception 'departing_user_remained';
   end if;
   if not exists (select 1 from auth.users where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') then
     raise exception 'partner_was_deleted';
+  end if;
+  select user_id into closed from public.space_closures;
+  if closed <> 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' then
+    raise exception 'partner_was_not_told:%', closed;
   end if;
 end $$;
 

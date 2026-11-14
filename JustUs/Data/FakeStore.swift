@@ -4,6 +4,7 @@ import Foundation
 final class FakeStore {
   nonisolated static let fileName = "justus-uitest-world.json"
   var world: FakeWorld
+  private var spaceClosed: Set<UUID> = []
   private let persist: Bool
 
   init(inMemory: Bool = false) {
@@ -13,6 +14,14 @@ final class FakeStore {
     } else {
       world = Self.read() ?? FakeWorld.seed()
     }
+  }
+
+  func markSpaceClosed(_ userId: UUID) {
+    spaceClosed.insert(userId)
+  }
+
+  func takeSpaceClosed(_ userId: UUID) -> Bool {
+    spaceClosed.remove(userId) != nil
   }
 
   func save() {

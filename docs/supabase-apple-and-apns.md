@@ -50,7 +50,7 @@ Not applied, and waiting for review:
 
 - `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs.
 - `supabase/proposed/003_memory_photo_and_leave_handoff.sql` — photo path on a completed date, and the unlink handoff.
-- `supabase/proposed/004_delete_my_account.sql` — account deletion. A remaining partner keeps history.
+- `supabase/proposed/004_delete_my_account.sql` — account deletion. Either partner closes the whole couple. The other person stays unpaired. Not applied.
 - `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — the live function bodies and the rollback. Not applied.
 - `supabase/proposed/006_push_claim_and_outbox.sql` — the push claim, the outbox, and a sandbox or production token column. Not applied.
 

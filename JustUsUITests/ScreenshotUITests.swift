@@ -7,7 +7,7 @@ final class ScreenshotUITests: XCTestCase {
       "inviteReplace", "inviteBlocked", "homeSolo", "homePlanner", "homePartner",
       "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount", "offline",
       "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan",
-      "errorBanner", "unlinkConfirm", "postDeletion", "notificationTap", "signOut"
+      "errorBanner", "unlinkConfirm", "postDeletion", "spaceClosed", "notificationTap", "signOut"
     ]
     let scrolled: Set<String> = [
       "homePlanner", "reveal", "memories", "settings", "deleteAccount",

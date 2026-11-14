@@ -84,7 +84,7 @@ final class DomainTests: XCTestCase {
     XCTAssertTrue(PhotoSavePolicy.shouldCommitPath(uploadSucceeded: true))
     XCTAssertFalse(PhotoSavePolicy.shouldCommitPath(uploadSucceeded: false))
     XCTAssertTrue(PhotoSavePolicy.shouldDeleteObject(uploadSucceeded: true, recordSucceeded: false))
-    XCTAssertTrue(AccountDeletionPolicy.partnerKeepsSharedHistory)
+    XCTAssertTrue(AccountDeletionPolicy.closesTheSharedSpace)
   }
 
   func testDeepLinkInvite() throws {

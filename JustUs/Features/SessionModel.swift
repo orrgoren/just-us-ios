@@ -40,6 +40,8 @@ final class SessionModel {
   var retryKind: RetryKind?
   /// Set when a magic link is expired or already used, so login offers a new link instead of a dead end.
   var offerNewLink = false
+  /// The partner's next launch, after the other person closed the shared space.
+  var spaceClosed = false
   var pushDenied = false
   var showDelete = false
   var deleteConfirm = ""
@@ -309,6 +311,7 @@ final class SessionModel {
     focusReveal = false
     signedIn = false
     offerNewLink = false
+    spaceClosed = false
     tab = .week
   }
 
