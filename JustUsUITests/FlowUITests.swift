@@ -46,19 +46,9 @@ final class FlowUITests: XCTestCase {
   func testCreateCoupleAndInvite() {
     let app = launch()
     signIn(app, email: "newcomer@example.com", code: "000000", expectHome: false)
-    let name = app.textFields["selfName"]
-    XCTAssertTrue(name.waitForExistence(timeout: 8))
-    name.tap()
-    name.typeText("Nova")
-    let partner = app.textFields["partnerName"]
-    XCTAssertTrue(partner.waitForExistence(timeout: 4))
-    // The keyboard covers the second field on SE. Scroll it clear before typing.
-    app.scrollViews.firstMatch.swipeUp()
-    partner.tap()
-    partner.typeText("Rio")
-    let create = app.buttons["createCouple"]
-    if !create.isHittable { app.scrollViews.firstMatch.swipeUp() }
-    create.tap()
+    typeFocused(app.textFields["selfName"], "Nova", in: app)
+    typeFocused(app.textFields["partnerName"], "Rio", in: app)
+    tapReady(app.buttons["createCouple"], in: app)
     XCTAssertTrue(app.buttons["shareInvite"].waitForExistence(timeout: 8))
   }
 
@@ -142,6 +132,38 @@ final class FlowUITests: XCTestCase {
     UITestLaunch.record(app)
     let mood = app.staticTexts.matching(NSPredicate(format: "identifier == 'partnerMood' AND label CONTAINS %@", "Easy together")).firstMatch
     XCTAssertTrue(mood.waitForExistence(timeout: 8))
+  }
+
+  /// Scrolls until the field can be tapped, then waits until that field has keyboard focus.
+  private func typeFocused(_ field: XCUIElement, _ text: String, in app: XCUIApplication) {
+    XCTAssertTrue(field.waitForExistence(timeout: 8))
+    let focused = NSPredicate(format: "hasKeyboardFocus == true AND isHittable == true")
+    for _ in 0..<6 {
+      if !field.isHittable {
+        app.scrollViews.firstMatch.swipeUp()
+      }
+      field.tap()
+      let ready = XCTNSPredicateExpectation(predicate: focused, object: field)
+      if XCTWaiter().wait(for: [ready], timeout: 3) == .completed {
+        field.typeText(text)
+        return
+      }
+      app.scrollViews.firstMatch.swipeUp()
+    }
+    XCTFail("Field did not take keyboard focus")
+  }
+
+  private func tapReady(_ element: XCUIElement, in app: XCUIApplication) {
+    XCTAssertTrue(element.waitForExistence(timeout: 8))
+    for _ in 0..<4 {
+      if element.isHittable {
+        element.tap()
+        return
+      }
+      app.scrollViews.firstMatch.swipeUp()
+    }
+    XCTAssertTrue(element.isHittable)
+    element.tap()
   }
 
   func launch(_ extra: [String] = []) -> XCUIApplication {

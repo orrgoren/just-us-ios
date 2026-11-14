@@ -7,6 +7,7 @@ struct RootView: View {
 
   var body: some View {
     JustScreen {
+      ScrollViewReader { proxy in
       ScrollView {
         VStack(alignment: .leading, spacing: Theme.Space.section) {
         Wordmark()
@@ -38,7 +39,12 @@ struct RootView: View {
         }
         .padding(Theme.Space.screen)
       }
+      .scrollDismissesKeyboard(.interactively)
       .accessibilityIdentifier(A11y.content)
+      .environment(\.scrollFieldIntoView) { id in
+        proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.2))
+      }
+      }
     }
     .preferredColorScheme(Launch.preferredScheme)
     .onOpenURL { url in Task { await model.open(url) } }
@@ -153,8 +159,21 @@ enum FieldNeed {
   case required, optional
 }
 
+private struct ScrollFieldKey: EnvironmentKey {
+  static let defaultValue: (String) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+  var scrollFieldIntoView: (String) -> Void {
+    get { self[ScrollFieldKey.self] }
+    set { self[ScrollFieldKey.self] = newValue }
+  }
+}
+
 struct LabeledField: View {
   @Environment(\.colorScheme) private var scheme
+  @Environment(\.scrollFieldIntoView) private var scrollFieldIntoView
+  @FocusState private var focused: Bool
   var title: String
   @Binding var text: String
   var identifier: String
@@ -169,11 +188,21 @@ struct LabeledField: View {
           .foregroundStyle(Theme.muted(scheme))
       }
       TextField(title, text: $text)
+        .focused($focused)
         .textFieldStyle(.plain)
         .foregroundStyle(Theme.ink)
         .padding(12)
         .background(Theme.blush, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityIdentifier(identifier)
+    }
+    .id(identifier)
+    .onChange(of: focused) { _, isOn in
+      guard isOn else { return }
+      scrollFieldIntoView(identifier)
+      Task { @MainActor in
+        try? await Task.sleep(for: .milliseconds(350))
+        scrollFieldIntoView(identifier)
+      }
     }
   }
 }
