@@ -2,9 +2,7 @@ import XCTest
 
 final class PushUITests: XCTestCase {
   func testForegroundPushRoutesToReveal() {
-    let app = XCUIApplication()
-    app.launchArguments = ["-uitest", "-JustUsPush", "plan_ready"]
-    app.launch()
+    let app = UITestLaunch.make(["-JustUsPush", "plan_ready"])
     let email = app.textFields["emailField"]
     XCTAssertTrue(email.waitForExistence(timeout: 12))
     email.tap()

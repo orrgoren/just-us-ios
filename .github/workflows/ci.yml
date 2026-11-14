@@ -84,16 +84,17 @@ jobs:
       - name: Export screenshots
         if: always()
         run: |
-          mkdir -p artifacts/screenshots
+          mkdir -p artifacts/screenshots artifacts/failures
           if [ -d build/se.xcresult ]; then
             xcrun xcresulttool export attachments --path build/se.xcresult --output-path artifacts/screenshots || true
+            python3 scripts/name-attachments.py artifacts/screenshots artifacts/failures || true
           fi
-          find artifacts/screenshots -type f | head -200
+          find artifacts/screenshots artifacts/failures -type f | head -200
           if [ ! -d build/se.xcresult ]; then
             echo "Missing build/se.xcresult"
             exit 1
           fi
-          if ! find artifacts/screenshots -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
+          if ! find artifacts/screenshots artifacts/failures -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
             echo "No screenshot images were exported"
             exit 1
           fi
@@ -105,6 +106,7 @@ jobs:
           path: |
             build/se.xcresult
             artifacts/screenshots
+            artifacts/failures
           if-no-files-found: warn
 
   promax:
@@ -144,16 +146,17 @@ jobs:
       - name: Export screenshots
         if: always()
         run: |
-          mkdir -p artifacts/screenshots
+          mkdir -p artifacts/screenshots artifacts/failures
           if [ -d build/promax.xcresult ]; then
             xcrun xcresulttool export attachments --path build/promax.xcresult --output-path artifacts/screenshots || true
+            python3 scripts/name-attachments.py artifacts/screenshots artifacts/failures || true
           fi
-          find artifacts/screenshots -type f | head -200
+          find artifacts/screenshots artifacts/failures -type f | head -200
           if [ ! -d build/promax.xcresult ]; then
             echo "Missing build/promax.xcresult"
             exit 1
           fi
-          if ! find artifacts/screenshots -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
+          if ! find artifacts/screenshots artifacts/failures -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
             echo "No screenshot images were exported"
             exit 1
           fi
@@ -165,4 +168,5 @@ jobs:
           path: |
             build/promax.xcresult
             artifacts/screenshots
+            artifacts/failures
           if-no-files-found: warn

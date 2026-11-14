@@ -1,6 +1,11 @@
 import XCTest
 
 final class FlowUITests: XCTestCase {
+  override func setUp() {
+    super.setUp()
+    continueAfterFailure = false
+  }
+
   func testInvalidEmailAndBadCodes() {
     let app = launch()
     let email = app.textFields["emailField"]
@@ -124,10 +129,7 @@ final class FlowUITests: XCTestCase {
   }
 
   func launch(_ extra: [String] = []) -> XCUIApplication {
-    let app = XCUIApplication()
-    app.launchArguments = ["-uitest"] + extra
-    app.launch()
-    return app
+    UITestLaunch.make(extra)
   }
 
   func signIn(_ app: XCUIApplication, email: String, code: String, expectHome: Bool) {

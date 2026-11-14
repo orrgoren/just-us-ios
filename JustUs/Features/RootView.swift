@@ -62,7 +62,7 @@ struct LoginScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text(L10n.loginTitle).font(Theme.display)
+      Text(L10n.loginTitle).font(Theme.display).accessibilityIdentifier(A11y.loginRoot)
       Text(L10n.loginBody).font(Theme.body)
       LabeledField(title: L10n.emailLabel, text: $model.email, identifier: A11y.emailField)
         .textInputAutocapitalization(.never)
@@ -73,7 +73,6 @@ struct LoginScreen: View {
         .accessibilityIdentifier(A11y.haveInvite)
         .frame(minHeight: 44)
     }
-    .accessibilityIdentifier(A11y.loginRoot)
   }
 }
 
