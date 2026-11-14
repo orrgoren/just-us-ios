@@ -5,6 +5,8 @@ default_platform(:ios)
 BUNDLE_IDENTIFIER = "com.orrgoren.justus"
 BUNDLE_RESOURCE_ID = "XZ2BWSBK3R"
 APP_STORE_PROFILE_NAME = "Just Us App Store"
+RELEASE_ENTITLEMENTS = "JustUs/Entitlements/Release.entitlements"
+APPLE_SIGN_IN = "com.apple.developer.applesignin"
 REQUIRED_CAPABILITIES = %w[PUSH_NOTIFICATIONS APPLE_ID_AUTH].freeze
 # Apple Distribution and the older iOS Distribution type. Development, Mac, and
 # Developer ID certificates are left alone.
@@ -92,8 +94,11 @@ def archive_release(api_key)
     build_configurations: ["Release"],
     team_id: team_id,
     code_sign_identity: "Apple Distribution",
-    profile_name: profile_name
+    profile_name: profile_name,
+    entitlements_file_path: RELEASE_ENTITLEMENTS
   )
+  assert_release_entitlements
+  assert_profile_includes_apple_sign_in
   # Fastlane's working directory is fastlane/, so a relative ./build expands to
   # fastlane/build. Gym writes the ipa next to the project. Use the absolute
   # path build_app returns instead of expanding a relative path here.
@@ -123,7 +128,63 @@ def archive_release(api_key)
   )
   ipa = Actions.lane_context[SharedValues::IPA_OUTPUT_PATH] if ipa.to_s.empty?
   UI.user_error!("Archive did not produce #{ipa}") if ipa.to_s.empty? || !File.exist?(ipa)
+  verify_exported_apple_sign_in(ipa)
   ipa
+end
+
+def assert_release_entitlements
+  require "xcodeproj"
+  project = Xcodeproj::Project.open(File.expand_path("../JustUs.xcodeproj", __dir__))
+  target = project.targets.find { |item| item.name == "JustUs" }
+  UI.user_error!("JustUs target was not found.") if target.nil?
+  release = target.build_configurations.find { |item| item.name == "Release" }
+  UI.user_error!("JustUs Release configuration was not found.") if release.nil?
+  path = release.build_settings["CODE_SIGN_ENTITLEMENTS"].to_s
+  UI.message("JustUs Release CODE_SIGN_ENTITLEMENTS=#{path}")
+  unless path == RELEASE_ENTITLEMENTS
+    UI.user_error!("JustUs Release CODE_SIGN_ENTITLEMENTS is #{path.inspect}, expected #{RELEASE_ENTITLEMENTS}.")
+  end
+  file = File.expand_path("../#{RELEASE_ENTITLEMENTS}", __dir__)
+  contents = File.read(file)
+  UI.message("Release entitlements file:\n#{contents}")
+  unless contents.include?(APPLE_SIGN_IN) && contents.include?("<string>Default</string>")
+    UI.user_error!("#{RELEASE_ENTITLEMENTS} does not set #{APPLE_SIGN_IN} to Default.")
+  end
+  UI.success("JustUs Release signs with #{RELEASE_ENTITLEMENTS}.")
+end
+
+def assert_profile_includes_apple_sign_in
+  path = File.expand_path("../build/signing/AppStore.mobileprovision", __dir__)
+  UI.user_error!("App Store profile was not downloaded to #{path}.") unless File.exist?(path)
+  decoded = command_output("security", "cms", "-D", "-i", path)
+  UI.message("Decoded #{APP_STORE_PROFILE_NAME} profile:\n#{decoded}")
+  unless decoded.include?(APPLE_SIGN_IN) && decoded.include?("Default")
+    UI.user_error!("Provisioning profile #{APP_STORE_PROFILE_NAME} does not include #{APPLE_SIGN_IN} = [Default].")
+  end
+  UI.success("Profile #{APP_STORE_PROFILE_NAME} includes #{APPLE_SIGN_IN}.")
+end
+
+def verify_exported_apple_sign_in(ipa)
+  require "tmpdir"
+  Dir.mktmpdir("justus-ipa") do |dir|
+    command_output("unzip", "-q", ipa, "-d", dir)
+    apps = Dir.glob(File.join(dir, "Payload", "*.app"))
+    UI.user_error!("#{ipa} has no Payload/*.app") unless apps.length == 1
+    entitlements = command_output("codesign", "-d", "--entitlements", ":-", apps.first)
+    UI.message("Exported IPA entitlements:\n#{entitlements}")
+    unless entitlements.include?(APPLE_SIGN_IN) && entitlements.include?("Default")
+      UI.user_error!("Exported app is missing #{APPLE_SIGN_IN} = [Default].")
+    end
+    UI.success("Exported app includes #{APPLE_SIGN_IN}.")
+  end
+end
+
+def command_output(*args)
+  require "open3"
+  stdout, stderr, status = Open3.capture3(*args)
+  combined = [stdout, stderr].reject(&:empty?).join
+  UI.user_error!("#{args.join(' ')} failed:\n#{combined}") unless status.success?
+  combined
 end
 
 def next_testflight_build_number(api_key)
