@@ -41,6 +41,7 @@ final class SessionModel {
   var momentDraft = ""
   var focusReveal = false
   let backend: any DateBackend
+  let pendingAppleNonce = AppleNonceBox()
   private let apple = AppleSignInCoordinator()
   var outbox: [String: Pending] = [:]
 
@@ -111,14 +112,26 @@ final class SessionModel {
   }
 
   func signInWithApple() async {
+    let result: (token: String, nonce: String)
+    do {
+      result = try await apple.start()
+    } catch {
+      reportApple(error)
+      return
+    }
     await work {
-      let result = try await self.apple.start()
       _ = try await self.backend.signInWithApple(idToken: result.token, nonce: result.nonce)
       Telemetry.analytics.record(.signedIn(method: "apple"))
       self.signedIn = true
       await self.refresh()
       self.screen = self.ritual == nil ? .setup : .main
     }
+  }
+
+  func reportApple(_ error: Error) {
+    guard !AppleSignInFailure.isCancellation(error) else { return }
+    AppleSignInFailure.log(error)
+    errorMessage = AppleSignInFailure.message(for: error)
   }
 
   func createCouple() async {

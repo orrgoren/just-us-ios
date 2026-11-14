@@ -1,8 +1,41 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import os
 import Security
 import UIKit
+
+final class AppleNonceBox {
+  var raw = ""
+}
+
+enum AppleSignInFailure {
+  static func isCancellation(_ error: Error) -> Bool {
+    if let auth = error as? ASAuthorizationError {
+      return auth.code == .canceled
+    }
+    let bridged = error as NSError
+    return bridged.domain == ASAuthorizationError.errorDomain
+      && bridged.code == ASAuthorizationError.Code.canceled.rawValue
+  }
+
+  static func message(for error: Error) -> String {
+    let code = (error as? ASAuthorizationError)?.code.rawValue ?? (error as NSError).code
+    return "Sign in with Apple failed (\(code)): \(error.localizedDescription)"
+  }
+
+  static func log(_ error: Error) {
+    let code = (error as? ASAuthorizationError)?.code.rawValue ?? (error as NSError).code
+    let description = error.localizedDescription
+    os_log(
+      "Sign in with Apple failed code=%{public}d %{public}@",
+      log: OSLog(subsystem: "com.orrgoren.justus", category: "apple-sign-in"),
+      type: .error,
+      code,
+      description as NSString
+    )
+  }
+}
 
 enum AppleNonce {
   static func raw() -> String {
@@ -39,14 +72,14 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
       controller.performRequests()
     }
     guard let tokenData = credential.identityToken, let token = String(data: tokenData, encoding: .utf8) else {
-      throw AppError.notAuthenticated
+      throw ASAuthorizationError(.invalidResponse)
     }
     return (token, nonce)
   }
 
   func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
     guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-      continuation?.resume(throwing: AppError.notAuthenticated)
+      continuation?.resume(throwing: ASAuthorizationError(.invalidResponse))
       continuation = nil
       return
     }

@@ -61,7 +61,6 @@ struct RootView: View {
 struct LoginScreen: View {
   @Bindable var model: SessionModel
   @Environment(\.colorScheme) private var colorScheme
-  @State private var appleNonce = ""
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -73,16 +72,23 @@ struct LoginScreen: View {
       WineButton(title: L10n.sendCode, identifier: A11y.sendCode) { Task { await model.sendCode() } }
       SignInWithAppleButton(.signIn) { request in
         let raw = AppleNonce.raw()
-        appleNonce = raw
+        model.pendingAppleNonce.raw = raw
         request.requestedScopes = [.fullName, .email]
         request.nonce = AppleNonce.hashed(raw)
       } onCompletion: { result in
-        guard case .success(let authorization) = result,
-              let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-              let tokenData = credential.identityToken,
-              let token = String(data: tokenData, encoding: .utf8) else { return }
-        let nonce = appleNonce
-        Task { await model.completeApple(token: token, nonce: nonce) }
+        switch result {
+        case .failure(let error):
+          model.reportApple(error)
+        case .success(let authorization):
+          guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let token = String(data: tokenData, encoding: .utf8) else {
+            model.reportApple(ASAuthorizationError(.invalidResponse))
+            return
+          }
+          let nonce = model.pendingAppleNonce.raw
+          Task { await model.completeApple(token: token, nonce: nonce) }
+        }
       }
       .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
       .frame(height: 48)
