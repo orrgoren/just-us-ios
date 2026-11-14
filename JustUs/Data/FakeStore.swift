@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class FakeStore {
-  static let fileName = "justus-uitest-world.json"
+  nonisolated static let fileName = "justus-uitest-world.json"
   var world: FakeWorld
   private let persist: Bool
 
