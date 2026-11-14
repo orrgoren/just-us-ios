@@ -32,12 +32,14 @@ final class LiveBackend: DateBackend {
 
   func verify(email: String, code: String) async throws -> SessionUser {
     guard let normalized = Validation.email(email), let digits = Validation.code(code) else { throw AppError.invalid(.code) }
-    return try await run { client in
+    let user = try await run { client in
       let response = try await client.auth.verifyOTP(email: normalized, token: digits, type: .email)
       guard let session = response.session else { throw AppError.notAuthenticated }
       self.cachedUser = session.user.id
       return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
     }
+    await uploadDeviceToken()
+    return user
   }
 
   func session(from url: URL) async throws -> SessionUser {
@@ -46,11 +48,13 @@ final class LiveBackend: DateBackend {
       throw AppError.linkExpired
     }
     do {
-      return try await run { client in
+      let user = try await run { client in
         let session = try await client.auth.session(from: url)
         self.cachedUser = session.user.id
         return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
       }
+      await uploadDeviceToken()
+      return user
     } catch let error as AppError {
       if error == .linkExpired || error == .sessionExpired || error == .notAuthenticated {
         AuthStorageReset.clear()
@@ -61,13 +65,15 @@ final class LiveBackend: DateBackend {
   }
 
   func signInWithApple(idToken: String, nonce: String) async throws -> SessionUser {
-    try await run { client in
+    let user = try await run { client in
       let session = try await client.auth.signInWithIdToken(
         credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
       )
       self.cachedUser = session.user.id
       return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
     }
+    await uploadDeviceToken()
+    return user
   }
 
   func restore() async throws -> SessionUser? {
@@ -75,6 +81,7 @@ final class LiveBackend: DateBackend {
     do {
       let session = try await client.auth.session
       cachedUser = session.user.id
+      await uploadDeviceToken()
       return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
     } catch {
       let mapped = ErrorMap.app(error)
@@ -152,7 +159,13 @@ final class LiveBackend: DateBackend {
 
   func registerDevice(token: String) async {
     deviceToken = token
-    guard AppConfig.pushEnabled, let user = cachedUser, let client else { return }
+    await uploadDeviceToken()
+  }
+
+  /// The APNs callback can arrive before the session exists. The token stays
+  /// in memory, and the next sign-in or restore uploads it.
+  private func uploadDeviceToken() async {
+    guard AppConfig.pushEnabled, let user = cachedUser, let token = deviceToken, let client else { return }
     let environment = AppConfig.pushSandbox ? "sandbox" : "production"
     let withEnvironment = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
     do {
