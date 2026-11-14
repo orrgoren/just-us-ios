@@ -54,7 +54,7 @@ extension SessionModel {
   }
 
   func surprise() async {
-    let excluding = ritual?.plan?.ideaId.map { [$0] } ?? []
+    let excluding = ritual?.plan.map { [$0.ideaId] } ?? []
     await act { try await self.backend.surprise(excluding: excluding); await self.refresh() }
   }
 

@@ -1,6 +1,11 @@
 import XCTest
 
 final class FlowUITests: XCTestCase {
+  override func setUp() {
+    super.setUp()
+    continueAfterFailure = false
+  }
+
   func testInvalidEmailAndBadCodes() {
     let app = launch()
     let email = app.textFields["emailField"]
@@ -28,6 +33,7 @@ final class FlowUITests: XCTestCase {
     app.buttons["sendCode"].tap()
     XCTAssertTrue(app.textFields["codeField"].waitForExistence(timeout: 8))
     app.buttons["resendCode"].tap()
+    UITestLaunch.record(app)
     XCTAssertTrue(app.staticTexts["errorBanner"].waitForExistence(timeout: 5))
   }
 
@@ -119,15 +125,13 @@ final class FlowUITests: XCTestCase {
       return
     }
     app.open(url)
-    let mood = app.staticTexts["partnerMood"]
+    UITestLaunch.record(app)
+    let mood = app.staticTexts.matching(NSPredicate(format: "identifier == 'partnerMood' AND label CONTAINS %@", "Easy together")).firstMatch
     XCTAssertTrue(mood.waitForExistence(timeout: 8))
   }
 
   func launch(_ extra: [String] = []) -> XCUIApplication {
-    let app = XCUIApplication()
-    app.launchArguments = ["-uitest"] + extra
-    app.launch()
-    return app
+    UITestLaunch.make(extra)
   }
 
   func signIn(_ app: XCUIApplication, email: String, code: String, expectHome: Bool) {

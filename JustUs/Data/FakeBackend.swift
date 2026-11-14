@@ -6,12 +6,13 @@ final class FakeBackend: DateBackend {
   let store: FakeStore
   private let cooldown: TimeInterval
 
-  init(store: FakeStore = FakeStore(), cooldown: TimeInterval? = nil) {
-    self.store = store
+  init(store: FakeStore? = nil, cooldown: TimeInterval? = nil) {
+    // Default arguments are nonisolated, so the MainActor store is built in the body.
+    self.store = store ?? FakeStore()
     if let cooldown {
       self.cooldown = cooldown
     } else {
-      self.cooldown = Launch.isUITest ? 1 : 30
+      self.cooldown = 30
     }
   }
 

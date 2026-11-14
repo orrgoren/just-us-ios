@@ -2,14 +2,49 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Tools
+        run: brew install xcodegen
+      - name: Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python3 scripts/write-secrets.py
+      - name: Project
+        run: xcodegen generate
+      - name: Build for testing
+        run: |
+          set -euo pipefail
+          # Xcode 26 has no -continueBuildingAfterErrors flag. The IDE default keeps compiling every file.
+          defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
+          xcodebuild build-for-testing \
+            -project JustUs.xcodeproj \
+            -scheme JustUs \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO
+
   test:
     name: SE and unit tests
+    needs: build
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
@@ -30,6 +65,7 @@ jobs:
           swiftlint lint
           python3 scripts/check-literals.py
           python3 scripts/check-apple-docs.py
+          python3 scripts/select-simulator.py --self-test
       - name: Test on iPhone SE
         env:
           SCREENSHOT_PREFIX: se
@@ -42,13 +78,26 @@ jobs:
             -project JustUs.xcodeproj \
             -scheme JustUs \
             -destination "platform=iOS Simulator,id=${UDID}" \
+            -parallel-testing-enabled NO \
             -resultBundlePath build/se.xcresult \
             CODE_SIGNING_ALLOWED=NO
       - name: Export screenshots
         if: always()
         run: |
-          mkdir -p artifacts/screenshots
-          xcrun xcresulttool export attachments --path build/se.xcresult --output-path artifacts/screenshots || true
+          mkdir -p artifacts/screenshots artifacts/failures
+          if [ -d build/se.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/se.xcresult --output-path artifacts/screenshots || true
+            python3 scripts/name-attachments.py artifacts/screenshots artifacts/failures || true
+          fi
+          find artifacts/screenshots artifacts/failures -type f | head -200
+          if [ ! -d build/se.xcresult ]; then
+            echo "Missing build/se.xcresult"
+            exit 1
+          fi
+          if ! find artifacts/screenshots artifacts/failures -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
+            echo "No screenshot images were exported"
+            exit 1
+          fi
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,10 +106,12 @@ jobs:
           path: |
             build/se.xcresult
             artifacts/screenshots
+            artifacts/failures
           if-no-files-found: warn
 
   promax:
     name: Pro Max UI tests
+    needs: build
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
@@ -89,13 +140,26 @@ jobs:
             -scheme JustUs \
             -destination "platform=iOS Simulator,id=${UDID}" \
             -only-testing:JustUsUITests \
+            -parallel-testing-enabled NO \
             -resultBundlePath build/promax.xcresult \
             CODE_SIGNING_ALLOWED=NO
       - name: Export screenshots
         if: always()
         run: |
-          mkdir -p artifacts/screenshots
-          xcrun xcresulttool export attachments --path build/promax.xcresult --output-path artifacts/screenshots || true
+          mkdir -p artifacts/screenshots artifacts/failures
+          if [ -d build/promax.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/promax.xcresult --output-path artifacts/screenshots || true
+            python3 scripts/name-attachments.py artifacts/screenshots artifacts/failures || true
+          fi
+          find artifacts/screenshots artifacts/failures -type f | head -200
+          if [ ! -d build/promax.xcresult ]; then
+            echo "Missing build/promax.xcresult"
+            exit 1
+          fi
+          if ! find artifacts/screenshots artifacts/failures -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
+            echo "No screenshot images were exported"
+            exit 1
+          fi
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -104,4 +168,5 @@ jobs:
           path: |
             build/promax.xcresult
             artifacts/screenshots
+            artifacts/failures
           if-no-files-found: warn

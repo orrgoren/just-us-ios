@@ -112,7 +112,7 @@ enum ZonedTime {
     let start = try zonedParts(instant: from, timeZone: timeZone)
     for offset in 0...7 {
       let date = try addDays(start.date, offset)
-      guard try weekday(of: date) == weekday else { continue }
+      guard try Self.weekday(of: date) == weekday else { continue }
       let instant = try zonedLocalToUtc(date: date, time: time, timeZone: timeZone)
       if instant > from { return instant }
     }
@@ -121,19 +121,18 @@ enum ZonedTime {
 
   static func formatWhen(_ instant: Date, timeZone: String, locale: Locale = .current) -> String {
     guard let zone = TimeZone(identifier: timeZone) else { return "" }
-    let formatted = instant.formatted(
-      Date.FormatStyle(date: .complete, time: .shortened)
-        .locale(locale)
-        .timeZone(zone)
-    )
-    return formatted
+    var style = Date.FormatStyle(date: .complete, time: .shortened)
+    style.locale = locale
+    style.timeZone = zone
+    return instant.formatted(style)
   }
 
   static func formatDay(_ instant: Date, timeZone: String, locale: Locale = .current) -> String {
     guard let zone = TimeZone(identifier: timeZone) else { return "" }
-    return instant.formatted(
-      Date.FormatStyle(date: .long, time: .omitted).locale(locale).timeZone(zone)
-    )
+    var style = Date.FormatStyle(date: .long, time: .omitted)
+    style.locale = locale
+    style.timeZone = zone
+    return instant.formatted(style)
   }
 
   static func weekdaySymbol(_ index: Int, locale: Locale = .current) -> String {

@@ -82,7 +82,7 @@ extension FakeBackend {
       throw AppError.notPlanner
     }
     guard store.world.dates[index].ideaId != nil else { throw AppError.missingPlan }
-    try saveHint(teaser: teaser, outfit: outfit, notes: notes)
+    try await saveHint(teaser: teaser, outfit: outfit, notes: notes)
     guard let fresh = dateIndex(mine.coupleId) else { throw AppError.saveFailed }
     let when = try ZonedTime.zonedLocalToUtc(date: day, time: time, timeZone: couple.timezone)
     store.world.dates[fresh].scheduledAt = when

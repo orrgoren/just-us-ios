@@ -308,7 +308,7 @@ extension LiveBackend {
     let partner = context.members.first { $0.userId != context.userId }
     var plan: FullPlan?
     var moods: [MoodVote] = []
-    var card: DateCard?
+    var dateCard: DateCard?
     if let active {
       let votes: [MoodRow] = try await fetch("mood_votes", column: "date_id", value: active.id.uuidString)
       moods = votes.compactMap { vote in
@@ -323,7 +323,7 @@ extension LiveBackend {
           plan = IdeasCatalog.plan(from: idea, notes: row.privateNotes)
         }
       }
-      card = card(from: active, context: context, completed: completed)
+      dateCard = card(from: active, context: context, completed: completed)
     }
     let view = RitualSnapshot(
       coupleId: context.couple.id,
@@ -335,7 +335,7 @@ extension LiveBackend {
       localTime: APIDate.clock(context.couple.localTime),
       timezone: context.couple.timezone,
       durationMinutes: context.couple.durationMinutes,
-      date: card, moods: moods,
+      date: dateCard, moods: moods,
       isPlanner: active?.plannerUserId == context.userId,
       revealed: active?.revealedAt != nil,
       plan: plan

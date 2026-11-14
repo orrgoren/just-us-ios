@@ -64,8 +64,6 @@ struct Wordmark: View {
         .foregroundStyle(Theme.champagne)
         .accessibilityHidden(true)
     }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(L10n.monogram)
   }
 }
 
@@ -115,8 +113,8 @@ struct WineButton: View {
         .frame(maxWidth: .infinity, minHeight: 48)
         .background(Theme.wine, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
-    .accessibilityIdentifier(identifier)
     .buttonStyle(.plain)
+    .accessibilityIdentifier(identifier)
   }
 }
 

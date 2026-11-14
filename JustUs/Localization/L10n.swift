@@ -222,7 +222,7 @@ enum L10n {
     }
   }
 
-  private static func text(_ key: String, _ value: String) -> String {
-    String(localized: String.LocalizationValue(key), defaultValue: String.LocalizationValue(value))
+  private static func text(_ key: StaticString, _ value: String.LocalizationValue) -> String {
+    String(localized: key, defaultValue: value)
   }
 }

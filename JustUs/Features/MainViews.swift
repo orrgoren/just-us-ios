@@ -18,11 +18,11 @@ struct MainScreen: View {
         .frame(minHeight: 44)
       switch model.tab {
       case .week:
-        RitualScreen(model: model).accessibilityIdentifier(A11y.homeRoot)
+        RitualScreen(model: model)
       case .memories:
-        MemoriesScreen(model: model).accessibilityIdentifier(A11y.memoriesRoot)
+        MemoriesScreen(model: model)
       case .settings:
-        SettingsScreen(model: model).accessibilityIdentifier(A11y.settingsRoot)
+        SettingsScreen(model: model)
       }
     }
   }
@@ -52,7 +52,7 @@ struct RitualScreen: View {
     GlassCard {
       VStack(alignment: .leading, spacing: 8) {
         MonogramView(names: [ritual.selfMember.displayName, ritual.partner?.displayName ?? ritual.inviteeName])
-        Text(L10n.homeTitle).font(Theme.display)
+        Text(L10n.homeTitle).font(Theme.display).accessibilityIdentifier(A11y.homeRoot)
         Text(L10n.datesCount(ritual.completedCount))
         Text(L10n.rhythm)
         if let date = ritual.date {
@@ -131,7 +131,7 @@ struct MemoriesScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text(L10n.memoriesTitle).font(Theme.display)
+      Text(L10n.memoriesTitle).font(Theme.display).accessibilityIdentifier(A11y.memoriesRoot)
       if model.memories.isEmpty {
         Text(L10n.memoriesEmpty)
       }
@@ -180,7 +180,7 @@ struct SettingsScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text(L10n.settingsTitle).font(Theme.display)
+      Text(L10n.settingsTitle).font(Theme.display).accessibilityIdentifier(A11y.settingsRoot)
       Text(L10n.settingsBody)
       if let settings = model.settings {
         Text(settings.selfName)
