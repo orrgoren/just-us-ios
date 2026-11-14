@@ -26,6 +26,8 @@ final class SessionModel {
   var pushDenied = false
   var showDelete = false
   var deleteConfirm = ""
+  var confirmUnlink = false
+  var signedIn = false
   var pendingReplace = false
   var blocked = false
   var noteDraft = ""
@@ -41,7 +43,6 @@ final class SessionModel {
   let backend: any DateBackend
   private let apple = AppleSignInCoordinator()
   var outbox: [String: Pending] = [:]
-  private var poll: Task<Void, Never>?
 
   init(backend: (any DateBackend)? = nil) {
     if let backend {
@@ -62,25 +63,18 @@ final class SessionModel {
       await applyScreenshot(name)
       return
     }
-    await restoreOrLogin()
-    if let raw = Launch.argument(after: "-JustUsURL"), let url = URL(string: raw) {
-      await open(url)
-    }
-    await PushRouter.shared.delivered()
     PushRouter.shared.handler = { [weak self] route in
       Task { await self?.follow(route) }
+    }
+    await restoreOrLogin()
+    await refreshPushRegistration()
+    if let raw = Launch.argument(after: "-JustUsURL"), let url = URL(string: raw) {
+      await open(url)
     }
     if let type = Launch.argument(after: "-JustUsPush") {
       let payload = ["type": type]
       PushRouter.shared.route(payload, id: "launch-\(type)")
       await follow(DeepLinks.route(userInfo: payload))
-    }
-    poll = Task { [weak self] in
-      while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(15))
-        await self?.refresh()
-        await PushRouter.shared.delivered()
-      }
     }
   }
 
@@ -96,6 +90,17 @@ final class SessionModel {
     await work {
       _ = try await self.backend.verify(email: self.email, code: self.code)
       Telemetry.analytics.record(.signedIn(method: "otp"))
+      self.signedIn = true
+      await self.refresh()
+      self.screen = self.ritual == nil ? .setup : .main
+    }
+  }
+
+  func completeApple(token: String, nonce: String) async {
+    await work {
+      _ = try await self.backend.signInWithApple(idToken: token, nonce: nonce)
+      Telemetry.analytics.record(.signedIn(method: "apple"))
+      self.signedIn = true
       await self.refresh()
       self.screen = self.ritual == nil ? .setup : .main
     }
@@ -106,6 +111,7 @@ final class SessionModel {
       let result = try await self.apple.start()
       _ = try await self.backend.signInWithApple(idToken: result.token, nonce: result.nonce)
       Telemetry.analytics.record(.signedIn(method: "apple"))
+      self.signedIn = true
       await self.refresh()
       self.screen = self.ritual == nil ? .setup : .main
     }
@@ -153,8 +159,17 @@ final class SessionModel {
       Telemetry.analytics.record(.inviteRedeemed)
       self.pendingReplace = false
       self.blocked = false
+      self.signedIn = true
       await self.refresh()
-      self.screen = .main
+      self.screen = Launch.isUITest ? .main : .softPrompt
+    }
+  }
+
+  func leaveInvite() {
+    if signedIn {
+      screen = ritual == nil ? .setup : .main
+    } else {
+      screen = .login
     }
   }
 
@@ -190,18 +205,48 @@ final class SessionModel {
       return
     }
     await backend.signOut()
-    ritual = nil
-    memories = []
-    settings = nil
+    clearSession()
     screen = .login
     Telemetry.analytics.record(.signedOut)
   }
 
+  func clearSession() {
+    email = ""
+    code = ""
+    draft = CoupleDraft(selfName: "", partnerName: "", weekday: 4, localTime: "20:30", timezone: TimeZone.current.identifier, durationMinutes: 90)
+    ritual = nil
+    memories = []
+    settings = nil
+    inviteToken = nil
+    inviteInput = ""
+    teaser = ""
+    outfit = ""
+    privateNotes = ""
+    planDay = ""
+    planTime = ""
+    noteDraft = ""
+    momentDraft = ""
+    deleteConfirm = ""
+    editingNote = nil
+    editingDate = nil
+    outbox = [:]
+    errorMessage = nil
+    showDelete = false
+    confirmUnlink = false
+    pendingReplace = false
+    blocked = false
+    focusReveal = false
+    signedIn = false
+    tab = .week
+  }
+
   private func restoreOrLogin() async {
     if let _ = try? await backend.restore() {
+      signedIn = true
       await refresh()
       screen = ritual == nil ? .setup : .main
     } else {
+      signedIn = false
       screen = .login
     }
   }
@@ -222,6 +267,7 @@ final class SessionModel {
   }
 
   private func requestPush() async {
+    UserDefaults.standard.set(true, forKey: "justus.push.asked")
     guard !Launch.isUITest else { return }
     let center = UNUserNotificationCenter.current()
     let settings = await center.notificationSettings()
@@ -237,6 +283,19 @@ final class SessionModel {
       }
     } catch {
       pushDenied = true
+    }
+  }
+
+  private func refreshPushRegistration() async {
+    guard !Launch.isUITest, signedIn else { return }
+    let center = UNUserNotificationCenter.current()
+    let settings = await center.notificationSettings()
+    if settings.authorizationStatus == .authorized, AppConfig.pushEnabled {
+      UIApplication.shared.registerForRemoteNotifications()
+      return
+    }
+    if settings.authorizationStatus == .notDetermined, !UserDefaults.standard.bool(forKey: "justus.push.asked"), screen == .main {
+      screen = .softPrompt
     }
   }
 

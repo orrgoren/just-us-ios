@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct RootView: View {
@@ -15,7 +16,7 @@ struct RootView: View {
         if let message = model.errorMessage {
           StatusBanner(message: message, identifier: A11y.errorBanner)
           if model.outbox.isEmpty == false {
-            WineButton(title: L10n.discard, identifier: A11y.signOut) { Task { await model.discardAndSignOut() } }
+            WineButton(title: L10n.discard, identifier: A11y.discard) { Task { await model.discardAndSignOut() } }
           }
         }
         if model.pushDenied {
@@ -59,6 +60,8 @@ struct RootView: View {
 
 struct LoginScreen: View {
   @Bindable var model: SessionModel
+  @Environment(\.colorScheme) private var colorScheme
+  @State private var appleNonce = ""
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -68,7 +71,22 @@ struct LoginScreen: View {
         .textInputAutocapitalization(.never)
         .keyboardType(.emailAddress)
       WineButton(title: L10n.sendCode, identifier: A11y.sendCode) { Task { await model.sendCode() } }
-      WineButton(title: L10n.apple, identifier: A11y.apple) { Task { await model.signInWithApple() } }
+      SignInWithAppleButton(.signIn) { request in
+        let raw = AppleNonce.raw()
+        appleNonce = raw
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = AppleNonce.hashed(raw)
+      } onCompletion: { result in
+        guard case .success(let authorization) = result,
+              let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken,
+              let token = String(data: tokenData, encoding: .utf8) else { return }
+        let nonce = appleNonce
+        Task { await model.completeApple(token: token, nonce: nonce) }
+      }
+      .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+      .frame(height: 48)
+      .accessibilityIdentifier(A11y.apple)
       Button(L10n.haveInvite) { model.screen = .invite }
         .accessibilityIdentifier(A11y.haveInvite)
         .frame(minHeight: 44)
@@ -105,8 +123,9 @@ struct LabeledField: View {
       Text(title).font(Theme.caption)
       TextField(title, text: $text)
         .textFieldStyle(.plain)
+        .foregroundStyle(Theme.ink)
         .padding(12)
-        .background(Theme.blush.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Theme.blush, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityIdentifier(identifier)
     }
   }

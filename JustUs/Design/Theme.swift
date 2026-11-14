@@ -119,15 +119,17 @@ struct WineButton: View {
 }
 
 struct StatusBanner: View {
+  @Environment(\.colorScheme) private var scheme
   var message: String
   var identifier: String
 
   var body: some View {
     Text(message)
       .font(Theme.caption)
+      .foregroundStyle(scheme == .dark ? Theme.canvas : Theme.ink)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(12)
-      .background(Theme.blush, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .background(scheme == .dark ? Theme.wine : Theme.blush, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
       .accessibilityIdentifier(identifier)
   }
 }

@@ -156,6 +156,13 @@ final class FakeBackend: DateBackend {
     _ = token
   }
 
+  func markRevealed() {
+    guard let index = store.world.dates.firstIndex(where: { $0.id == SeedID.dateA }) else { return }
+    store.world.dates[index].status = .scheduled
+    store.world.dates[index].revealedAt = Date()
+    store.save()
+  }
+
   private func accept(code: String, email: String) throws {
     guard let digits = Validation.code(code) else { throw AppError.invalid(.code) }
     if digits == "111111" { throw AppError.expiredCode }

@@ -38,7 +38,10 @@ create policy notification_preferences_own on public.notification_preferences
   with check (auth.uid() = user_id);
 
 alter table public.memory_notes add column if not exists author_name text;
-alter table public.memory_notes alter column author_user_id drop not null;
+-- NOT live. memory_notes.author_user_id is still NOT NULL on
+-- vowmukhhnfhtnjlswkun. 004 is the proposed drop. Do not run this statement
+-- by re-applying 001.
+-- alter table public.memory_notes alter column author_user_id drop not null;
 alter table public.dates add column if not exists memory_photo_path text;
 
 insert into storage.buckets (id, name, public)

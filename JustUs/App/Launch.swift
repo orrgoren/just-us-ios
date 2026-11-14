@@ -5,19 +5,16 @@ enum Launch {
 
   static func prepare() {
     let arguments = ProcessInfo.processInfo.arguments
-    if arguments.contains("-uitest") {
-      UserDefaults.standard.set(true, forKey: uitestKey)
-      if !arguments.contains("-uitestKeep") {
-        resetFakeStoreIfNeeded(arguments)
-      }
+    guard arguments.contains("-uitest") else { return }
+    UserDefaults.standard.removeObject(forKey: uitestKey)
+    if !arguments.contains("-uitestKeep") {
+      resetFakeStoreIfNeeded(arguments)
     }
-    if arguments.contains("-uitest") {
-      UIView.setAnimationsEnabled(false)
-    }
+    UIView.setAnimationsEnabled(false)
   }
 
   static var isUITest: Bool {
-    ProcessInfo.processInfo.arguments.contains("-uitest") || UserDefaults.standard.bool(forKey: uitestKey)
+    ProcessInfo.processInfo.arguments.contains("-uitest")
   }
 
   static var screenshot: String? {
@@ -79,6 +76,13 @@ enum AppConfig {
   static var privacyURL: String { value("PRIVACY_POLICY_URL").replacingOccurrences(of: "/$()/", with: "//") }
   static var supportURL: String { value("SUPPORT_URL").replacingOccurrences(of: "/$()/", with: "//") }
   static var pushEnabled: Bool { value("APNS_ENABLED") == "YES" }
+  static var pushSandbox: Bool {
+    #if DEBUG
+    true
+    #else
+    false
+    #endif
+  }
 
   static var refusesProductionLiveTests: Bool {
     supabaseURL.contains("vowmukhhnfhtnjlswkun.supabase.co")

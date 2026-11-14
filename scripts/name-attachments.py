@@ -27,16 +27,21 @@ def main() -> None:
         for item in test.get("attachments", []):
             readable = item.get("suggestedHumanReadableName") or item.get("exportedFileName") or "attachment"
             failure = item.get("isAssociatedWithFailure") is True
-            interesting = failure or "hierarchy" in readable.lower() or readable.startswith("launch-")
-            if not interesting:
-                continue
-            src = os.path.join(source, item["exportedFileName"])
+            src = os.path.join(source, item.get("exportedFileName") or "")
             if not os.path.exists(src):
                 continue
-            prefix = "failure-" if failure else ""
-            target = os.path.join(destination, f"{prefix}{test_name}-{safe(readable)}")
-            shutil.copy(src, target)
-            copied += 1
+            named = any(token in readable for token in ("-light-", "-dark-", "se-", "promax-", "device-", "rtl-"))
+            if failure or "hierarchy" in readable.lower():
+                prefix = "failure-" if failure else ""
+                target = os.path.join(destination, f"{prefix}{test_name}-{safe(readable)}")
+                shutil.copy(src, target)
+                copied += 1
+            elif named:
+                filename = safe(readable)
+                if "." not in filename:
+                    filename += os.path.splitext(src)[1] or ".png"
+                shutil.copy(src, os.path.join(source, filename))
+                copied += 1
     print(f"Named {copied} attachments")
 
 

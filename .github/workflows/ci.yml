@@ -69,9 +69,11 @@ jobs:
       - name: Test on iPhone SE
         env:
           SCREENSHOT_PREFIX: se
+          TEST_RUNNER_SCREENSHOT_PREFIX: se
         run: |
           set -euo pipefail
           UDID=$(python3 scripts/select-simulator.py se)
+          printf '%s' "se" > /tmp/justus-screenshot-prefix.txt
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b || true
           xcodebuild test \
@@ -130,9 +132,11 @@ jobs:
       - name: UI tests on Pro Max
         env:
           SCREENSHOT_PREFIX: promax
+          TEST_RUNNER_SCREENSHOT_PREFIX: promax
         run: |
           set -euo pipefail
           UDID=$(python3 scripts/select-simulator.py promax)
+          printf '%s' "promax" > /tmp/justus-screenshot-prefix.txt
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b || true
           xcodebuild test \
@@ -170,3 +174,17 @@ jobs:
             artifacts/screenshots
             artifacts/failures
           if-no-files-found: warn
+
+  sql:
+    name: Account SQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Postgres
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql
+          sudo service postgresql start
+      - name: Lifecycle
+        run: bash scripts/sql-lifecycle.sh

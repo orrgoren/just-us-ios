@@ -95,10 +95,12 @@ struct PlanRow: Decodable {
 struct NoteRow: Decodable, Identifiable {
   var id: UUID
   var authorUserId: UUID?
+  var authorName: String?
   var note: String
   enum CodingKeys: String, CodingKey {
     case id
     case authorUserId = "author_user_id"
+    case authorName = "author_name"
     case note
   }
 }
@@ -112,6 +114,7 @@ struct MemoryDateRow: Decodable {
   var snapshotEmoji: String?
   var snapshotSummary: String?
   var snapshotIdeaId: String?
+  var memoryPhotoPath: String?
   var memoryNotes: [NoteRow]?
 
   enum CodingKeys: String, CodingKey {
@@ -123,6 +126,7 @@ struct MemoryDateRow: Decodable {
     case snapshotEmoji = "snapshot_emoji"
     case snapshotSummary = "snapshot_summary"
     case snapshotIdeaId = "snapshot_idea_id"
+    case memoryPhotoPath = "memory_photo_path"
     case memoryNotes = "memory_notes"
   }
 }

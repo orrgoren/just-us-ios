@@ -8,14 +8,83 @@
 --   1. A completed date may change memory_photo_path only, and only to
 --      {couple_id}/{date_id}.jpg. Skipped and canceled dates stay locked.
 --      The planner, snapshots, and every other column stay locked.
---   2. While app.membership_handoff is on for this transaction, the only
---      permitted change is planner_user_id, and the new planner must already
---      be a member. leave_couple and delete_my_account set that flag.
---      A client cannot set it through PostgREST.
+--   2. A handoff may change planner_user_id only. The old planner must be
+--      the caller, the new planner must already be a member, and the
+--      transaction must hold a row in app_private.handoff_tickets whose
+--      nonce matches the transaction-local GUC. Setting the GUC alone,
+--      including via set_config, does nothing: the ticket table is not in
+--      the API schema and is revoked from anon and authenticated.
 --
 -- set_memory_photo_path is the write the iOS app uses after the storage
 -- upload. A direct update of that one column is also accepted by the guard,
 -- so the web app's other date rules are unchanged.
+
+create table if not exists app_private.handoff_tickets (
+  nonce text primary key
+);
+
+revoke all on table app_private.handoff_tickets from public, anon, authenticated;
+
+create or replace function app_private.handoff_active()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, app_private
+as $$
+  select exists (
+    select 1
+    from app_private.handoff_tickets
+    where nonce = current_setting('app.membership_handoff', true)
+  );
+$$;
+
+create or replace function app_private.begin_handoff()
+returns void
+language plpgsql
+security definer
+set search_path = public, app_private
+as $$
+declare
+  v_nonce text := gen_random_uuid()::text;
+begin
+  insert into app_private.handoff_tickets (nonce) values (v_nonce);
+  perform set_config('app.membership_handoff', v_nonce, true);
+end;
+$$;
+
+create or replace function app_private.end_handoff()
+returns void
+language plpgsql
+security definer
+set search_path = public, app_private
+as $$
+declare
+  v_nonce text := current_setting('app.membership_handoff', true);
+begin
+  delete from app_private.handoff_tickets where nonce = v_nonce;
+  perform set_config('app.membership_handoff', '', true);
+end;
+$$;
+
+-- Couple deletion does not remove objects in the private date-photos bucket.
+create or replace function app_private.delete_couple_photos(p_couple uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, storage
+as $$
+begin
+  delete from storage.objects
+  where bucket_id = 'date-photos'
+    and split_part(name, '/', 1) = lower(p_couple::text);
+end;
+$$;
+
+revoke all on function app_private.handoff_active() from public, anon, authenticated;
+revoke all on function app_private.begin_handoff() from public, anon, authenticated;
+revoke all on function app_private.end_handoff() from public, anon, authenticated;
+revoke all on function app_private.delete_couple_photos(uuid) from public, anon, authenticated;
 
 create or replace function app_private.guard_date_update()
 returns trigger
@@ -41,34 +110,37 @@ begin
     raise exception 'forbidden';
   end if;
 
-  -- Unlink and account deletion. Transaction-local, and only the planner moves.
-  -- The caller may already have left, which is why this is ahead of the
-  -- membership check: delete_my_account still has to move finished nights
-  -- off the departing login. The old planner must be the caller, and the new
-  -- planner must already be a member. A client cannot set the flag.
-  if current_setting('app.membership_handoff', true) = 'on'
+  -- Unlink and account deletion. The ticket, not the GUC string, is what
+  -- allows the write. The old planner must be the caller. Every column
+  -- except planner_user_id is compared from the row image, so a new column
+  -- cannot slip through a handwritten list. This is ahead of the membership
+  -- check because delete_my_account still moves finished nights after the
+  -- login has already left.
+  if app_private.handoff_active()
     and old.planner_user_id = v_uid
     and new.planner_user_id is distinct from old.planner_user_id
-    and new.status is not distinct from old.status
-    and new.scheduled_at is not distinct from old.scheduled_at
-    and new.duration_minutes is not distinct from old.duration_minutes
-    and new.location is not distinct from old.location
-    and new.location_is_override is not distinct from old.location_is_override
-    and new.public_teaser is not distinct from old.public_teaser
-    and new.outfit_hint is not distinct from old.outfit_hint
-    and new.revealed_at is not distinct from old.revealed_at
-    and new.skipped_at is not distinct from old.skipped_at
-    and new.completed_at is not distinct from old.completed_at
-    and new.snapshot_idea_id is not distinct from old.snapshot_idea_id
-    and new.snapshot_title is not distinct from old.snapshot_title
-    and new.snapshot_emoji is not distinct from old.snapshot_emoji
-    and new.snapshot_summary is not distinct from old.snapshot_summary
-    and new.memory_photo_path is not distinct from old.memory_photo_path
+    and (to_jsonb(new) - 'planner_user_id' - 'updated_at')
+      is not distinct from (to_jsonb(old) - 'planner_user_id' - 'updated_at')
     and exists (
       select 1 from public.couple_members
       where couple_id = new.couple_id and user_id = new.planner_user_id
     )
   then
+    new.updated_at := now();
+    return new;
+  end if;
+
+  -- Cancel an unrevealed night the caller still plans, including after they
+  -- have left and are no longer a member. Status is the only change.
+  if app_private.handoff_active()
+    and old.planner_user_id = v_uid
+    and old.status = 'scheduled'
+    and new.status = 'canceled'
+    and old.revealed_at is null
+    and (to_jsonb(new) - 'status' - 'skipped_at' - 'updated_at')
+      is not distinct from (to_jsonb(old) - 'status' - 'skipped_at' - 'updated_at')
+  then
+    new.skipped_at := now();
     new.updated_at := now();
     return new;
   end if;
@@ -267,6 +339,7 @@ set search_path = public
 as $$
 declare
   v_uid uuid := auth.uid();
+  v_couple uuid;
   membership public.couple_members%rowtype;
   partner uuid;
   remaining int;
@@ -275,57 +348,81 @@ begin
     raise exception 'not_authenticated';
   end if;
 
-  select * into membership
+  select couple_id into v_couple
   from public.couple_members
   where user_id = v_uid;
   if not found then
     return;
   end if;
 
+  -- One couple row lock. Two members leaving at once take this in order,
+  -- then re-read membership, so the second sees the first leave and the
+  -- empty couple is deleted instead of erroring or being left behind.
+  perform 1 from public.couples where id = v_couple for update;
+
+  select * into membership
+  from public.couple_members
+  where user_id = v_uid
+    and couple_id = v_couple
+  for update;
+  if not found then
+    return;
+  end if;
+
   select user_id into partner
   from public.couple_members
-  where couple_id = membership.couple_id
+  where couple_id = v_couple
     and user_id <> v_uid
+  order by member_index
   limit 1;
 
   if partner is not null then
-    -- The web guard rejects a planner change on a scheduled night. Cancel an
-    -- unrevealed one while the leaver is still its planner. That uses the
-    -- existing scheduled → canceled path, and the follow-up trigger opens
-    -- the next draft instead of leaving the partner with nobody who can edit.
+    -- Cancel an unrevealed night while the leaver is still its planner.
     -- Drop the sealed plan first so a later planner change cannot reveal it.
     delete from public.private_date_plans as plan
     using public.dates as night
     where plan.date_id = night.id
-      and night.couple_id = membership.couple_id
+      and night.couple_id = v_couple
       and night.planner_user_id = v_uid
       and night.status = 'scheduled'
       and night.revealed_at is null;
 
     update public.dates
     set status = 'canceled'
-    where couple_id = membership.couple_id
+    where couple_id = v_couple
       and planner_user_id = v_uid
       and status = 'scheduled'
       and revealed_at is null;
 
-    -- A draft reassignment through the normal guard deletes the sealed plan.
-    -- Do the same here so the handoff does not reveal it to the new planner.
     delete from public.private_date_plans as plan
     using public.dates as night
     where plan.date_id = night.id
-      and night.couple_id = membership.couple_id
+      and night.couple_id = v_couple
       and night.planner_user_id = v_uid
       and night.status = 'draft'
       and night.revealed_at is null;
 
-    perform set_config('app.membership_handoff', 'on', true);
+    perform app_private.begin_handoff();
+    update public.couples
+    set created_by = partner
+    where id = v_couple
+      and created_by = v_uid;
+
+    update public.couple_invites
+    set created_by = partner
+    where couple_id = v_couple
+      and created_by = v_uid;
+
+    update public.couple_invites
+    set redeemed_by = null
+    where couple_id = v_couple
+      and redeemed_by = v_uid;
+
     update public.dates
     set planner_user_id = partner
-    where couple_id = membership.couple_id
-      and planner_user_id = v_uid
-      and status in ('draft', 'scheduled');
-    perform set_config('app.membership_handoff', 'off', true);
+    where couple_id = v_couple
+      and planner_user_id = v_uid;
+    perform app_private.end_handoff();
   end if;
 
   -- Keep the name on notes the partner can still read after this login is gone.
@@ -338,9 +435,10 @@ begin
 
   select count(*) into remaining
   from public.couple_members
-  where couple_id = membership.couple_id;
+  where couple_id = v_couple;
   if remaining = 0 then
-    delete from public.couples where id = membership.couple_id;
+    perform app_private.delete_couple_photos(v_couple);
+    delete from public.couples where id = v_couple;
   end if;
 end;
 $$;

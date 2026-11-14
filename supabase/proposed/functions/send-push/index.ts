@@ -39,12 +39,25 @@ Deno.serve(async (request) => {
   if (CLIENT_FIELDS.some((field) => field in body)) return json({ error: "client_fields" }, 400);
 
   const kind = body.kind;
-  if (typeof kind !== "string" || !KINDS.includes(kind as Kind)) return json({ error: "kind" }, 400);
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "configuration" }, 500);
+
+  const header = request.headers.get("authorization") ?? "";
+  const bearer = header.replace(/^Bearer\s+/i, "").trim();
+  if (bearer && bearer === serviceKey && kind === "flush") {
+    try {
+      const flushed = await flushOutbox(supabaseUrl, serviceKey);
+      return json(flushed, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "push_log_missing") return json({ error: "push_log_missing" }, 503);
+      return json({ error: "unavailable" }, 500);
+    }
+  }
+
+  if (typeof kind !== "string" || !KINDS.includes(kind as Kind)) return json({ error: "kind" }, 400);
 
   const callerId = await authenticatedUserId(request, supabaseUrl, anonKey);
   if (!callerId) return json({ error: "not_authenticated" }, 401);
@@ -82,13 +95,43 @@ async function deliver(
   const couple = coupleRows[0];
   if (!couple) return { status: 200, body: { decision: "suppress", reason: "no_couple" } };
 
-  // Mood, reveal, invite-accepted, and the weekly reminder go to the other
-  // member. An invite nudge is the opposite: the invitee has no account yet,
-  // so the reminder goes to the caller's own registered devices. The token
-  // list still comes from device_tokens, never from the request.
-  const recipientId = kind === "inviteNudge" ? callerId : partner?.user_id;
-  if (!recipientId) return { status: 200, body: { decision: "suppress", reason: "no_partner" } };
-  if (kind === "inviteNudge" && partner) return { status: 200, body: { decision: "suppress", reason: "couple_full" } };
+  // The client names the event. The rows decide whether it happened.
+  if (kind === "planReady") {
+    const nights = await db.select<{ id: string }[]>(
+      `dates?couple_id=eq.${caller.couple_id}&planner_user_id=eq.${callerId}&status=eq.scheduled&revealed_at=is.null&select=id&limit=1`,
+    );
+    const nightId = nights[0]?.id;
+    if (!nightId) return { status: 200, body: { decision: "suppress", reason: "not_ready" } };
+    const plans = await db.select<{ date_id: string }[]>(
+      `private_date_plans?date_id=eq.${nightId}&select=date_id&limit=1`,
+    );
+    if (!plans[0]) return { status: 200, body: { decision: "suppress", reason: "not_ready" } };
+  }
+  if (kind === "partnerMood") {
+    const votes = await db.select<{ date_id: string }[]>(
+      `mood_votes?user_id=eq.${callerId}&select=date_id&limit=1`,
+    );
+    if (!votes[0]) return { status: 200, body: { decision: "suppress", reason: "no_mood" } };
+  }
+  if (kind === "inviteAccepted" && !partner) {
+    return { status: 200, body: { decision: "suppress", reason: "no_partner" } };
+  }
+
+  // Weekly reminder is to the caller, about their partner. Other events go
+  // to the partner and name the caller. An invite nudge has no invitee
+  // account, so it uses the caller's own devices.
+  let recipientId = partner?.user_id ?? "";
+  let name = caller.display_name;
+  if (kind === "inviteNudge") {
+    if (partner) return { status: 200, body: { decision: "suppress", reason: "couple_full" } };
+    recipientId = callerId;
+    name = couple.invitee_display_name;
+  } else if (kind === "weeklyReminder") {
+    recipientId = callerId;
+    name = partner?.display_name || couple.invitee_display_name;
+  } else if (!partner) {
+    return { status: 200, body: { decision: "suppress", reason: "no_partner" } };
+  }
 
   const preferenceRows = await db.select<Record<string, boolean>[]>(
     `notification_preferences?user_id=eq.${recipientId}&select=partner_mood,plan_ready,invite_accepted,weekly_reminder&limit=1`,
@@ -108,12 +151,19 @@ async function deliver(
     return { status: 200, body: { decision: "suppress", reason: "invalid_timezone" } };
   }
   if (zoned.hour >= QUIET_START || zoned.hour < QUIET_END) {
-    return { status: 202, body: { decision: "defer", reason: "quiet_hours" } };
+    const hours = zoned.hour >= QUIET_START ? 24 - zoned.hour + QUIET_END : QUIET_END - zoned.hour;
+    const notBefore = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+    await db.insert("push_outbox", {
+      caller_user_id: callerId,
+      recipient_user_id: recipientId,
+      kind,
+      not_before: notBefore,
+    });
+    return { status: 202, body: { decision: "defer", reason: "quiet_hours", not_before: notBefore } };
   }
 
   const since = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
-  // Transactional reveals are not part of the cap or the dedupe, and a burst of
-  // them must not push the rows that are out of this window.
+  // planReady uses the same daily cap and six-hour dedupe as the other kinds.
   const history = await db.select<{ kind: Kind; transactional: boolean; sent_at: string }[]>(
     `push_deliveries?recipient_user_id=eq.${recipientId}&transactional=eq.false&sent_at=gte.${encodeURIComponent(since)}&select=kind,transactional,sent_at&order=sent_at.desc&limit=50`,
   );
@@ -122,34 +172,36 @@ async function deliver(
   const policy = decide(kind, history, inviteAge, couple.timezone);
   if (policy !== "send") return { status: 200, body: { decision: "suppress", reason: policy } };
 
-  const name = kind === "inviteNudge" ? couple.invitee_display_name : caller.display_name;
   const nudgeIndex = history.filter((row) => row.kind === "inviteNudge").length + 1;
   const text = message(kind, name, nudgeIndex);
   if (forbidden(text)) return { status: 200, body: { decision: "suppress", reason: "secret" } };
 
-  const tokenRows = await db.select<{ token: string }[]>(
-    `device_tokens?user_id=eq.${recipientId}&select=token`,
-  );
-  const tokens = tokenRows.map((row) => row.token).filter((token) => token.length > 0);
+  const tokens = await loadTokens(db, recipientId);
   if (tokens.length === 0) return { status: 200, body: { decision: "suppress", reason: "no_device" } };
 
-  const transactional = kind === "planReady";
-  const logged = await db.insert("push_deliveries", {
-    recipient_user_id: recipientId,
-    kind,
-    transactional,
-  });
+  const claimed = await db.claim(recipientId, kind, couple.timezone);
+  if (!claimed.ok) return { status: 200, body: { decision: "suppress", reason: claimed.reason } };
+
+  const jwt = await apnsJwt();
   let sent = 0;
   try {
-    for (const token of tokens) {
-      if (await send(token, text, kind)) sent += 1;
+    for (const row of tokens) {
+      const sandbox = row.environment
+        ? row.environment === "sandbox"
+        : Deno.env.get("APNS_USE_SANDBOX") === "true";
+      const status = await send(row.token, text, kind, jwt, sandbox);
+      if (status === 410 || status === 400) {
+        await db.remove("device_tokens", `user_id=eq.${recipientId}&token=eq.${encodeURIComponent(row.token)}`);
+        continue;
+      }
+      if (status >= 200 && status < 300) sent += 1;
     }
   } catch (error) {
-    if (sent === 0) await db.remove("push_deliveries", `id=eq.${logged.id}`);
+    if (sent === 0) await db.remove("push_deliveries", `id=eq.${claimed.id}`);
     throw error;
   }
   if (sent === 0) {
-    await db.remove("push_deliveries", `id=eq.${logged.id}`);
+    await db.remove("push_deliveries", `id=eq.${claimed.id}`);
     return { status: 502, body: { error: "apns" } };
   }
   return { status: 200, body: { decision: "send", devices: sent } };
@@ -169,7 +221,7 @@ function decide(
   timeZone: string,
 ): "send" | string {
   const now = Date.now();
-  if (kind === "partnerMood" || kind === "inviteAccepted") {
+  if (kind === "partnerMood" || kind === "inviteAccepted" || kind === "planReady") {
     const recent = history.some((row) => row.kind === kind && now - Date.parse(row.sent_at) < DEDUPE_MS);
     if (recent) return "deduped_6h";
   }
@@ -184,11 +236,9 @@ function decide(
     }
     if (nudges.length >= 2) return "nudges_finished";
   }
-  if (kind !== "planReady") {
-    const today = localParts(new Date(), timeZone).day;
-    const already = history.some((row) => !row.transactional && localParts(new Date(row.sent_at), timeZone).day === today);
-    if (already) return "daily_non_transactional";
-  }
+  const today = localParts(new Date(), timeZone).day;
+  const already = history.some((row) => !row.transactional && localParts(new Date(row.sent_at), timeZone).day === today);
+  if (already) return "daily_non_transactional";
   return "send";
 }
 
@@ -262,6 +312,23 @@ class Db {
     if (!response.ok) throw new Error("db");
   }
 
+  async claim(recipient: string, kind: Kind, timezone: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+    const response = await this.request("rpc/claim_push_delivery", {
+      method: "POST",
+      body: JSON.stringify({ p_recipient: recipient, p_kind: kind, p_timezone: timezone }),
+    });
+    if (response.status === 404) throw new Error("push_log_missing");
+    if (!response.ok) {
+      const body = await response.text();
+      if (body.includes("deduped_6h")) return { ok: false, reason: "deduped_6h" };
+      if (body.includes("daily_non_transactional")) return { ok: false, reason: "daily_non_transactional" };
+      throw new Error("db");
+    }
+    const id = await response.json() as string;
+    if (!id) throw new Error("db");
+    return { ok: true, id };
+  }
+
   private request(path: string, init: RequestInit): Promise<Response> {
     const headers = new Headers(init.headers);
     headers.set("apikey", this.serviceKey);
@@ -287,9 +354,36 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-async function send(token: string, text: string, kind: Kind): Promise<boolean> {
-  const jwt = await apnsJwt();
-  const sandbox = Deno.env.get("APNS_USE_SANDBOX") === "true";
+async function loadTokens(db: Db, recipientId: string): Promise<{ token: string; environment: string | null }[]> {
+  try {
+    const rows = await db.select<{ token: string; environment: string | null }[]>(
+      `device_tokens?user_id=eq.${recipientId}&select=token,environment`,
+    );
+    return rows.filter((row) => row.token.length > 0);
+  } catch (error) {
+    if (error instanceof Error && error.message === "push_log_missing") throw error;
+    const rows = await db.select<{ token: string }[]>(
+      `device_tokens?user_id=eq.${recipientId}&select=token`,
+    );
+    return rows.filter((row) => row.token.length > 0).map((row) => ({ token: row.token, environment: null }));
+  }
+}
+
+async function flushOutbox(supabaseUrl: string, serviceKey: string): Promise<Record<string, unknown>> {
+  const db = new Db(supabaseUrl, serviceKey);
+  const due = await db.select<{ id: string; caller_user_id: string; kind: Kind }[]>(
+    `push_outbox?not_before=lte.${encodeURIComponent(new Date().toISOString())}&select=id,caller_user_id,kind&limit=50`,
+  );
+  let sent = 0;
+  for (const row of due) {
+    await db.remove("push_outbox", `id=eq.${row.id}`);
+    const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey);
+    if (decision.body.decision === "send") sent += 1;
+  }
+  return { decision: "flush", sent };
+}
+
+async function send(token: string, text: string, kind: Kind, jwt: string, sandbox: boolean): Promise<number> {
   const host = sandbox ? "api.sandbox.push.apple.com" : "api.push.apple.com";
   const topic = Deno.env.get("APNS_BUNDLE_ID") ?? "com.orrgoren.justus";
   const response = await fetch(`https://${host}/3/device/${encodeURIComponent(token)}`, {
@@ -304,7 +398,7 @@ async function send(token: string, text: string, kind: Kind): Promise<boolean> {
       type: kind,
     }),
   });
-  return response.ok;
+  return response.status;
 }
 
 async function apnsJwt(): Promise<string> {

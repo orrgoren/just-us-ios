@@ -71,7 +71,9 @@ Not applied, and waiting for review:
 
 - `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs for the cap, the six-hour dedupe, and the invite nudges.
 - `supabase/proposed/003_memory_photo_and_leave_handoff.sql` — a completed date may change `memory_photo_path` only, `set_memory_photo_path` writes that column, and `leave_couple` hands an open night to the partner who stays.
-- `supabase/proposed/004_delete_my_account.sql` — account deletion that leaves the partner the dates, notes, and photos.
+- `supabase/proposed/004_delete_my_account.sql` — account deletion. A remaining partner keeps history. The last member deletes the couple even if someone else created it, and date photos are removed with the couple.
+- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — the live function bodies and the rollback. Not applied.
+- `supabase/proposed/006_push_claim_and_outbox.sql` — atomic push claim, quiet-hours outbox, and a sandbox/production token column. Not applied. No cron is installed.
 
 The iOS client calls `delete_my_account`, `leave_couple`, and `set_memory_photo_path`. Until a function exists, that action says nothing changed.
 

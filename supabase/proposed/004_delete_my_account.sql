@@ -3,7 +3,13 @@
 --
 -- Apply 003_memory_photo_and_leave_handoff.sql first. Account deletion
 -- reassigns dates.planner_user_id, and the live date guard rejects that on
--- a completed or scheduled night. 003 adds the transaction-local exception.
+-- a completed or scheduled night. 003 adds the handoff ticket. The caller
+-- must be the old owner. An unrevealed scheduled night is canceled, matching
+-- leave_couple. If the caller is the last member, the couple is deleted even
+-- when created_by is someone who already unlinked, and date-photos objects
+-- under that couple folder are deleted with it.
+-- Live memory_notes.author_user_id is still NOT NULL. The drop below is
+-- proposed, not already applied.
 --
 -- The previous delete_my_account fails on the live schema:
 --   couples.created_by, couple_invites.created_by, and dates.planner_user_id
@@ -45,14 +51,13 @@ begin
     return new;
   end if;
 
-  if current_setting('app.membership_handoff', true) = 'on'
-    and new.date_id is not distinct from old.date_id
-    and new.created_at is not distinct from old.created_at
-    and new.note is not distinct from old.note
+  if app_private.handoff_active()
     and old.author_user_id is not distinct from auth.uid()
     and new.author_user_id is null
     and new.author_name is not null
     and char_length(btrim(new.author_name)) > 0
+    and (to_jsonb(new) - 'author_user_id' - 'author_name' - 'updated_at')
+      is not distinct from (to_jsonb(old) - 'author_user_id' - 'author_name' - 'updated_at')
   then
     new.updated_at := now();
     return new;
@@ -79,15 +84,11 @@ security definer
 set search_path = public
 as $$
 begin
-  if current_setting('app.membership_handoff', true) = 'on'
+  if app_private.handoff_active()
+    and old.created_by = auth.uid()
     and new.created_by is distinct from old.created_by
-    and new.id is not distinct from old.id
-    and new.created_at is not distinct from old.created_at
-    and new.weekday is not distinct from old.weekday
-    and new.local_time is not distinct from old.local_time
-    and new.timezone is not distinct from old.timezone
-    and new.default_duration_minutes is not distinct from old.default_duration_minutes
-    and new.invitee_display_name is not distinct from old.invitee_display_name
+    and (to_jsonb(new) - 'created_by' - 'updated_at')
+      is not distinct from (to_jsonb(old) - 'created_by' - 'updated_at')
     and exists (
       select 1 from public.couple_members
       where couple_id = new.id and user_id = new.created_by
@@ -130,23 +131,25 @@ security definer
 set search_path = public, app_private
 as $$
 begin
-  if current_setting('app.membership_handoff', true) = 'on' then
-    if new.id is distinct from old.id
-      or new.couple_id is distinct from old.couple_id
-      or new.token_hash is distinct from old.token_hash
-      or new.expires_at is distinct from old.expires_at
-      or new.redeemed_at is distinct from old.redeemed_at
-      or new.revoked_at is distinct from old.revoked_at
+  if app_private.handoff_active() then
+    if (to_jsonb(new) - 'created_by' - 'redeemed_by')
+      is distinct from (to_jsonb(old) - 'created_by' - 'redeemed_by')
     then
       raise exception 'forbidden';
     end if;
-    if new.created_by is distinct from old.created_by and not exists (
-      select 1 from public.couple_members
-      where couple_id = new.couple_id and user_id = new.created_by
+    if new.created_by is distinct from old.created_by and (
+      old.created_by is distinct from auth.uid()
+      or not exists (
+        select 1 from public.couple_members
+        where couple_id = new.couple_id and user_id = new.created_by
+      )
     ) then
       raise exception 'forbidden';
     end if;
-    if new.redeemed_by is distinct from old.redeemed_by and new.redeemed_by is not null then
+    if new.redeemed_by is distinct from old.redeemed_by and (
+      new.redeemed_by is not null
+      or old.redeemed_by is distinct from auth.uid()
+    ) then
       raise exception 'forbidden';
     end if;
     return new;
@@ -189,106 +192,165 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_name text;
+  v_couple uuid;
+  v_partner uuid;
 begin
   if v_uid is null then
     raise exception 'not_authenticated';
   end if;
 
-  -- Leave can run first. The login is then no longer a member, but finished
-  -- nights, notes, and invites still reference it. Hand those to whoever
-  -- stayed. A couple with nobody else is removed instead.
-  select display_name into v_name
+  -- Leave can run first. The login is then no longer a member, but the
+  -- couple row can still name them as created_by. The last remaining member
+  -- must be able to delete that couple. A partner who is still a member
+  -- keeps the shared history.
+  select display_name, couple_id into v_name, v_couple
   from public.couple_members
   where user_id = v_uid
   limit 1;
 
-  perform set_config('app.membership_handoff', 'on', true);
+  if v_couple is not null then
+    perform 1 from public.couples where id = v_couple for update;
+    select user_id into v_partner
+    from public.couple_members
+    where couple_id = v_couple
+      and user_id <> v_uid
+    order by member_index
+    limit 1;
+  end if;
 
-  update public.couples as owned
-  set created_by = (
-    select member.user_id
-    from public.couple_members as member
-    where member.couple_id = owned.id
-      and member.user_id <> v_uid
-    order by member.member_index
-    limit 1
-  )
-  where owned.created_by = v_uid
-    and exists (
-      select 1 from public.couple_members as member
-      where member.couple_id = owned.id and member.user_id <> v_uid
-    );
+  if v_partner is not null then
+    delete from public.private_date_plans as plan
+    using public.dates as night
+    where plan.date_id = night.id
+      and night.couple_id = v_couple
+      and night.planner_user_id = v_uid
+      and night.status = 'scheduled'
+      and night.revealed_at is null;
 
-  update public.couple_invites as invite
-  set created_by = (
-    select member.user_id
-    from public.couple_members as member
-    where member.couple_id = invite.couple_id
-      and member.user_id <> v_uid
-    order by member.member_index
-    limit 1
-  )
-  where invite.created_by = v_uid
-    and exists (
-      select 1 from public.couple_members as member
-      where member.couple_id = invite.couple_id and member.user_id <> v_uid
-    );
+    update public.dates
+    set status = 'canceled'
+    where couple_id = v_couple
+      and planner_user_id = v_uid
+      and status = 'scheduled'
+      and revealed_at is null;
 
-  update public.couple_invites
-  set redeemed_by = null
-  where redeemed_by = v_uid;
+    delete from public.private_date_plans as plan
+    using public.dates as night
+    where plan.date_id = night.id
+      and night.couple_id = v_couple
+      and night.planner_user_id = v_uid
+      and night.status = 'draft'
+      and night.revealed_at is null;
 
-  -- Do not hand an unrevealed plan to the partner. Revealed and completed
-  -- plans stay, because that night is already shared history.
-  delete from public.private_date_plans as plan
-  using public.dates as night
-  where plan.date_id = night.id
-    and night.planner_user_id = v_uid
-    and night.revealed_at is null
-    and night.status <> 'completed'
-    and exists (
-      select 1 from public.couple_members as member
-      where member.couple_id = night.couple_id and member.user_id <> v_uid
-    );
+    perform app_private.begin_handoff();
+    update public.couples
+    set created_by = v_partner
+    where id = v_couple
+      and created_by = v_uid;
+    update public.couple_invites
+    set created_by = v_partner
+    where couple_id = v_couple
+      and created_by = v_uid;
+    update public.couple_invites
+    set redeemed_by = null
+    where couple_id = v_couple
+      and redeemed_by = v_uid;
+    update public.dates
+    set planner_user_id = v_partner
+    where couple_id = v_couple
+      and planner_user_id = v_uid;
+    update public.memory_notes
+    set author_name = coalesce(
+          nullif(btrim(author_name), ''),
+          nullif(btrim(v_name), ''),
+          'Just Us'
+        ),
+        author_user_id = null
+    where author_user_id = v_uid;
+    perform app_private.end_handoff();
 
-  update public.dates as night
-  set planner_user_id = (
-    select member.user_id
-    from public.couple_members as member
-    where member.couple_id = night.couple_id
-      and member.user_id <> v_uid
-    order by member.member_index
-    limit 1
-  )
-  where night.planner_user_id = v_uid
-    and exists (
-      select 1 from public.couple_members as member
-      where member.couple_id = night.couple_id and member.user_id <> v_uid
-    );
+    delete from public.mood_votes where user_id = v_uid;
+    delete from public.couple_members where user_id = v_uid;
+  elsif v_couple is not null then
+    -- Last member. Delete the couple even when created_by is the person who
+    -- already unlinked and is no longer a member. Cascades clear the foreign
+    -- keys that would otherwise roll back the auth.users delete.
+    perform app_private.delete_couple_photos(v_couple);
+    delete from public.couples where id = v_couple;
+  else
+    -- Already left, and someone else may still be there.
+    perform app_private.begin_handoff();
+    update public.couples as owned
+    set created_by = (
+      select member.user_id
+      from public.couple_members as member
+      where member.couple_id = owned.id
+      order by member.member_index
+      limit 1
+    )
+    where owned.created_by = v_uid
+      and exists (
+        select 1 from public.couple_members as member
+        where member.couple_id = owned.id
+      );
 
-  update public.memory_notes
-  set author_name = coalesce(
-        nullif(btrim(author_name), ''),
-        nullif(btrim(v_name), ''),
-        'Just Us'
-      ),
-      author_user_id = null
-  where author_user_id = v_uid;
+    update public.couple_invites as invite
+    set created_by = (
+      select member.user_id
+      from public.couple_members as member
+      where member.couple_id = invite.couple_id
+      order by member.member_index
+      limit 1
+    )
+    where invite.created_by = v_uid
+      and exists (
+        select 1 from public.couple_members as member
+        where member.couple_id = invite.couple_id
+      );
 
-  -- mood_votes.user_id is in the primary key, so the row cannot stay after
-  -- the user is gone. This removes only the leaver's votes.
-  delete from public.mood_votes where user_id = v_uid;
+    update public.couple_invites
+    set redeemed_by = null
+    where redeemed_by = v_uid;
 
-  delete from public.couple_members where user_id = v_uid;
+    delete from public.private_date_plans as plan
+    using public.dates as night
+    where plan.date_id = night.id
+      and night.planner_user_id = v_uid
+      and night.status = 'scheduled'
+      and night.revealed_at is null;
 
-  delete from public.couples as owned
-  where owned.created_by = v_uid
-    and not exists (
-      select 1 from public.couple_members as member
-      where member.couple_id = owned.id and member.user_id <> v_uid
-    );
+    update public.dates as night
+    set status = 'canceled'
+    where night.planner_user_id = v_uid
+      and night.status = 'scheduled'
+      and night.revealed_at is null;
 
-  perform set_config('app.membership_handoff', 'off', true);
+    update public.dates as night
+    set planner_user_id = (
+      select member.user_id
+      from public.couple_members as member
+      where member.couple_id = night.couple_id
+      order by member.member_index
+      limit 1
+    )
+    where night.planner_user_id = v_uid
+      and exists (
+        select 1 from public.couple_members as member
+        where member.couple_id = night.couple_id
+      );
+
+    update public.memory_notes
+    set author_name = coalesce(
+          nullif(btrim(author_name), ''),
+          nullif(btrim(v_name), ''),
+          'Just Us'
+        ),
+        author_user_id = null
+    where author_user_id = v_uid;
+    perform app_private.end_handoff();
+
+    delete from public.mood_votes where user_id = v_uid;
+  end if;
 
   delete from auth.users where id = v_uid;
 end;
