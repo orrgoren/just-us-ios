@@ -72,7 +72,8 @@ final class AuthCallbackTests: XCTestCase {
 
     await model.signOut()
     XCTAssertFalse(model.signedIn)
-    XCTAssertNil(try await backend.restore())
+    let restored = try await backend.restore()
+    XCTAssertNil(restored)
     XCTAssertNil(backend.codeVerifier)
     XCTAssertTrue(backend.store.world.otpSentAt.isEmpty)
     XCTAssertEqual(model.screen, .login)
