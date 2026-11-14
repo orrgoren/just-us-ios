@@ -155,15 +155,40 @@ final class FlowUITests: XCTestCase {
 
   private func tapReady(_ element: XCUIElement, in app: XCUIApplication) {
     XCTAssertTrue(element.waitForExistence(timeout: 8))
-    for _ in 0..<4 {
-      if element.isHittable {
+    dismissKeyboard(app)
+    let scroll = app.scrollViews["mainContent"]
+    let hittable = NSPredicate(format: "isHittable == true")
+    for _ in 0..<8 {
+      let ready = XCTNSPredicateExpectation(predicate: hittable, object: element)
+      if XCTWaiter().wait(for: [ready], timeout: 1) == .completed {
         element.tap()
         return
       }
-      app.scrollViews.firstMatch.swipeUp()
+      drag(scroll)
     }
     XCTAssertTrue(element.isHittable)
     element.tap()
+  }
+
+  /// The keyboard pins the focused field, so Create stays below it until the keyboard closes.
+  private func dismissKeyboard(_ app: XCUIApplication) {
+    let done = app.buttons["dismissKeyboard"]
+    if done.waitForExistence(timeout: 2), done.isHittable {
+      done.tap()
+    } else {
+      drag(app.scrollViews["mainContent"])
+    }
+    let gone = NSPredicate(format: "exists == false")
+    _ = XCTWaiter().wait(
+      for: [XCTNSPredicateExpectation(predicate: gone, object: app.keyboards.firstMatch)],
+      timeout: 3
+    )
+  }
+
+  private func drag(_ scroll: XCUIElement) {
+    let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.22))
+    let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
+    start.press(forDuration: 0.05, thenDragTo: end)
   }
 
   func launch(_ extra: [String] = []) -> XCUIApplication {

@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
   @Bindable var model: SessionModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var keyboardDismiss = 0
 
   var body: some View {
     JustScreen {
@@ -39,11 +40,19 @@ struct RootView: View {
         }
         .padding(Theme.Space.screen)
       }
-      .scrollDismissesKeyboard(.interactively)
+      .scrollDismissesKeyboard(.immediately)
       .accessibilityIdentifier(A11y.content)
+      .toolbar {
+        ToolbarItemGroup(placement: .keyboard) {
+          Spacer()
+          Button(L10n.dismissKeyboard) { keyboardDismiss += 1 }
+            .accessibilityIdentifier(A11y.dismissKeyboard)
+        }
+      }
       .environment(\.scrollFieldIntoView) { id in
         proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.2))
       }
+      .environment(\.keyboardDismiss, keyboardDismiss)
       }
     }
     .preferredColorScheme(Launch.preferredScheme)
@@ -163,16 +172,26 @@ private struct ScrollFieldKey: EnvironmentKey {
   static let defaultValue: (String) -> Void = { _ in }
 }
 
+private struct KeyboardDismissKey: EnvironmentKey {
+  static let defaultValue = 0
+}
+
 extension EnvironmentValues {
   var scrollFieldIntoView: (String) -> Void {
     get { self[ScrollFieldKey.self] }
     set { self[ScrollFieldKey.self] = newValue }
+  }
+
+  var keyboardDismiss: Int {
+    get { self[KeyboardDismissKey.self] }
+    set { self[KeyboardDismissKey.self] = newValue }
   }
 }
 
 struct LabeledField: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.scrollFieldIntoView) private var scrollFieldIntoView
+  @Environment(\.keyboardDismiss) private var keyboardDismiss
   @FocusState private var focused: Bool
   var title: String
   @Binding var text: String
@@ -201,9 +220,11 @@ struct LabeledField: View {
       scrollFieldIntoView(identifier)
       Task { @MainActor in
         try? await Task.sleep(for: .milliseconds(350))
+        guard focused else { return }
         scrollFieldIntoView(identifier)
       }
     }
+    .onChange(of: keyboardDismiss) { _, _ in focused = false }
   }
 }
 

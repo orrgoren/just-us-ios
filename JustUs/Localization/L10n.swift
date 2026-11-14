@@ -33,6 +33,7 @@ enum L10n {
   static var setupNamesHelp: String { text("setup.namesHelp", "They'll see the name you chose when they join.") }
   static var settingUp: String { text("setup.settingUp", "Setting up your space…") }
   static var required: String { text("field.required", "Required") }
+  static var dismissKeyboard: String { text("field.done", "Done") }
   static var optional: String { text("field.optional", "Optional") }
   static var yourTurn: String { text("role.yours", "Your turn") }
   static var waitingOnThem: String { text("role.waiting", "Waiting on them") }
