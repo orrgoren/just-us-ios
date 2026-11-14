@@ -84,6 +84,7 @@ final class FlowUITests: XCTestCase {
     let app = launch()
     signIn(app, email: "blair@couple-a.test", code: "000000", expectHome: true)
     XCTAssertTrue(app.otherElements["homeRoot"].waitForExistence(timeout: 8) || app.staticTexts["homeRoot"].exists || app.scrollViews.firstMatch.exists)
+    XCTAssertFalse(app.buttons["haveInvite"].exists)
     XCTAssertFalse(app.staticTexts["A table for two"].exists)
     XCTAssertFalse(app.staticTexts["Only the planner knows"].exists)
   }

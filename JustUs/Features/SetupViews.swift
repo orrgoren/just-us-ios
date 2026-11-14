@@ -33,6 +33,7 @@ struct InviteShareScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
+      InviteBackButton { model.leaveInvite() }
       Text(L10n.inviteTitle).font(Theme.display)
       Text(L10n.inviteBody)
       if let url = inviteURL {
@@ -76,11 +77,9 @@ struct InviteRedeemScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
+      InviteBackButton { model.leaveInvite() }
       Text(L10n.inviteTitle).font(Theme.display)
       Text(bodyCopy)
-      Button(L10n.back) { model.leaveInvite() }
-        .accessibilityIdentifier(A11y.inviteBack)
-        .frame(minHeight: 44)
       if model.signedIn {
         LabeledField(title: L10n.pasteCode, text: $model.inviteInput, identifier: A11y.inviteToken)
       }
@@ -102,5 +101,24 @@ struct InviteRedeemScreen: View {
     if model.pendingReplace { return L10n.replaceBody }
     if model.blocked { return L10n.keptBody }
     return L10n.joinBody
+  }
+}
+
+struct InviteBackButton: View {
+  @Environment(\.colorScheme) private var scheme
+  var action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 6) {
+        Image(systemName: "chevron.backward")
+          .accessibilityHidden(true)
+        Text(L10n.back)
+      }
+      .font(Theme.body.weight(.semibold))
+      .foregroundStyle(Theme.ink(scheme))
+      .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+    }
+    .accessibilityIdentifier(A11y.inviteBack)
   }
 }

@@ -13,9 +13,11 @@ struct MainScreen: View {
         Text(L10n.tabUs).tag(AppTab.settings)
       }
       .pickerStyle(.segmented)
-      Button(L10n.haveInvite) { model.screen = .invite }
-        .accessibilityIdentifier(A11y.haveInvite)
-        .frame(minHeight: 44)
+      if !coupleIsLinked {
+        Button(L10n.haveInvite) { model.screen = .invite }
+          .accessibilityIdentifier(A11y.haveInvite)
+          .frame(minHeight: 44)
+      }
       switch model.tab {
       case .week:
         RitualScreen(model: model)
@@ -25,6 +27,10 @@ struct MainScreen: View {
         SettingsScreen(model: model)
       }
     }
+  }
+
+  private var coupleIsLinked: Bool {
+    model.ritual?.partner != nil || model.settings?.partnerJoined == true
   }
 }
 
