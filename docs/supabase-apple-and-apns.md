@@ -1,6 +1,6 @@
 # Supabase Apple provider and APNs secrets
 
-Nothing in this repository is applied to Supabase. Orr reviews this page, then the values are entered by hand. The private key stays in GitHub secrets and in Supabase secrets. It is not committed.
+Orr reviews this page, then the Apple provider values are entered by hand. The private key stays in GitHub secrets and in Supabase secrets. It is not committed. Schema that is already live is listed under Related schema. The SQL in this repository is not a migration.
 
 The same Apple key covers APNs and Sign in with Apple for `com.orrgoren.justus`.
 
@@ -38,7 +38,7 @@ Callback URL, if the dashboard shows one: `https://vowmukhhnfhtnjlswkun.supabase
 
 ## Edge Function secrets
 
-The proposed sender is `supabase/proposed/functions/send-push/index.ts`. Deploy it only after this page is approved. Set the function secrets to:
+`send-push` v1 is already deployed with `verify_jwt` on. The replacement source is `supabase/proposed/functions/send-push/index.ts`. Do not redeploy it until `supabase/proposed/002_push_deliveries.sql` is applied and Tom has verified the function. Set the function secrets to:
 
 | Secret | Value |
 | --- | --- |
@@ -65,7 +65,15 @@ Push copy, quiet hours (22:00–08:00 local), the one-non-transactional-push-per
 
 ## Related schema
 
-`supabase/proposed/001_push_devices_and_account.sql` adds device tokens, notification preferences, the photo column, account deletion, and unlink. It is not applied. The iOS client calls `delete_my_account` and `leave_couple` and, until those functions exist, shows that nothing changed.
+Already live on `vowmukhhnfhtnjlswkun`: `device_tokens`, `notification_preferences`, `memory_notes.author_name`, `dates.memory_photo_path`, the private `date-photos` bucket, `mood_votes` in `supabase_realtime`, and `leave_couple()` for `authenticated` only. `supabase/proposed/001_push_devices_and_account.sql` records that proposal. Do not apply it again.
+
+Not applied, and waiting for review:
+
+- `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs for the cap, the six-hour dedupe, and the invite nudges.
+- `supabase/proposed/003_memory_photo_and_leave_handoff.sql` — a completed date may change `memory_photo_path` only, `set_memory_photo_path` writes that column, and `leave_couple` hands an open night to the partner who stays.
+- `supabase/proposed/004_delete_my_account.sql` — account deletion that leaves the partner the dates, notes, and photos.
+
+The iOS client calls `delete_my_account`, `leave_couple`, and `set_memory_photo_path`. Until a function exists, that action says nothing changed.
 
 ## What GitHub Actions already has
 

@@ -217,7 +217,7 @@ extension LiveBackend {
       }
       uploaded = true
       try await runWrite { client in
-        try await client.from("dates").update(PhotoPatch(path: path)).eq("id", value: dateId.uuidString).execute()
+        try await client.rpc("set_memory_photo_path", params: PhotoPathParams(pDateId: dateId, pPath: path)).execute()
       }
     } catch {
       if PhotoSavePolicy.shouldDeleteObject(uploadSucceeded: uploaded, recordSucceeded: false), let client {
@@ -456,11 +456,6 @@ private struct PlannerPatch: Encodable {
 private struct RecentIdea: Decodable {
   var snapshotIdeaId: String?
   enum CodingKeys: String, CodingKey { case snapshotIdeaId = "snapshot_idea_id" }
-}
-
-private struct PhotoPatch: Encodable {
-  var path: String
-  enum CodingKeys: String, CodingKey { case path = "memory_photo_path" }
 }
 
 private struct NotesBody: Encodable { var note: String }

@@ -176,3 +176,12 @@ struct CoupleIDParams: Encodable {
     case pCoupleId = "p_couple_id"
   }
 }
+
+struct PhotoPathParams: Encodable {
+  var pDateId: UUID
+  var pPath: String
+  enum CodingKeys: String, CodingKey {
+    case pDateId = "p_date_id"
+    case pPath = "p_path"
+  }
+}
