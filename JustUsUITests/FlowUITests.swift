@@ -51,9 +51,14 @@ final class FlowUITests: XCTestCase {
     name.tap()
     name.typeText("Nova")
     let partner = app.textFields["partnerName"]
+    XCTAssertTrue(partner.waitForExistence(timeout: 4))
+    // The keyboard covers the second field on SE. Scroll it clear before typing.
+    app.scrollViews.firstMatch.swipeUp()
     partner.tap()
     partner.typeText("Rio")
-    app.buttons["createCouple"].tap()
+    let create = app.buttons["createCouple"]
+    if !create.isHittable { app.scrollViews.firstMatch.swipeUp() }
+    create.tap()
     XCTAssertTrue(app.buttons["shareInvite"].waitForExistence(timeout: 8))
   }
 
