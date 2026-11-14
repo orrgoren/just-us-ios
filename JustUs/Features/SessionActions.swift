@@ -186,6 +186,7 @@ extension SessionModel {
       try await self.backend.deleteAccount()
       Telemetry.analytics.record(.accountDeleted)
       self.clearSession()
+      self.email = ""
       self.screen = .login
     }
   }

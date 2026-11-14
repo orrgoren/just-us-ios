@@ -280,14 +280,13 @@ final class SessionModel {
     let kept = email
     await backend.signOut()
     clearSession()
-    email = Launch.isUITest ? "" : kept
+    email = kept
     offerNewLink = false
     screen = .login
     Telemetry.analytics.record(.signedOut)
   }
 
   func clearSession() {
-    email = ""
     code = ""
     draft = CoupleDraft(selfName: "", partnerName: "", weekday: 4, localTime: "20:30", timezone: TimeZone.current.identifier, durationMinutes: 90)
     ritual = nil

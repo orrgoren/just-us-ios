@@ -171,6 +171,9 @@ final class AccountUITests: XCTestCase {
     let field = app.textFields["emailField"]
     XCTAssertTrue(field.waitForExistence(timeout: 12))
     field.tap()
+    if let existing = field.value as? String, existing.contains("@") {
+      field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+    }
     field.typeText(email)
     app.buttons["sendCode"].tap()
     let codeField = app.textFields["codeField"]
