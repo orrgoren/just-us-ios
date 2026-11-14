@@ -1,0 +1,5 @@
+#include "Shared.xcconfig"
+
+APP_ENVIRONMENT = Release
+APNS_ENABLED = YES
+SWIFT_COMPILATION_MODE = wholemodule

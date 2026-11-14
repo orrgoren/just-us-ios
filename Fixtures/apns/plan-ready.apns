@@ -1,0 +1,11 @@
+{
+  "Simulator Target Bundle": "com.orrgoren.justus",
+  "aps": {
+    "alert": {
+      "title": "Just Us",
+      "body": "Your date is ready to reveal."
+    },
+    "sound": "default"
+  },
+  "type": "plan_ready"
+}

@@ -1,0 +1,67 @@
+import Foundation
+
+@MainActor
+final class FakeStore {
+  static let fileName = "justus-uitest-world.json"
+  var world: FakeWorld
+  private let persist: Bool
+
+  init(inMemory: Bool = false) {
+    persist = !inMemory
+    if inMemory {
+      world = FakeWorld.seed()
+    } else {
+      world = Self.read() ?? FakeWorld.seed()
+    }
+  }
+
+  func save() {
+    guard persist else { return }
+    guard let url = Self.fileURL(), let data = try? JSONEncoder().encode(world) else { return }
+    try? data.write(to: url, options: .atomic)
+  }
+
+  static func resetFiles() {
+    guard let url = fileURL() else { return }
+    try? FileManager.default.removeItem(at: url)
+    CacheStore.deleteAll()
+  }
+
+  private static func read() -> FakeWorld? {
+    guard let url = fileURL(), let data = try? Data(contentsOf: url) else { return nil }
+    return try? JSONDecoder().decode(FakeWorld.self, from: data)
+  }
+
+  private static func fileURL() -> URL? {
+    guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+      return nil
+    }
+    let folder = base.appendingPathComponent("JustUs", isDirectory: true)
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    return folder.appendingPathComponent(fileName)
+  }
+}
+
+enum CacheStore {
+  static func deleteAll() {
+    guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+      return
+    }
+    let folder = base.appendingPathComponent("JustUs", isDirectory: true)
+    guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else {
+      return
+    }
+    for file in files where file.lastPathComponent.hasPrefix("cache-") {
+      try? FileManager.default.removeItem(at: file)
+    }
+  }
+
+  static func url(userId: UUID) -> URL? {
+    guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+      return nil
+    }
+    let folder = base.appendingPathComponent("JustUs", isDirectory: true)
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    return folder.appendingPathComponent("cache-\(userId.uuidString).json")
+  }
+}
