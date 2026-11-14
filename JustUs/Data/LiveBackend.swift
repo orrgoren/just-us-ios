@@ -20,6 +20,7 @@ final class LiveBackend: DateBackend {
   func sendCode(email: String) async throws {
     guard let normalized = Validation.email(email) else { throw AppError.invalid(.email) }
     guard let redirect = AuthCallback.redirect else { throw AppError.server(code: "redirect") }
+    AuthStorageReset.clearVerifier()
     try await run { client in
       try await client.auth.signInWithOTP(
         email: normalized,
@@ -40,10 +41,22 @@ final class LiveBackend: DateBackend {
   }
 
   func session(from url: URL) async throws -> SessionUser {
-    try await run { client in
-      let session = try await client.auth.session(from: url)
-      self.cachedUser = session.user.id
-      return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
+    if AuthCallback.isStale(url) {
+      AuthStorageReset.clear()
+      throw AppError.linkExpired
+    }
+    do {
+      return try await run { client in
+        let session = try await client.auth.session(from: url)
+        self.cachedUser = session.user.id
+        return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
+      }
+    } catch let error as AppError {
+      if error == .linkExpired || error == .sessionExpired || error == .notAuthenticated {
+        AuthStorageReset.clear()
+        throw AppError.linkExpired
+      }
+      throw error
     }
   }
 
@@ -64,6 +77,10 @@ final class LiveBackend: DateBackend {
       cachedUser = session.user.id
       return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
     } catch {
+      let mapped = ErrorMap.app(error)
+      if mapped == .sessionExpired || mapped == .linkExpired {
+        AuthStorageReset.clear()
+      }
       return nil
     }
   }
@@ -79,6 +96,9 @@ final class LiveBackend: DateBackend {
     if let client {
       try? await client.auth.signOut()
     }
+    // supabase-swift skips signOut when the access token is already gone, and it never deletes the
+    // PKCE code verifier. Wipe both so the next launch cannot revive a dead session or an old link.
+    AuthStorageReset.clear()
     if let cachedUser { CacheStore.deleteAll() }
     cachedUser = nil
     deviceToken = nil
@@ -325,6 +345,23 @@ struct PushKindBody: Encodable {
 
 struct PushAck: Decodable {
   var decision: String?
+}
+
+enum AuthStorageReset {
+  static let sessionKey = "supabase.auth.token"
+  static let verifierKey = "supabase.auth.token-code-verifier"
+  static let legacySessionKey = "supabase.session"
+
+  static func clear() {
+    let storage = KeychainLocalStorage()
+    try? storage.remove(key: sessionKey)
+    try? storage.remove(key: verifierKey)
+    try? storage.remove(key: legacySessionKey)
+  }
+
+  static func clearVerifier() {
+    try? KeychainLocalStorage().remove(key: verifierKey)
+  }
 }
 
 struct PreferenceRow: Encodable {

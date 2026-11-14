@@ -27,6 +27,13 @@ enum Theme {
   static let title = Font.system(.title2, design: .serif)
   static let body = Font.body
   static let caption = Font.subheadline
+
+  enum Space {
+    static let screen: CGFloat = 28
+    static let section: CGFloat = 24
+    static let stack: CGFloat = 12
+    static let field: CGFloat = 6
+  }
 }
 
 struct JustScreen<Content: View>: View {
@@ -94,28 +101,70 @@ struct GlassCard<Content: View>: View {
 
   var body: some View {
     content
-      .padding(20)
+      .padding(Theme.Space.section)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+  }
+}
+
+struct HelperText: View {
+  @Environment(\.colorScheme) private var scheme
+  var text: String
+
+  var body: some View {
+    Text(text)
+      .font(Theme.caption)
+      .foregroundStyle(Theme.muted(scheme))
+      .fixedSize(horizontal: false, vertical: true)
+  }
+}
+
+struct RoleLine: View {
+  var waiting: Bool
+  var text: String
+
+  var body: some View {
+    Text(text)
+      .font(Theme.caption.weight(.semibold))
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(waiting ? Theme.champagne : Theme.blush, in: Capsule())
   }
 }
 
 struct WineButton: View {
   var title: String
   var identifier: String
+  var busy: Bool = false
+  var busyTitle: String?
   var action: () -> Void
 
   var body: some View {
-    Button(action: action) {
-      Text(title)
-        .font(.body.weight(.semibold))
-        .foregroundStyle(Theme.canvas)
-        .frame(maxWidth: .infinity, minHeight: 48)
-        .background(Theme.wine, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    Button(action: {
+      guard !busy else { return }
+      Haptics.tap()
+      action()
+    }) {
+      HStack(spacing: 10) {
+        if busy {
+          ProgressView()
+            .controlSize(.small)
+            .tint(Theme.canvas)
+        }
+        Text(label)
+          .font(.body.weight(.semibold))
+          .foregroundStyle(Theme.canvas)
+      }
+      .frame(maxWidth: .infinity, minHeight: 48)
+      .background(Theme.wine, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     .buttonStyle(.plain)
+    .disabled(busy)
     .accessibilityIdentifier(identifier)
+    .accessibilityLabel(label)
   }
+
+  private var label: String { busy ? (busyTitle ?? L10n.loading) : title }
 }
 
 struct StatusBanner: View {
@@ -137,5 +186,9 @@ struct StatusBanner: View {
 enum Haptics {
   static func tap() {
     UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+  }
+
+  static func success() {
+    UINotificationFeedbackGenerator().notificationOccurred(.success)
   }
 }

@@ -13,6 +13,8 @@ enum A11y {
   static let weekday = "weekday"
   static let timeField = "timeField"
   static let zoneField = "zoneField"
+  static let durationValue = "durationValue"
+  static let actionRetry = "actionRetry"
   static let dayField = "dayField"
   static let retry = "retryButton"
   static let deleteSubmit = "deleteSubmit"

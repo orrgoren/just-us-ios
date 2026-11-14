@@ -5,6 +5,8 @@ final class FakeBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
   let store: FakeStore
   private let cooldown: TimeInterval
+  /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
+  private(set) var codeVerifier: String?
 
   init(store: FakeStore? = nil, cooldown: TimeInterval? = nil) {
     // Default arguments are nonisolated, so the MainActor store is built in the body.
@@ -23,6 +25,7 @@ final class FakeBackend: DateBackend {
       throw AppError.cooldown(seconds: max(1, Int(cooldown - Date().timeIntervalSince(sent))))
     }
     store.world.otpSentAt[normalized] = Date()
+    codeVerifier = UUID().uuidString
     store.save()
   }
 
@@ -40,9 +43,14 @@ final class FakeBackend: DateBackend {
   func session(from url: URL) async throws -> SessionUser {
     try guardOnline()
     guard AuthCallback.isCallback(url) else { throw AppError.notAuthenticated }
-    guard let email = store.world.otpSentAt.max(by: { $0.value < $1.value })?.key else {
-      throw AppError.notAuthenticated
+    if AuthCallback.isStale(url) { throw AppError.linkExpired }
+    let items = AuthCallback.params(url)
+    let hasGrant = items["code"] != nil || items["access_token"] != nil
+    guard hasGrant, codeVerifier != nil, let email = store.world.otpSentAt.max(by: { $0.value < $1.value })?.key else {
+      throw AppError.linkExpired
     }
+    codeVerifier = nil
+    store.world.otpSentAt[email] = nil
     let account = user(email: email)
     store.world.sessionUserId = account.id
     store.save()
@@ -69,6 +77,8 @@ final class FakeBackend: DateBackend {
 
   func signOut() async {
     store.world.sessionUserId = nil
+    store.world.otpSentAt = [:]
+    codeVerifier = nil
     store.save()
     CacheStore.deleteAll()
   }
