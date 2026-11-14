@@ -63,6 +63,7 @@ enum A11y {
   static let memoryNoteField = "memoryNoteField"
   static let memorySave = "memorySave"
   static let content = "mainContent"
+  static let dismissKeyboard = "dismissKeyboard"
   static let homeRoot = "homeRoot"
   static let loginRoot = "loginRoot"
   static let settingsRoot = "settingsRoot"
