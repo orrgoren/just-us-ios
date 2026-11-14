@@ -39,7 +39,12 @@ enum Launch {
   /// A UI-test relaunch, such as opening a deep link, repeats the same reset token.
   /// A new test passes a new token and starts from an empty store.
   private static func resetFakeStoreIfNeeded(_ arguments: [String]) {
+    let openingLink = arguments.contains { $0.contains("://") }
     guard let flag = arguments.firstIndex(of: "-uitestReset") else {
+      let repeatedLaunch = UserDefaults.standard.string(forKey: "justus.uitest.reset") != nil
+      if openingLink || (repeatedLaunch && !arguments.contains("-JustUsScreen")) {
+        return
+      }
       FakeStore.resetFiles()
       return
     }

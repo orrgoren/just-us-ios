@@ -120,11 +120,13 @@ final class FlowUITests: XCTestCase {
   func testPartnerMoodDeepLink() {
     let app = launch()
     signIn(app, email: "alex@couple-a.test", code: "000000", expectHome: true)
-    app.terminate()
-    app.launchArguments += ["-uitestKeep", "-JustUsURL", "justus://uitest/partner-mood"]
-    app.launch()
+    guard let url = URL(string: "justus://uitest/partner-mood") else {
+      XCTFail("Missing test URL")
+      return
+    }
+    app.open(url)
     UITestLaunch.record(app)
-    let mood = app.staticTexts["partnerMood"]
+    let mood = app.staticTexts.matching(NSPredicate(format: "identifier == 'partnerMood' AND label CONTAINS %@", "Easy together")).firstMatch
     XCTAssertTrue(mood.waitForExistence(timeout: 8))
   }
 
