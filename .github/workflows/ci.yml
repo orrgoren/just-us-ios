@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: SE and unit tests
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Tools
+        run: brew install xcodegen swiftlint
+      - name: Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python3 scripts/write-secrets.py
+      - name: Project
+        run: xcodegen generate
+      - name: Lint and copy checks
+        run: |
+          swiftlint lint
+          python3 scripts/check-literals.py
+          python3 scripts/check-apple-docs.py
+      - name: Test on iPhone SE
+        env:
+          SCREENSHOT_PREFIX: se
+        run: |
+          set -euo pipefail
+          UDID=$(python3 scripts/select-simulator.py se)
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
+          xcodebuild test \
+            -project JustUs.xcodeproj \
+            -scheme JustUs \
+            -destination "platform=iOS Simulator,id=${UDID}" \
+            -resultBundlePath build/se.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Export screenshots
+        if: always()
+        run: |
+          mkdir -p artifacts/screenshots
+          xcrun xcresulttool export attachments --path build/se.xcresult --output-path artifacts/screenshots || true
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: se-results
+          path: |
+            build/se.xcresult
+            artifacts/screenshots
+          if-no-files-found: warn
+
+  promax:
+    name: Pro Max UI tests
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Tools
+        run: brew install xcodegen
+      - name: Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python3 scripts/write-secrets.py
+      - name: Project
+        run: xcodegen generate
+      - name: UI tests on Pro Max
+        env:
+          SCREENSHOT_PREFIX: promax
+        run: |
+          set -euo pipefail
+          UDID=$(python3 scripts/select-simulator.py promax)
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
+          xcodebuild test \
+            -project JustUs.xcodeproj \
+            -scheme JustUs \
+            -destination "platform=iOS Simulator,id=${UDID}" \
+            -only-testing:JustUsUITests \
+            -resultBundlePath build/promax.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Export screenshots
+        if: always()
+        run: |
+          mkdir -p artifacts/screenshots
+          xcrun xcresulttool export attachments --path build/promax.xcresult --output-path artifacts/screenshots || true
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promax-results
+          path: |
+            build/promax.xcresult
+            artifacts/screenshots
+          if-no-files-found: warn

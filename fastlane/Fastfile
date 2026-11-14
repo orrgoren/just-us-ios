@@ -1,0 +1,123 @@
+# APNS_KEY_ID (S6M487B43U) and APNS_KEY_P8 are for the Supabase Edge Function,
+# documented in docs/supabase-apple-and-apns.md. This lane does not read them.
+default_platform(:ios)
+
+BUNDLE_IDENTIFIER = "com.orrgoren.justus"
+BUNDLE_RESOURCE_ID = "XZ2BWSBK3R"
+REQUIRED_CAPABILITIES = %w[PUSH_NOTIFICATIONS APPLE_ID_AUTH].freeze
+
+platform :ios do
+  desc "Verify the existing App ID, archive Release with automatic signing, upload to internal TestFlight. Does not register a bundle id."
+  lane :beta do
+    api_key = connect_api_key
+    bundle = verify_existing_bundle_id
+    ensure_app_store_record(bundle)
+    ipa = archive_release
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: ipa,
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+      changelog: "Internal TestFlight build of Just Us."
+    )
+  end
+end
+
+def connect_api_key
+  require_env!("ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_KEY_P8", "APPLE_TEAM_ID")
+  key_content = normalized_p8(ENV.fetch("ASC_KEY_P8"))
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_content: key_content,
+    is_key_content_base64: false,
+    duration: 1200,
+    in_house: false
+  )
+end
+
+def verify_existing_bundle_id
+  UI.message("Checking App ID #{BUNDLE_IDENTIFIER} (#{BUNDLE_RESOURCE_ID}). Registration is skipped.")
+  bundle = Spaceship::ConnectAPI::BundleId.find(BUNDLE_IDENTIFIER)
+  UI.user_error!("App ID #{BUNDLE_IDENTIFIER} was not found. This lane does not create it.") if bundle.nil?
+  unless bundle.id == BUNDLE_RESOURCE_ID
+    UI.user_error!("Found #{bundle.identifier} but resource id is #{bundle.id}, expected #{BUNDLE_RESOURCE_ID}.")
+  end
+  present = bundle.get_capabilities.map { |capability| capability.capability_type.to_s }
+  missing = REQUIRED_CAPABILITIES - present
+  unless missing.empty?
+    UI.user_error!("App ID is missing capabilities: #{missing.join(', ')}. Present: #{present.join(', ')}.")
+  end
+  UI.success("Verified #{bundle.identifier} (#{bundle.id}) with #{REQUIRED_CAPABILITIES.join(' and ')}.")
+  bundle
+end
+
+def ensure_app_store_record(bundle)
+  existing = Spaceship::ConnectAPI::App.find(BUNDLE_IDENTIFIER)
+  if existing
+    UI.success("App Store Connect app already exists (#{existing.id}).")
+    return existing
+  end
+  UI.message("Creating the App Store Connect app record. The App ID itself is not modified.")
+  Spaceship::ConnectAPI::App.create(
+    name: "Just Us",
+    bundle_id: bundle.id,
+    sku: "just-us-ios",
+    primary_locale: "en-US",
+    platforms: ["IOS"],
+    version_string: "1.0"
+  )
+end
+
+def archive_release
+  team_id = ENV.fetch("APPLE_TEAM_ID")
+  key_path = write_api_key_once
+  build_app(
+    project: "JustUs.xcodeproj",
+    scheme: "JustUs",
+    configuration: "Release",
+    export_method: "app-store",
+    export_team_id: team_id,
+    output_directory: "./build",
+    output_name: "JustUs.ipa",
+    clean: true,
+    export_options: {
+      signingStyle: "automatic",
+      teamID: team_id
+    },
+    xcargs: [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath '#{key_path}'",
+      "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
+      "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
+      "DEVELOPMENT_TEAM=#{team_id}",
+      "CODE_SIGN_STYLE=Automatic"
+    ].join(" ")
+  )
+  ipa = File.expand_path("./build/JustUs.ipa")
+  UI.user_error!("Archive did not produce #{ipa}") unless File.exist?(ipa)
+  ipa
+end
+
+def require_env!(*names)
+  missing = names.select { |name| ENV[name].to_s.strip.empty? }
+  return if missing.empty?
+
+  UI.user_error!("Missing environment: #{missing.join(', ')}. APNS key secrets are not required for this upload.")
+end
+
+def normalized_p8(raw)
+  text = raw.to_s.strip
+  return text if text.include?("BEGIN PRIVATE KEY")
+
+  require "base64"
+  Base64.decode64(text).force_encoding("UTF-8")
+end
+
+def write_api_key_once
+  path = File.expand_path("../build/AuthKey_#{ENV.fetch('ASC_KEY_ID')}.p8", __dir__)
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, normalized_p8(ENV.fetch("ASC_KEY_P8")))
+  File.chmod(0o600, path)
+  path
+end

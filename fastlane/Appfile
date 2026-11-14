@@ -1,0 +1,2 @@
+app_identifier("com.orrgoren.justus")
+# Team id comes from the APPLE_TEAM_ID secret at runtime. It is not committed.
