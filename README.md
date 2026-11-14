@@ -28,4 +28,4 @@ Supabase still needs the Apple provider and the APNs Edge Function secrets. Do n
 
 Edge Function secrets: `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_KEY_P8`, and `APNS_USE_SANDBOX` when the build uses the development push entitlement. The full field list is in [docs/supabase-apple-and-apns.md](docs/supabase-apple-and-apns.md).
 
-Proposed SQL and the sender live under `supabase/proposed/`. Nothing there is applied.
+`supabase/proposed/001_push_devices_and_account.sql` is already live (device tokens, notification preferences, author name, the photo column, the date-photos bucket, and `leave_couple`). Do not apply it again. `memory_notes.author_user_id` is still NOT NULL live; 001 does not drop that. `002` through `006`, the live snapshots in `supabase/proposed/live/`, `005_rollback.sql`, and the rewritten `send-push` are not applied. The deployed sender is still v1.

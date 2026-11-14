@@ -186,7 +186,7 @@ enum SeedBuilder {
       id: SeedID.dateRiley, coupleId: SeedID.coupleRiley, status: .completed, scheduledAt: now,
       durationMinutes: 90, location: .home, locationIsOverride: false,
       publicTeaser: nil, outfitHint: nil, revealedAt: now, plannerUserId: SeedID.riley,
-      ideaId: "h1", planTitle: "Kept night", privateNotes: nil, photoJPEG: nil,
+      ideaId: "h1", planTitle: "Kept night", privateNotes: nil, photoJPEG: PhotoBytes.sample(),
       snapshotTitle: "Kept night", snapshotEmoji: "♥", snapshotSummary: "Together", completedAt: now
     ))
     world.notes.append(FakeNote(

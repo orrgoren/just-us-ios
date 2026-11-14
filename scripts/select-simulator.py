@@ -105,13 +105,43 @@ def self_test():
     print("select-simulator self-test passed")
 
 
+def ensure_compact_se(listing):
+    """Create a 375pt iPhone SE when the runtime has that device type."""
+    if any("iPhone SE" in phone["name"] for phone in devices_from(listing)):
+        return listing
+    try:
+        types = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"]))
+        runtimes = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"]))
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        return listing
+    device_type = next((item.get("identifier") for item in types.get("devicetypes", []) if "iPhone SE" in item.get("name", "")), None)
+    available = [item for item in runtimes.get("runtimes", []) if item.get("isAvailable") and "iOS" in item.get("name", "")]
+    if not device_type or not available:
+        print("No 375pt iPhone SE device type on this runtime", file=sys.stderr)
+        return listing
+    runtime = sorted(available, key=lambda item: item.get("identifier", ""))[-1]
+    try:
+        created = subprocess.check_output([
+            "xcrun", "simctl", "create", "iPhone SE (3rd generation)", device_type, runtime["identifier"],
+        ], text=True).strip()
+        print(f"created 375pt simulator {created}", file=sys.stderr)
+    except subprocess.CalledProcessError:
+        print("Could not create a 375pt iPhone SE; using the compact iPhone", file=sys.stderr)
+        return listing
+    raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"])
+    return json.loads(raw)
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--self-test":
         self_test()
         return
     kind = sys.argv[1] if len(sys.argv) > 1 else "se"
     raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"])
-    chosen = choose(json.loads(raw), kind)
+    listing = json.loads(raw)
+    if kind == "se":
+        listing = ensure_compact_se(listing)
+    chosen = choose(listing, kind)
     print(f"selected {kind}: {chosen['name']} ({chosen['runtime']})", file=sys.stderr)
     print(chosen["udid"])
 

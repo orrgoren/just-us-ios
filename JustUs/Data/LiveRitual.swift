@@ -20,6 +20,7 @@ extension LiveBackend {
         onConflict: "date_id,user_id"
       ).execute()
     }
+    await notify("partnerMood")
   }
 
   func setPlace(_ choice: PlaceChoice) async throws {
@@ -88,6 +89,7 @@ extension LiveBackend {
         scheduledAt: ISO8601DateFormatter().string(from: when), status: "scheduled"
       )).eq("id", value: date.id.uuidString).eq("status", value: "draft").execute()
     }
+    await notify("planReady")
   }
 
   func reveal() async throws {
@@ -159,13 +161,30 @@ extension LiveBackend {
     guard let context = try await loadContext() else { return [] }
     let rows: [MemoryDateRow] = try await runWrite { client in
       let response: PostgrestResponse<[MemoryDateRow]> = try await client.from("dates")
-        .select("id, scheduled_at, location, completed_at, snapshot_title, snapshot_emoji, snapshot_summary, snapshot_idea_id, memory_notes(id, author_user_id, note)")
+        .select("id, scheduled_at, location, completed_at, snapshot_title, snapshot_emoji, snapshot_summary, snapshot_idea_id, memory_photo_path, memory_notes(id, author_user_id, author_name, note)")
         .eq("couple_id", value: context.couple.id.uuidString).eq("status", value: "completed")
         .order("completed_at", ascending: false).execute()
       return response.value
     }
-    return rows.enumerated().map { index, row in
-      MemoryItem(
+    var items: [MemoryItem] = []
+    for (index, row) in rows.enumerated() {
+      var jpeg: Data?
+      var state: PhotoState = .empty
+      if let path = row.memoryPhotoPath, !path.isEmpty {
+        jpeg = try? await runWrite { client in
+          try await client.storage.from("date-photos").download(path: path)
+        }
+        state = jpeg == nil ? .failed : .saved
+      }
+      let notes = (row.memoryNotes ?? []).map { note in
+        let memberName = context.members.first { $0.userId == note.authorUserId }?.displayName
+        let name = (note.authorName?.isEmpty == false ? note.authorName : nil) ?? memberName ?? ""
+        return MemoryNote(
+          id: note.id, authorUserId: note.authorUserId,
+          authorName: name, note: note.note, mine: note.authorUserId == context.userId
+        )
+      }
+      items.append(MemoryItem(
         id: row.id,
         title: catalogTitle(row),
         emoji: row.snapshotEmoji ?? "♥",
@@ -173,16 +192,11 @@ extension LiveBackend {
         location: row.location == "out" ? .out : .home,
         when: APIDate.parse(row.completedAt) ?? APIDate.parse(row.scheduledAt) ?? Date(),
         number: rows.count - index,
-        notes: (row.memoryNotes ?? []).map { note in
-          MemoryNote(
-            id: note.id, authorUserId: note.authorUserId,
-            authorName: context.members.first { $0.userId == note.authorUserId }?.displayName ?? "",
-            note: note.note, mine: note.authorUserId == context.userId
-          )
-        },
-        photoPath: nil, photoJPEG: nil, photoState: .empty
-      )
+        notes: notes,
+        photoPath: row.memoryPhotoPath, photoJPEG: jpeg, photoState: state
+      ))
     }
+    return items
   }
 
   func saveNote(dateId: UUID, noteId: UUID?, text: String) async throws {
@@ -217,7 +231,7 @@ extension LiveBackend {
       }
       uploaded = true
       try await runWrite { client in
-        try await client.from("dates").update(PhotoPatch(path: path)).eq("id", value: dateId.uuidString).execute()
+        try await client.rpc("set_memory_photo_path", params: PhotoPathParams(pDateId: dateId, pPath: path)).execute()
       }
     } catch {
       if PhotoSavePolicy.shouldDeleteObject(uploadSucceeded: uploaded, recordSucceeded: false), let client {
@@ -456,11 +470,6 @@ private struct PlannerPatch: Encodable {
 private struct RecentIdea: Decodable {
   var snapshotIdeaId: String?
   enum CodingKeys: String, CodingKey { case snapshotIdeaId = "snapshot_idea_id" }
-}
-
-private struct PhotoPatch: Encodable {
-  var path: String
-  enum CodingKeys: String, CodingKey { case path = "memory_photo_path" }
 }
 
 private struct NotesBody: Encodable { var note: String }

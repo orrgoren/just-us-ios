@@ -110,7 +110,7 @@ enum DeepLinks {
     switch type {
     case "plan_ready", "planReady", "reveal": return .reveal
     case "partner_mood", "partnerMood", "weekly", "weeklyReminder": return .home
-    case "invite_accepted", "inviteAccepted", "invite_nudge": return .settings
+    case "invite_accepted", "inviteAccepted", "invite_nudge", "inviteNudge": return .settings
     default: return .home
     }
   }
@@ -119,7 +119,7 @@ enum DeepLinks {
     let type = (userInfo["type"] as? String) ?? (userInfo["screen"] as? String) ?? ""
     if type == "reveal" || type == "plan_ready" || type == "planReady" { return .reveal }
     if type == "memories" { return .memories }
-    if type == "settings" || type == "invite_accepted" || type == "inviteAccepted" { return .settings }
+    if type == "settings" || type == "invite_accepted" || type == "inviteAccepted" || type == "invite_nudge" || type == "inviteNudge" { return .settings }
     return pushRoute(type)
   }
 }

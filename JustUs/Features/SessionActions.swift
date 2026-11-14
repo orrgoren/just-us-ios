@@ -16,11 +16,17 @@ extension SessionModel {
         draft.durationMinutes = settings.durationMinutes
       }
       if let ritual {
-        teaser = ritual.date?.publicTeaser ?? teaser
-        outfit = ritual.date?.outfitHint ?? outfit
-        privateNotes = ritual.plan?.privateNotes ?? privateNotes
-        planDay = ritual.date?.scheduledDate ?? planDay
-        planTime = ritual.date?.scheduledTime ?? planTime
+        teaser = ritual.date?.publicTeaser ?? ""
+        outfit = ritual.date?.outfitHint ?? ""
+        privateNotes = ritual.plan?.privateNotes ?? ""
+        planDay = ritual.date?.scheduledDate ?? ""
+        planTime = ritual.date?.scheduledTime ?? ""
+      } else {
+        teaser = ""
+        outfit = ""
+        privateNotes = ""
+        planDay = ""
+        planTime = ""
       }
       offline = false
     } catch {
@@ -165,8 +171,8 @@ extension SessionModel {
     await act {
       try await self.backend.deleteAccount()
       Telemetry.analytics.record(.accountDeleted)
+      self.clearSession()
       self.screen = .login
-      self.showDelete = false
     }
   }
 
@@ -206,12 +212,16 @@ extension SessionModel {
       inviteToken = SeedID.validToken
       screen = .inviteShare
     case "softPrompt": screen = .softPrompt
-    case "inviteRedeem": screen = .invite
+    case "inviteRedeem":
+      signedIn = true
+      screen = .invite
     case "inviteReplace":
+      signedIn = true
       pendingReplace = true
       inviteInput = SeedID.validToken
       screen = .invite
     case "inviteBlocked":
+      signedIn = true
       blocked = true
       screen = .invite
     case "homeSolo":
@@ -244,10 +254,41 @@ extension SessionModel {
       tab = .settings
       showDelete = true
       screen = .main
-    case "offline":
+    case "offline", "errorBanner":
       await signedIn("alex@couple-a.test")
       backend.setOffline(true)
       offline = true
+      errorMessage = L10n.offline
+      screen = .main
+    case "plannerTools", "selectedMood":
+      await signedIn("alex@couple-a.test")
+      screen = .main
+    case "settingsBottom", "signOut":
+      await signedIn("alex@couple-a.test")
+      tab = .settings
+      screen = .main
+    case "photoMemory":
+      await signedIn("riley@busy.test")
+      tab = .memories
+      screen = .main
+    case "revealedPlan":
+      await signedIn("blair@couple-a.test")
+      (backend as? FakeBackend)?.markRevealed()
+      await refresh()
+      focusReveal = true
+      screen = .main
+    case "unlinkConfirm":
+      await signedIn("alex@couple-a.test")
+      tab = .settings
+      confirmUnlink = true
+      screen = .main
+    case "postDeletion":
+      await signedIn("demo@justus.app")
+      deleteConfirm = L10n.deleteWord
+      await deleteAccount()
+    case "notificationTap":
+      await signedIn("alex@couple-a.test")
+      focusReveal = true
       screen = .main
     default:
       screen = .login
@@ -257,6 +298,7 @@ extension SessionModel {
   private func signedIn(_ email: String) async {
     _ = try? await backend.sendCode(email: email)
     _ = try? await backend.verify(email: email, code: "000000")
+    signedIn = true
     await refresh()
   }
 

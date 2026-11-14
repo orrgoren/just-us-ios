@@ -5,20 +5,31 @@ import UserNotifications
 @MainActor
 final class PushRouter {
   static let shared = PushRouter()
-  var handler: ((AppRoute) -> Void)?
+  var handler: ((AppRoute) -> Void)? {
+    didSet { flush() }
+  }
   private var seen: Set<String> = []
+  private var pending: [AppRoute] = []
 
+  /// A tap is the only thing that navigates. A banner and a delivered-notification
+  /// poll used to call this with no tap and move the screen on their own.
   func route(_ userInfo: [AnyHashable: Any], id: String) {
     guard seen.insert(id).inserted else { return }
-    let route = DeepLinks.route(userInfo: userInfo)
-    write(route)
-    handler?(route)
+    let destination = DeepLinks.route(userInfo: userInfo)
+    write(destination)
+    guard let handler else {
+      pending.append(destination)
+      return
+    }
+    handler(destination)
   }
 
-  func delivered() async {
-    let notes = await UNUserNotificationCenter.current().deliveredNotifications()
-    for note in notes {
-      route(note.request.content.userInfo, id: note.request.identifier)
+  private func flush() {
+    guard let handler else { return }
+    let queued = pending
+    pending.removeAll()
+    for destination in queued {
+      handler(destination)
     }
   }
 
@@ -62,7 +73,6 @@ final class JustUsDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
-    await PushRouter.shared.route(notification.request.content.userInfo, id: notification.request.identifier)
     return [.banner, .sound]
   }
 }

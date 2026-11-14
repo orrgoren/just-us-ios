@@ -26,8 +26,7 @@ enum PushPolicy {
 
   static func isTransactional(_ kind: PushKind) -> Bool {
     switch kind {
-    case .planReady: return true
-    case .partnerMood, .inviteAccepted, .weeklyReminder, .inviteNudge: return false
+    case .partnerMood, .planReady, .inviteAccepted, .weeklyReminder, .inviteNudge: return false
     }
   }
 
@@ -44,7 +43,7 @@ enum PushPolicy {
       return .deferUntil(nextQuietEnd(now, timeZone: timeZone))
     }
     switch kind {
-    case .partnerMood, .inviteAccepted:
+    case .partnerMood, .inviteAccepted, .planReady:
       let recent = history.contains { $0.kind == kind && now.timeIntervalSince($0.sentAt) < 6 * 3600 }
       if recent { return .suppress("deduped_6h") }
     case .inviteNudge:
@@ -60,7 +59,7 @@ enum PushPolicy {
       if inSecond && !history.contains(where: { $0.kind == .inviteNudge }) {
         return sendOrDailyCap(kind: kind, now: now, timeZone: timeZone, history: history)
       }
-    case .weeklyReminder, .planReady:
+    case .weeklyReminder:
       break
     }
     return sendOrDailyCap(kind: kind, now: now, timeZone: timeZone, history: history)

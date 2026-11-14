@@ -1,8 +1,11 @@
--- PROPOSED ONLY. Do not apply until Orr approves.
--- This file is not a migration in the web repo and CI never runs it.
--- Review foreign keys against the live schema before applying.
--- The iOS app calls delete_my_account and leave_couple and treats a missing
--- function as "nothing changed".
+-- ALREADY APPLIED. Do not run this file again.
+-- device_tokens, notification_preferences, memory_notes.author_name,
+-- dates.memory_photo_path, the private date-photos bucket, and leave_couple()
+-- are live on vowmukhhnfhtnjlswkun. Applying this file again would replace
+-- leave_couple with the version that leaves an open date stuck on the leaver,
+-- and it would create the delete_my_account that fails on the live foreign
+-- keys. The replacements are 003_memory_photo_and_leave_handoff.sql and
+-- 004_delete_my_account.sql. Neither of those is applied.
 
 create table if not exists public.device_tokens (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -35,7 +38,10 @@ create policy notification_preferences_own on public.notification_preferences
   with check (auth.uid() = user_id);
 
 alter table public.memory_notes add column if not exists author_name text;
-alter table public.memory_notes alter column author_user_id drop not null;
+-- NOT live. memory_notes.author_user_id is still NOT NULL on
+-- vowmukhhnfhtnjlswkun. 004 is the proposed drop. Do not run this statement
+-- by re-applying 001.
+-- alter table public.memory_notes alter column author_user_id drop not null;
 alter table public.dates add column if not exists memory_photo_path text;
 
 insert into storage.buckets (id, name, public)

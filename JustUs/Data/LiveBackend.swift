@@ -7,6 +7,7 @@ final class LiveBackend: DateBackend {
   let client: SupabaseClient?
   var watchTask: Task<Void, Never>?
   private var cachedUser: UUID?
+  private var deviceToken: String?
 
   init() {
     guard let url = URL(string: AppConfig.supabaseURL), AppConfig.supabaseURL.hasPrefix("https://"), !AppConfig.anonKey.isEmpty else {
@@ -56,11 +57,18 @@ final class LiveBackend: DateBackend {
 
   func signOut() async {
     watchTask?.cancel()
+    if let client, let cachedUser, let deviceToken {
+      _ = try? await client.from("device_tokens").delete()
+        .eq("user_id", value: cachedUser.uuidString)
+        .eq("token", value: deviceToken)
+        .execute()
+    }
     if let client {
       try? await client.auth.signOut()
     }
     if let cachedUser { CacheStore.deleteAll() }
     cachedUser = nil
+    deviceToken = nil
   }
 
   func membership() async throws -> MembershipKind {
@@ -106,12 +114,32 @@ final class LiveBackend: DateBackend {
     try await run { client in
       try await client.rpc("redeem_couple_invite", params: RedeemParams(pToken: extracted, pReplaceEmpty: replaceEmpty)).execute()
     }
+    await notify("inviteAccepted")
   }
 
   func registerDevice(token: String) async {
+    deviceToken = token
     guard AppConfig.pushEnabled, let user = cachedUser, let client else { return }
-    let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
-    _ = try? await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+    let environment = AppConfig.pushSandbox ? "sandbox" : "production"
+    let withEnvironment = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
+    do {
+      try await client.from("device_tokens").upsert(withEnvironment, onConflict: "user_id,token").execute()
+    } catch {
+      let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
+      _ = try? await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+    }
+  }
+
+  func notify(_ kind: String) async {
+    guard let client else { return }
+    do {
+      let _: PushAck = try await client.functions.invoke(
+        "send-push",
+        options: FunctionInvokeOptions(body: PushKindBody(kind: kind))
+      )
+    } catch {
+      return
+    }
   }
 
   func setOffline(_ offline: Bool) {}
@@ -263,6 +291,27 @@ struct DeviceTokenRow: Encodable {
     case token
     case platform
   }
+}
+
+struct DeviceTokenEnvRow: Encodable {
+  var userId: UUID
+  var token: String
+  var platform: String
+  var environment: String
+  enum CodingKeys: String, CodingKey {
+    case userId = "user_id"
+    case token
+    case platform
+    case environment
+  }
+}
+
+struct PushKindBody: Encodable {
+  var kind: String
+}
+
+struct PushAck: Decodable {
+  var decision: String?
 }
 
 struct PreferenceRow: Encodable {

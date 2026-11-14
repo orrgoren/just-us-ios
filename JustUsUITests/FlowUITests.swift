@@ -55,12 +55,8 @@ final class FlowUITests: XCTestCase {
     let invalid = launch()
     XCTAssertTrue(invalid.buttons["haveInvite"].waitForExistence(timeout: 12))
     invalid.buttons["haveInvite"].tap()
-    let field = invalid.textFields["inviteToken"]
-    XCTAssertTrue(field.waitForExistence(timeout: 4))
-    field.tap()
-    field.typeText("nope")
-    invalid.buttons["redeemInvite"].tap()
-    XCTAssertTrue(invalid.staticTexts["errorBanner"].waitForExistence(timeout: 5))
+    XCTAssertTrue(invalid.buttons["inviteBack"].waitForExistence(timeout: 4))
+    XCTAssertFalse(invalid.buttons["redeemInvite"].exists)
 
     let jordan = launch()
     signIn(jordan, email: "jordan@invite.test", code: "000000", expectHome: true)
@@ -96,7 +92,10 @@ final class FlowUITests: XCTestCase {
     let app = launch()
     signIn(app, email: "alex@couple-a.test", code: "000000", expectHome: true)
     app.buttons["Us"].tap()
-    app.buttons["signOut"].tap()
+    let signOut = app.buttons["signOut"]
+    if !signOut.waitForExistence(timeout: 2) { app.swipeUp() }
+    XCTAssertTrue(signOut.waitForExistence(timeout: 4))
+    signOut.tap()
     XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 8))
   }
 
@@ -104,7 +103,10 @@ final class FlowUITests: XCTestCase {
     let app = launch()
     signIn(app, email: "demo@justus.app", code: "424242", expectHome: true)
     app.buttons["Us"].tap()
-    app.buttons["deleteAccount"].tap()
+    let delete = app.buttons["deleteAccount"]
+    if !delete.waitForExistence(timeout: 2) { app.swipeUp() }
+    XCTAssertTrue(delete.waitForExistence(timeout: 4))
+    delete.tap()
     app.buttons["deleteSubmit"].tap()
     XCTAssertTrue(app.staticTexts["errorBanner"].waitForExistence(timeout: 5))
   }

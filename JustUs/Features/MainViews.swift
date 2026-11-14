@@ -1,5 +1,6 @@
 import PhotosUI
 import SwiftUI
+import UIKit
 
 struct MainScreen: View {
   @Bindable var model: SessionModel
@@ -12,7 +13,6 @@ struct MainScreen: View {
         Text(L10n.tabUs).tag(AppTab.settings)
       }
       .pickerStyle(.segmented)
-      .accessibilityIdentifier(A11y.tabWeek)
       Button(L10n.haveInvite) { model.screen = .invite }
         .accessibilityIdentifier(A11y.haveInvite)
         .frame(minHeight: 44)
@@ -68,13 +68,26 @@ struct RitualScreen: View {
     VStack(alignment: .leading, spacing: 8) {
       Text(L10n.yourMood).font(Theme.title)
       ForEach(MoodKey.allCases) { mood in
-        Button(L10n.moodName(mood)) { Task { await model.choose(mood: mood) } }
-          .accessibilityIdentifier(A11y.mood(mood))
-          .frame(minHeight: 44)
+        let selected = ritual.moods.first { $0.userId == ritual.selfMember.userId }?.mood == mood
+        Button {
+          Task { await model.choose(mood: mood) }
+        } label: {
+          HStack {
+            Text(L10n.moodName(mood))
+            if selected {
+              Image(systemName: "checkmark")
+                .accessibilityHidden(true)
+            }
+          }
+        }
+        .fontWeight(selected ? .semibold : .regular)
+        .accessibilityIdentifier(A11y.mood(mood))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .frame(minHeight: 44)
       }
       if let partner = ritual.partner {
         let mood = ritual.moods.first { $0.userId == partner.userId }?.mood
-        Text(mood.map { L10n.moodOf(partner.displayName) + " " + L10n.moodName($0) } ?? L10n.waitingChoice)
+        Text(mood.map { L10n.partnerMoodLine(partner.displayName, L10n.moodName($0)) } ?? L10n.waitingChoice)
           .accessibilityIdentifier(A11y.partnerMood)
       }
     }
@@ -140,6 +153,14 @@ struct MemoriesScreen: View {
           VStack(alignment: .leading, spacing: 8) {
             Text(L10n.memoryNumber(memory.number))
             Text(memory.title).font(Theme.title)
+            if let data = memory.photoJPEG, let image = UIImage(data: data) {
+              Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: 220)
+                .accessibilityLabel(L10n.photo)
+                .accessibilityIdentifier(A11y.memoryPhoto)
+            }
             ForEach(memory.notes) { note in
               Text(note.note)
               if note.mine {
@@ -155,13 +176,15 @@ struct MemoriesScreen: View {
         }
       }
       if model.editingDate != nil {
-        LabeledField(title: L10n.moment, text: $model.noteDraft, identifier: A11y.memoryNote)
-        WineButton(title: L10n.saveMoment, identifier: A11y.saveNote) { Task { await model.saveMoment() } }
+        LabeledField(title: L10n.moment, text: $model.noteDraft, identifier: A11y.memoryNoteField)
+        WineButton(title: L10n.saveMoment, identifier: A11y.memorySave) { Task { await model.saveMoment() } }
         Button(L10n.deleteMoment) { Task { await model.deleteMoment() } }.frame(minHeight: 44)
         PhotosPicker(selection: $photo, matching: .images) { Text(L10n.addPhoto) }
-        Button(L10n.samplePhoto) { Task { await model.useSamplePhoto() } }
-          .accessibilityIdentifier(A11y.samplePhoto)
-          .frame(minHeight: 44)
+        if Launch.isUITest {
+          Button(L10n.samplePhoto) { Task { await model.useSamplePhoto() } }
+            .accessibilityIdentifier(A11y.samplePhoto)
+            .frame(minHeight: 44)
+        }
       }
     }
     .onChange(of: photo) { _, item in
@@ -185,19 +208,26 @@ struct SettingsScreen: View {
       if let settings = model.settings {
         Text(settings.selfName)
         Text(settings.partnerName)
-        Toggle(L10n.notifyMood, isOn: moodBinding).accessibilityIdentifier(A11y.tabSettings)
-        Toggle(L10n.notifyPlan, isOn: planBinding)
-        Toggle(L10n.notifyInvite, isOn: inviteBinding)
-        Toggle(L10n.notifyWeek, isOn: weekBinding)
+        Toggle(L10n.notifyMood, isOn: moodBinding).accessibilityIdentifier(A11y.notifyMood)
+        Toggle(L10n.notifyPlan, isOn: planBinding).accessibilityIdentifier(A11y.notifyPlan)
+        Toggle(L10n.notifyInvite, isOn: inviteBinding).accessibilityIdentifier(A11y.notifyInvite)
+        Toggle(L10n.notifyWeek, isOn: weekBinding).accessibilityIdentifier(A11y.notifyWeek)
         if settings.partnerJoined {
           Text(L10n.partnerHere)
-          Button(L10n.unlink) { Task { await model.unlinkPartner() } }
-            .accessibilityIdentifier(A11y.unlink).frame(minHeight: 44)
+          if model.confirmUnlink {
+            Text(L10n.unlinkBody)
+            WineButton(title: L10n.unlinkConfirm, identifier: A11y.unlinkConfirm) { Task { await model.unlinkPartner() } }
+            Button(L10n.stay) { model.confirmUnlink = false }
+              .frame(minHeight: 44)
+          } else {
+            Button(L10n.unlink) { model.confirmUnlink = true }
+              .accessibilityIdentifier(A11y.unlink).frame(minHeight: 44)
+          }
         }
       }
       LabeledField(title: L10n.myName, text: $model.draft.selfName, identifier: A11y.selfName)
       LabeledField(title: L10n.ourTime, text: $model.draft.localTime, identifier: A11y.timeField)
-      WineButton(title: L10n.saveSettings, identifier: A11y.saveDate) { Task { await model.saveSettings() } }
+      WineButton(title: L10n.saveSettings, identifier: A11y.saveSettings) { Task { await model.saveSettings() } }
       if let privacy = URL(string: AppConfig.privacyURL) {
         Link(L10n.privacy, destination: privacy)
       }

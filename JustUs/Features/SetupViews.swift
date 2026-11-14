@@ -43,8 +43,8 @@ struct InviteShareScreen: View {
       if let token = model.inviteToken {
         Text(token).font(.body.monospaced()).textSelection(.enabled)
       }
-      WineButton(title: L10n.continueOn, identifier: A11y.softYes) { model.finishInvite(askPush: true) }
-      Button(L10n.skipInvite) { model.finishInvite(askPush: false) }
+      WineButton(title: L10n.continueOn, identifier: A11y.continueInvite) { model.finishInvite(askPush: true) }
+      Button(L10n.skipInvite) { model.finishInvite(askPush: true) }
         .accessibilityIdentifier(A11y.skipInvite)
         .frame(minHeight: 44)
     }
@@ -78,23 +78,27 @@ struct InviteRedeemScreen: View {
     VStack(alignment: .leading, spacing: 16) {
       Text(L10n.inviteTitle).font(Theme.display)
       Text(bodyCopy)
-      LabeledField(title: L10n.pasteCode, text: $model.inviteInput, identifier: A11y.inviteToken)
-      if model.pendingReplace {
+      Button(L10n.back) { model.leaveInvite() }
+        .accessibilityIdentifier(A11y.inviteBack)
+        .frame(minHeight: 44)
+      if model.signedIn {
+        LabeledField(title: L10n.pasteCode, text: $model.inviteInput, identifier: A11y.inviteToken)
+      }
+      if model.signedIn && model.pendingReplace {
         WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty) {
           Task { await model.redeem(replaceEmpty: true) }
         }
         Button(L10n.stay) { model.pendingReplace = false }
           .accessibilityIdentifier(A11y.stay)
           .frame(minHeight: 44)
-      } else if model.blocked {
-        Text(L10n.keptBody)
-      } else {
+      } else if model.signedIn && !model.blocked {
         WineButton(title: L10n.join, identifier: A11y.redeem) { Task { await model.redeem(replaceEmpty: false) } }
       }
     }
   }
 
   private var bodyCopy: String {
+    if !model.signedIn { return L10n.signInFirst }
     if model.pendingReplace { return L10n.replaceBody }
     if model.blocked { return L10n.keptBody }
     return L10n.joinBody

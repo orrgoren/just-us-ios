@@ -157,6 +157,15 @@ enum L10n {
     }
   }
 
+  static func partnerMoodLine(_ name: String, _ mood: String) -> String {
+    String(format: text("ritual.partnerMoodLine", "%1$@'s mood is %2$@"), locale: .current, name, mood)
+  }
+
+  static var back: String { text("invite.back", "Back") }
+  static var signInFirst: String { text("invite.signInFirst", "Sign in before joining a space.") }
+  static var unlinkConfirm: String { text("settings.unlinkConfirm", "Yes, unlink") }
+  static var photo: String { text("memories.photo", "Photo from the night") }
+
   static func moodOf(_ name: String) -> String {
     String(format: text("ritual.moodOf", "%@'s mood"), locale: .current, name)
   }
