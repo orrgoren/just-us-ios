@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-"""Write Config/Secrets.xcconfig from the environment. Never prints the key."""
+"""Write Config/Secrets.xcconfig from the environment. Never prints the key.
+
+Xcode Cloud and GitHub Actions both set:
+  SUPABASE_URL
+  SUPABASE_ANON_KEY
+No other variable is read. The Apple and APNs keys are not build inputs.
+"""
 
 import os
 from pathlib import Path
 
-url = os.environ["SUPABASE_URL"].strip().replace("//", "/$()/")
-key = os.environ["SUPABASE_ANON_KEY"].strip()
+try:
+    url = os.environ["SUPABASE_URL"].strip().replace("//", "/$()/")
+    key = os.environ["SUPABASE_ANON_KEY"].strip()
+except KeyError as missing:
+    raise SystemExit(
+        "Set SUPABASE_URL and SUPABASE_ANON_KEY. "
+        "Xcode Cloud: workflow → Environment → those two secrets."
+    ) from missing
 if not url or not key:
     raise SystemExit("SUPABASE_URL and SUPABASE_ANON_KEY are required")
 path = Path("Config/Secrets.xcconfig")
