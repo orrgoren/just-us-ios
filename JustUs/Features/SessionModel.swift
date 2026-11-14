@@ -63,6 +63,9 @@ final class SessionModel {
       return
     }
     await restoreOrLogin()
+    if let raw = Launch.argument(after: "-JustUsURL"), let url = URL(string: raw) {
+      await open(url)
+    }
     await PushRouter.shared.delivered()
     PushRouter.shared.handler = { [weak self] route in
       Task { await self?.follow(route) }

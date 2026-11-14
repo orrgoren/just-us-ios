@@ -8,7 +8,7 @@ enum Launch {
     if arguments.contains("-uitest") {
       UserDefaults.standard.set(true, forKey: uitestKey)
       if !arguments.contains("-uitestKeep") {
-        FakeStore.resetFiles()
+        resetFakeStoreIfNeeded(arguments)
       }
     }
     if arguments.contains("-uitest") {
@@ -34,6 +34,25 @@ enum Launch {
     case "light": return .light
     default: return nil
     }
+  }
+
+  /// A UI-test relaunch, such as opening a deep link, repeats the same reset token.
+  /// A new test passes a new token and starts from an empty store.
+  private static func resetFakeStoreIfNeeded(_ arguments: [String]) {
+    guard let flag = arguments.firstIndex(of: "-uitestReset") else {
+      FakeStore.resetFiles()
+      return
+    }
+    let next = arguments.index(after: flag)
+    guard arguments.indices.contains(next) else {
+      FakeStore.resetFiles()
+      return
+    }
+    let token = arguments[next]
+    let key = "justus.uitest.reset"
+    if UserDefaults.standard.string(forKey: key) == token { return }
+    FakeStore.resetFiles()
+    UserDefaults.standard.set(token, forKey: key)
   }
 
   static func argument(after flag: String) -> String? {

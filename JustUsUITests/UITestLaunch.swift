@@ -3,7 +3,7 @@ import XCTest
 enum UITestLaunch {
   static func make(_ extra: [String] = []) -> XCUIApplication {
     let app = XCUIApplication()
-    app.launchArguments = ["-uitest"] + extra
+    app.launchArguments = ["-uitest", "-uitestReset", UUID().uuidString] + extra
     app.launch()
     record(app)
     return app

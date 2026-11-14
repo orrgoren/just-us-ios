@@ -33,6 +33,7 @@ final class FlowUITests: XCTestCase {
     app.buttons["sendCode"].tap()
     XCTAssertTrue(app.textFields["codeField"].waitForExistence(timeout: 8))
     app.buttons["resendCode"].tap()
+    UITestLaunch.record(app)
     XCTAssertTrue(app.staticTexts["errorBanner"].waitForExistence(timeout: 5))
   }
 
@@ -119,11 +120,10 @@ final class FlowUITests: XCTestCase {
   func testPartnerMoodDeepLink() {
     let app = launch()
     signIn(app, email: "alex@couple-a.test", code: "000000", expectHome: true)
-    guard let url = URL(string: "justus://uitest/partner-mood") else {
-      XCTFail("Missing test URL")
-      return
-    }
-    app.open(url)
+    app.terminate()
+    app.launchArguments += ["-uitestKeep", "-JustUsURL", "justus://uitest/partner-mood"]
+    app.launch()
+    UITestLaunch.record(app)
     let mood = app.staticTexts["partnerMood"]
     XCTAssertTrue(mood.waitForExistence(timeout: 8))
   }

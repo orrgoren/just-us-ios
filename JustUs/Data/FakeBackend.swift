@@ -12,7 +12,7 @@ final class FakeBackend: DateBackend {
     if let cooldown {
       self.cooldown = cooldown
     } else {
-      self.cooldown = Launch.isUITest ? 1 : 30
+      self.cooldown = 30
     }
   }
 
