@@ -28,11 +28,12 @@ jobs:
       - name: Build for testing
         run: |
           set -euo pipefail
+          # Xcode 26 has no -continueBuildingAfterErrors flag. The IDE default keeps compiling every file.
+          defaults write com.apple.dt.Xcode IDEBuildingContinueBuildingAfterErrors -bool YES
           xcodebuild build-for-testing \
             -project JustUs.xcodeproj \
             -scheme JustUs \
             -destination "generic/platform=iOS Simulator" \
-            -continueBuildingAfterErrors \
             CODE_SIGNING_ALLOWED=NO
 
   test:
