@@ -80,17 +80,26 @@ end
 def archive_release(api_key)
   team_id = ENV.fetch("APPLE_TEAM_ID")
   profile_name = install_app_store_signing(api_key, team_id)
-  # Manual distribution signing only. Automatic signing makes Xcode request an
-  # iOS App Development profile, which this team cannot create because it has
-  # no devices. -allowProvisioningUpdates is omitted for the same reason.
-  # project.yml stays Automatic so the unsigned CI test build is unchanged.
+  # Manual signing is written onto the JustUs app target only. Global xcargs
+  # would also hit Swift package targets such as swift-crypto, which reject a
+  # provisioning profile. Debug stays Automatic for the unsigned CI test build.
+  # -allowProvisioningUpdates is omitted so Xcode does not request a
+  # Development profile. This team has no devices.
+  update_code_signing_settings(
+    path: "JustUs.xcodeproj",
+    use_automatic_signing: false,
+    targets: ["JustUs"],
+    build_configurations: ["Release"],
+    team_id: team_id,
+    code_sign_identity: "Apple Distribution",
+    profile_name: profile_name
+  )
   build_app(
     project: "JustUs.xcodeproj",
     scheme: "JustUs",
     configuration: "Release",
     export_method: "app-store",
     export_team_id: team_id,
-    codesigning_identity: "Apple Distribution",
     skip_profile_detection: true,
     output_directory: "./build",
     output_name: "JustUs.ipa",
@@ -102,13 +111,7 @@ def archive_release(api_key)
       provisioningProfiles: {
         BUNDLE_IDENTIFIER => profile_name
       }
-    },
-    xcargs: [
-      "CODE_SIGN_STYLE=Manual",
-      "CODE_SIGN_IDENTITY=#{Shellwords.shellescape('Apple Distribution')}",
-      "PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.shellescape(profile_name)}",
-      "DEVELOPMENT_TEAM=#{team_id}"
-    ].join(" ")
+    }
   )
   ipa = File.expand_path("./build/JustUs.ipa")
   UI.user_error!("Archive did not produce #{ipa}") unless File.exist?(ipa)
@@ -116,7 +119,6 @@ def archive_release(api_key)
 end
 
 def install_app_store_signing(api_key, team_id)
-  require "shellwords"
   signing_dir = File.expand_path("../build/signing", __dir__)
   FileUtils.mkdir_p(signing_dir)
   keychain_path = prepare_runner_keychain
@@ -153,6 +155,9 @@ def install_app_store_signing(api_key, team_id)
   profile_type = Actions.lane_context[SharedValues::SIGH_PROFILE_TYPE].to_s
   UI.user_error!("App Store profile was not installed.") if profile_name.to_s.empty?
   UI.user_error!("Expected an app-store profile, got #{profile_type}.") unless profile_type == "app-store"
+  unless profile_name == APP_STORE_PROFILE_NAME
+    UI.user_error!("Expected profile #{APP_STORE_PROFILE_NAME}, got #{profile_name}.")
+  end
   UI.success("Using App Store profile #{profile_name}.")
   profile_name
 end
