@@ -6,6 +6,12 @@ final class FlowUITests: XCTestCase {
     continueAfterFailure = false
   }
 
+  func testLaunchShowsLogin() {
+    let app = launch()
+    XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 12))
+    XCTAssertTrue(app.staticTexts["loginRoot"].exists || app.otherElements["loginRoot"].exists)
+  }
+
   func testInvalidEmailAndBadCodes() {
     let app = launch()
     let email = app.textFields["emailField"]

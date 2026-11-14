@@ -4,7 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The remaining UI tests and Pro Max stay off the default run.
+  # Nightly is not scheduled. Dispatch this workflow with ui_suite=full to run them.
   workflow_dispatch:
+    inputs:
+      ui_suite:
+        description: smoke is launch, create-couple, and sign-out. full adds the rest of the UI tests and Pro Max.
+        type: choice
+        required: true
+        default: smoke
+        options:
+          - smoke
+          - full
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -20,6 +31,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       ui: ${{ steps.filter.outputs.ui }}
+      screenshots: ${{ steps.filter.outputs.screenshots }}
+      full: ${{ steps.filter.outputs.full }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,15 +43,18 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           BEFORE_SHA: ${{ github.event.before }}
+          UI_SUITE: ${{ github.event.inputs.ui_suite || 'smoke' }}
         run: |
           python3 - <<'PY'
           import os
           import subprocess
 
-          def emit(ui):
+          def emit(ui, screenshots, full):
               with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
                   handle.write(f"ui={ui}\n")
-              print(f"ui={ui}")
+                  handle.write(f"screenshots={screenshots}\n")
+                  handle.write(f"full={full}\n")
+              print(f"ui={ui} screenshots={screenshots} full={full}")
 
           def skippable(path):
               return (
@@ -48,13 +64,22 @@ jobs:
                   or path.endswith(".md")
               )
 
+          def ui_file(path):
+              return (
+                  path.startswith("JustUs/Features/")
+                  or path.startswith("JustUs/Design/")
+                  or path.startswith("JustUs/Localization/")
+                  or path.endswith(".xcstrings")
+              )
+
           event = os.environ.get("EVENT_NAME", "")
-          if event == "workflow_dispatch":
-              emit("true")
+          full = "true" if event == "workflow_dispatch" and os.environ.get("UI_SUITE") == "full" else "false"
+          if full == "true":
+              emit("true", "true", "true")
               raise SystemExit(0)
           base = os.environ.get("BASE_SHA", "") if event == "pull_request" else os.environ.get("BEFORE_SHA", "")
           if not base or set(base) <= {"0"}:
-              emit("true")
+              emit("true", "true", full)
               raise SystemExit(0)
           diff = subprocess.run(
               ["git", "diff", "--name-only", base, "HEAD"],
@@ -63,13 +88,15 @@ jobs:
           )
           if diff.returncode != 0:
               print(diff.stderr)
-              emit("true")
+              emit("true", "true", full)
               raise SystemExit(0)
           paths = [line for line in diff.stdout.splitlines() if line.strip()]
           for path in paths:
               print(path)
-          # Empty diff and any file outside the docs/signing allowlist still run the UI suite.
-          emit("false" if paths and all(skippable(path) for path in paths) else "true")
+          # Empty diff and any file outside the docs/signing allowlist still run the smoke UI tests.
+          ui = "false" if paths and all(skippable(path) for path in paths) else "true"
+          screenshots = "true" if any(ui_file(path) for path in paths) else "false"
+          emit(ui, screenshots, full)
           PY
 
   build:
@@ -129,21 +156,34 @@ jobs:
         env:
           SCREENSHOT_PREFIX: se
           TEST_RUNNER_SCREENSHOT_PREFIX: se
+          FULL_UI: ${{ needs.changes.outputs.full }}
         run: |
           set -euo pipefail
           UDID=$(python3 scripts/select-simulator.py se | tail -n 1)
           printf '%s' "se" > /tmp/justus-screenshot-prefix.txt
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b || true
-          xcodebuild test \
-            -project JustUs.xcodeproj \
-            -scheme JustUs \
-            -destination "platform=iOS Simulator,id=${UDID}" \
-            -parallel-testing-enabled NO \
-            -resultBundlePath build/se.xcresult \
+          # Unit tests plus launch, create-couple, and sign-out.
+          # ui_suite=full runs every test in the scheme, including the rest of the UI suite.
+          common=(
+            -project JustUs.xcodeproj
+            -scheme JustUs
+            -destination "platform=iOS Simulator,id=${UDID}"
+            -parallel-testing-enabled NO
+            -resultBundlePath build/se.xcresult
             CODE_SIGNING_ALLOWED=NO
+          )
+          if [ "${FULL_UI}" = "true" ]; then
+            xcodebuild test "${common[@]}"
+          else
+            xcodebuild test "${common[@]}" \
+              -only-testing:JustUsTests \
+              -only-testing:JustUsUITests/FlowUITests/testLaunchShowsLogin \
+              -only-testing:JustUsUITests/FlowUITests/testCreateCoupleAndInvite \
+              -only-testing:JustUsUITests/FlowUITests/testSignOutReturnsToLogin
+          fi
       - name: Export screenshots
-        if: always()
+        if: always() && (needs.changes.outputs.screenshots == 'true' || needs.changes.outputs.full == 'true')
         run: |
           mkdir -p artifacts/screenshots artifacts/failures
           if [ -d build/se.xcresult ]; then
@@ -173,7 +213,7 @@ jobs:
   promax:
     name: Pro Max UI tests
     needs: [build, changes]
-    if: ${{ always() && needs.build.result == 'success' && needs.changes.outputs.ui != 'false' }}
+    if: ${{ always() && needs.build.result == 'success' && needs.changes.outputs.full == 'true' }}
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
