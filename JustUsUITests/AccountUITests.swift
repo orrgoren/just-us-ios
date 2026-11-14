@@ -62,14 +62,21 @@ final class AccountUITests: XCTestCase {
     let app = UITestLaunch.make()
     signIn(app, email: "alex@couple-a.test")
     app.buttons["Us"].tap()
-    let name = app.textFields["selfName"]
+    var name = app.textFields["selfName"]
+    for _ in 0..<4 where name.isHittable == false {
+      app.swipeUp()
+      name = app.textFields["selfName"]
+    }
     XCTAssertTrue(name.waitForExistence(timeout: 4))
     name.tap()
     if let existing = name.value as? String, existing != "My name" {
       name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
     }
     name.typeText("Alexandra")
-    app.buttons["saveSettings"].tap()
+    let save = app.buttons["saveSettings"]
+    if save.isHittable == false { app.swipeUp() }
+    XCTAssertTrue(save.waitForExistence(timeout: 4))
+    save.tap()
     XCTAssertTrue(app.staticTexts["Alexandra"].waitForExistence(timeout: 8))
   }
 
