@@ -4,12 +4,20 @@ default_platform(:ios)
 
 BUNDLE_IDENTIFIER = "com.orrgoren.justus"
 BUNDLE_RESOURCE_ID = "XZ2BWSBK3R"
+APP_STORE_PROFILE_NAME = "Just Us App Store"
 REQUIRED_CAPABILITIES = %w[PUSH_NOTIFICATIONS APPLE_ID_AUTH].freeze
+# Apple Distribution and the older iOS Distribution type. Development, Mac, and
+# Developer ID certificates are left alone.
+DISTRIBUTION_CERTIFICATE_TYPES = [
+  "DISTRIBUTION",
+  "IOS_DISTRIBUTION"
+].freeze
 
 platform :ios do
   desc "Verify the existing App ID, archive Release with App Store distribution signing, upload to internal TestFlight. Does not register a bundle id or a device."
   lane :beta do
     api_key = connect_api_key
+    revoke_distribution_certificates
     bundle = verify_existing_bundle_id
     ensure_app_store_record(bundle)
     ipa = archive_release(api_key)
@@ -113,7 +121,7 @@ def install_app_store_signing(api_key, team_id)
   FileUtils.mkdir_p(signing_dir)
   keychain_path = prepare_runner_keychain
 
-  UI.message("Installing an Apple Distribution certificate into the runner keychain. No development certificate is requested.")
+  UI.message("Installing one Apple Distribution certificate into the runner keychain. No development certificate is requested.")
   get_certificates(
     {
       api_key: api_key,
@@ -127,14 +135,16 @@ def install_app_store_signing(api_key, team_id)
   cert_id = Actions.lane_context[SharedValues::CERT_CERTIFICATE_ID]
   UI.user_error!("Apple Distribution certificate was not installed.") if cert_id.to_s.empty?
 
-  UI.message("Installing the App Store profile for #{BUNDLE_IDENTIFIER}. No devices and no development profile.")
+  delete_named_app_store_profile
+  UI.message("Installing the App Store profile for #{BUNDLE_IDENTIFIER} against #{cert_id}. No devices and no development profile.")
   get_provisioning_profile(
     api_key: api_key,
     app_identifier: BUNDLE_IDENTIFIER,
     team_id: team_id,
     platform: "ios",
     cert_id: cert_id,
-    provisioning_name: "Just Us App Store",
+    provisioning_name: APP_STORE_PROFILE_NAME,
+    force: true,
     output_path: signing_dir,
     filename: "AppStore.mobileprovision",
     skip_install: false
@@ -145,6 +155,37 @@ def install_app_store_signing(api_key, team_id)
   UI.user_error!("Expected an app-store profile, got #{profile_type}.") unless profile_type == "app-store"
   UI.success("Using App Store profile #{profile_name}.")
   profile_name
+end
+
+def revoke_distribution_certificates
+  # The runner keychain is empty, so every previous private key is gone and
+  # those certificates can never sign again. Revoking them frees the account
+  # slot. Apple re-signs builds it has already accepted, so this does not
+  # remove an uploaded TestFlight or App Store build.
+  certs = Spaceship::ConnectAPI::Certificate.all(
+    filter: { certificateType: DISTRIBUTION_CERTIFICATE_TYPES.join(",") }
+  )
+  certs.select! { |cert| DISTRIBUTION_CERTIFICATE_TYPES.include?(cert.certificate_type) }
+  if certs.empty?
+    UI.message("No Apple Distribution or iOS Distribution certificates to revoke.")
+    return
+  end
+  certs.each do |cert|
+    UI.message("Revoking #{cert.certificate_type} #{cert.id} (#{cert.display_name}).")
+    cert.delete!
+  end
+  UI.success("Revoked #{certs.length} distribution certificate(s) on team #{ENV.fetch('APPLE_TEAM_ID')}.")
+end
+
+def delete_named_app_store_profile
+  profiles = Spaceship::ConnectAPI::Profile.all(filter: { name: APP_STORE_PROFILE_NAME })
+  matches = profiles.select { |profile| profile.name == APP_STORE_PROFILE_NAME }
+  return if matches.empty?
+
+  matches.each do |profile|
+    UI.message("Removing provisioning profile #{profile.name} (#{profile.id}) so it can be recreated for the new certificate.")
+    profile.delete!
+  end
 end
 
 def prepare_runner_keychain
