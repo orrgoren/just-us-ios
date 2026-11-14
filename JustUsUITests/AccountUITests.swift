@@ -62,13 +62,13 @@ final class AccountUITests: XCTestCase {
     let app = UITestLaunch.make()
     signIn(app, email: "alex@couple-a.test")
     app.buttons["Us"].tap()
-    var name = app.textFields["selfName"]
-    for _ in 0..<4 where name.isHittable == false {
-      app.swipeUp()
-      name = app.textFields["selfName"]
-    }
+    let name = app.textFields["selfName"]
     XCTAssertTrue(name.waitForExistence(timeout: 4))
+    // A sliver at the bottom of the 375pt SE counts as hittable, then typeText
+    // fails because the field never takes keyboard focus.
+    scrollFullyOnScreen(name, in: app)
     name.tap()
+    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 4))
     if let existing = name.value as? String, existing != "My name" {
       name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
     }
@@ -106,6 +106,22 @@ final class AccountUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["offlineBanner"].waitForExistence(timeout: 8))
     app.buttons["retryButton"].tap()
     XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))
+  }
+
+  private func scrollFullyOnScreen(_ element: XCUIElement, in app: XCUIApplication) {
+    let height = app.frame.height
+    for _ in 0..<6 {
+      let frame = element.frame
+      if frame.minY >= 12, frame.maxY <= height - 96, element.isHittable {
+        return
+      }
+      if frame.minY < 12 {
+        app.swipeDown()
+      } else {
+        app.swipeUp()
+      }
+    }
+    XCTAssertTrue(element.isHittable)
   }
 
   private func signIn(_ app: XCUIApplication, email: String, code: String = "000000") {
