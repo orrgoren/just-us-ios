@@ -7,12 +7,12 @@ BUNDLE_RESOURCE_ID = "XZ2BWSBK3R"
 REQUIRED_CAPABILITIES = %w[PUSH_NOTIFICATIONS APPLE_ID_AUTH].freeze
 
 platform :ios do
-  desc "Verify the existing App ID, archive Release with automatic signing, upload to internal TestFlight. Does not register a bundle id."
+  desc "Verify the existing App ID, archive Release with App Store distribution signing, upload to internal TestFlight. Does not register a bundle id or a device."
   lane :beta do
     api_key = connect_api_key
     bundle = verify_existing_bundle_id
     ensure_app_store_record(bundle)
-    ipa = archive_release
+    ipa = archive_release(api_key)
     upload_to_testflight(
       api_key: api_key,
       ipa: ipa,
@@ -60,7 +60,7 @@ def ensure_app_store_record(bundle)
   end
   UI.message("Creating the App Store Connect app record. The App ID itself is not modified.")
   Spaceship::ConnectAPI::App.create(
-    name: "Just Us",
+    name: "Just Us Couples",
     bundle_id: bundle.id,
     sku: "just-us-ios",
     primary_locale: "en-US",
@@ -69,34 +69,102 @@ def ensure_app_store_record(bundle)
   )
 end
 
-def archive_release
+def archive_release(api_key)
   team_id = ENV.fetch("APPLE_TEAM_ID")
-  key_path = write_api_key_once
+  profile_name = install_app_store_signing(api_key, team_id)
+  # Manual distribution signing only. Automatic signing makes Xcode request an
+  # iOS App Development profile, which this team cannot create because it has
+  # no devices. -allowProvisioningUpdates is omitted for the same reason.
+  # project.yml stays Automatic so the unsigned CI test build is unchanged.
   build_app(
     project: "JustUs.xcodeproj",
     scheme: "JustUs",
     configuration: "Release",
-    export_method: "app-store",
+    export_method: "app-store-connect",
     export_team_id: team_id,
+    codesigning_identity: "Apple Distribution",
+    skip_profile_detection: true,
     output_directory: "./build",
     output_name: "JustUs.ipa",
     clean: true,
     export_options: {
-      signingStyle: "automatic",
-      teamID: team_id
+      signingStyle: "manual",
+      signingCertificate: "Apple Distribution",
+      teamID: team_id,
+      provisioningProfiles: {
+        BUNDLE_IDENTIFIER => profile_name
+      }
     },
     xcargs: [
-      "-allowProvisioningUpdates",
-      "-authenticationKeyPath '#{key_path}'",
-      "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
-      "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
-      "DEVELOPMENT_TEAM=#{team_id}",
-      "CODE_SIGN_STYLE=Automatic"
+      "CODE_SIGN_STYLE=Manual",
+      "CODE_SIGN_IDENTITY=#{Shellwords.shellescape('Apple Distribution')}",
+      "PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.shellescape(profile_name)}",
+      "DEVELOPMENT_TEAM=#{team_id}"
     ].join(" ")
   )
   ipa = File.expand_path("./build/JustUs.ipa")
   UI.user_error!("Archive did not produce #{ipa}") unless File.exist?(ipa)
   ipa
+end
+
+def install_app_store_signing(api_key, team_id)
+  require "shellwords"
+  signing_dir = File.expand_path("../build/signing", __dir__)
+  FileUtils.mkdir_p(signing_dir)
+  keychain_path = prepare_runner_keychain
+
+  UI.message("Installing an Apple Distribution certificate into the runner keychain. No development certificate is requested.")
+  get_certificates(
+    {
+      api_key: api_key,
+      development: false,
+      generate_apple_certs: true,
+      team_id: team_id,
+      platform: "ios",
+      output_path: signing_dir
+    }.merge(keychain_args(keychain_path))
+  )
+  cert_id = Actions.lane_context[SharedValues::CERT_CERTIFICATE_ID]
+  UI.user_error!("Apple Distribution certificate was not installed.") if cert_id.to_s.empty?
+
+  UI.message("Installing the App Store profile for #{BUNDLE_IDENTIFIER}. No devices and no development profile.")
+  get_provisioning_profile(
+    api_key: api_key,
+    app_identifier: BUNDLE_IDENTIFIER,
+    team_id: team_id,
+    development: false,
+    adhoc: false,
+    platform: "ios",
+    cert_id: cert_id,
+    provisioning_name: "Just Us App Store",
+    output_path: signing_dir,
+    filename: "AppStore.mobileprovision",
+    skip_install: false
+  )
+  profile_name = Actions.lane_context[SharedValues::SIGH_NAME]
+  profile_type = Actions.lane_context[SharedValues::SIGH_PROFILE_TYPE].to_s
+  UI.user_error!("App Store profile was not installed.") if profile_name.to_s.empty?
+  UI.user_error!("Expected an app-store profile, got #{profile_type}.") unless profile_type == "app-store"
+  UI.success("Using App Store profile #{profile_name}.")
+  profile_name
+end
+
+def prepare_runner_keychain
+  return nil unless ENV["CI"]
+
+  setup_ci
+  raw = Actions.lane_context[SharedValues::KEYCHAIN_PATH]
+  UI.user_error!("CI keychain was not created.") if raw.to_s.empty?
+  expanded = File.expand_path(raw)
+  path = ["#{expanded}-db", expanded].find { |candidate| File.exist?(candidate) }
+  UI.user_error!("CI keychain was not found at #{expanded}.") if path.nil?
+  path
+end
+
+def keychain_args(keychain_path)
+  return {} if keychain_path.nil?
+
+  { keychain_path: keychain_path, keychain_password: "" }
 end
 
 def require_env!(*names)
@@ -112,12 +180,4 @@ def normalized_p8(raw)
 
   require "base64"
   Base64.decode64(text).force_encoding("UTF-8")
-end
-
-def write_api_key_once
-  path = File.expand_path("../build/AuthKey_#{ENV.fetch('ASC_KEY_ID')}.p8", __dir__)
-  FileUtils.mkdir_p(File.dirname(path))
-  File.write(path, normalized_p8(ENV.fetch("ASC_KEY_P8")))
-  File.chmod(0o600, path)
-  path
 end

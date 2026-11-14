@@ -12,7 +12,7 @@ The lane checks the existing App ID. It does not register a bundle id.
 | Resource id | `XZ2BWSBK3R` |
 | Capabilities | `PUSH_NOTIFICATIONS`, `APPLE_ID_AUTH` |
 
-Signing uses the App Store Connect API key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`) and `APPLE_TEAM_ID` (`694YR89B4S`). No certificates are committed. If the App Store Connect app record “Just Us” (English, sku `just-us-ios`) is missing, the lane creates that record only. It does not modify the App ID.
+Signing uses the App Store Connect API key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`) and `APPLE_TEAM_ID` (`694YR89B4S`). The lane installs an Apple Distribution certificate and an App Store provisioning profile (`Just Us App Store`) into the runner keychain, then archives with manual signing (`CODE_SIGN_IDENTITY` `Apple Distribution`). It does not request a Development profile and does not register a device. No certificates, profiles, or keys are committed. The App Store Connect record is “Just Us Couples” (English, sku `just-us-ios`). The lane finds it by bundle id and does not rename it. If that record is missing, the lane creates it with that name. It does not modify the App ID.
 
 `APNS_KEY_ID` (`S6M487B43U`) and `APNS_KEY_P8` are not used by the upload. They belong to the Supabase Edge Function in [supabase-apple-and-apns.md](supabase-apple-and-apns.md).
 
