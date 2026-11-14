@@ -41,6 +41,7 @@ final class SessionModel {
   var momentDraft = ""
   var focusReveal = false
   let backend: any DateBackend
+  let pendingAppleNonce = AppleNonceBox()
   private let apple = AppleSignInCoordinator()
   var outbox: [String: Pending] = [:]
 
@@ -89,10 +90,14 @@ final class SessionModel {
   func verify() async {
     await work {
       _ = try await self.backend.verify(email: self.email, code: self.code)
-      Telemetry.analytics.record(.signedIn(method: "otp"))
-      self.signedIn = true
-      await self.refresh()
-      self.screen = self.ritual == nil ? .setup : .main
+      await self.finishEmailSignIn()
+    }
+  }
+
+  func completeEmailLink(_ url: URL) async {
+    await work {
+      _ = try await self.backend.session(from: url)
+      await self.finishEmailSignIn()
     }
   }
 
@@ -107,14 +112,26 @@ final class SessionModel {
   }
 
   func signInWithApple() async {
+    let result: (token: String, nonce: String)
+    do {
+      result = try await apple.start()
+    } catch {
+      reportApple(error)
+      return
+    }
     await work {
-      let result = try await self.apple.start()
       _ = try await self.backend.signInWithApple(idToken: result.token, nonce: result.nonce)
       Telemetry.analytics.record(.signedIn(method: "apple"))
       self.signedIn = true
       await self.refresh()
       self.screen = self.ritual == nil ? .setup : .main
     }
+  }
+
+  func reportApple(_ error: Error) {
+    guard !AppleSignInFailure.isCancellation(error) else { return }
+    AppleSignInFailure.log(error)
+    errorMessage = AppleSignInFailure.message(for: error)
   }
 
   func createCouple() async {
@@ -176,6 +193,10 @@ final class SessionModel {
   func open(_ url: URL) async {
     if Launch.isUITest, url.host == "uitest" {
       await uitest(url)
+      return
+    }
+    if AuthCallback.isCallback(url) {
+      await completeEmailLink(url)
       return
     }
     guard let route = DeepLinks.route(from: url) else { return }
@@ -244,11 +265,19 @@ final class SessionModel {
     if let _ = try? await backend.restore() {
       signedIn = true
       await refresh()
-      screen = ritual == nil ? .setup : .main
-    } else {
-      signedIn = false
+      if screen == .loading || screen == .login || screen == .code {
+        screen = ritual == nil ? .setup : .main
+      }
+    } else if !signedIn && screen == .loading {
       screen = .login
     }
+  }
+
+  private func finishEmailSignIn() async {
+    Telemetry.analytics.record(.signedIn(method: "otp"))
+    signedIn = true
+    await refresh()
+    screen = ritual == nil ? .setup : .main
   }
 
   private func work(_ body: () async throws -> Void) async {

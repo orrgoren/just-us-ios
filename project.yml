@@ -39,6 +39,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.orrgoren.justus
+        # JustUs/Info.plist registers the justus scheme used by justus://auth-callback.
         INFOPLIST_FILE: JustUs/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1"

@@ -7,17 +7,17 @@ enum L10n {
   static var tagline: String { text("brand.tagline", "One night. Every week. Just us.") }
   static var wordmark: String { text("brand.wordmark", "Just Us") }
   static var loginTitle: String { text("auth.loginTitle", "A night that is only yours") }
-  static var loginBody: String { text("auth.loginBody", "Sign in with Apple, or with a six-digit code from your email. No links to tap.") }
+  static var loginBody: String { text("auth.loginBody", "Sign in with Apple, or with a link we email to this iPhone.") }
   static var emailLabel: String { text("auth.email", "Email") }
   static var emailPrompt: String { text("auth.emailPrompt", "you@example.com") }
-  static var sendCode: String { text("auth.sendCode", "Email me a code") }
+  static var sendCode: String { text("auth.sendCode", "Email me a sign-in link") }
   static var apple: String { text("auth.apple", "Sign in with Apple") }
   static var haveInvite: String { text("auth.haveInvite", "I have an invite") }
-  static var codeTitle: String { text("auth.codeTitle", "Enter your code") }
-  static var codeBody: String { text("auth.codeBody", "We sent a six-digit code. It expires soon.") }
+  static var codeTitle: String { text("auth.codeTitle", "Check your email") }
+  static var codeBody: String { text("auth.codeBody", "Check your email and tap the sign-in link on this iPhone.") }
   static var codeLabel: String { text("auth.code", "Code") }
   static var verify: String { text("auth.verify", "Continue") }
-  static var resend: String { text("auth.resend", "Resend code") }
+  static var resend: String { text("auth.resend", "Resend link") }
   static var useAnotherEmail: String { text("auth.another", "Use a different email") }
   static var setupTitle: String { text("setup.title", "Make it yours") }
   static var setupBody: String { text("setup.body", "Your name, their name, and the evening you want to keep.") }

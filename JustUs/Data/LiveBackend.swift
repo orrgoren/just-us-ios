@@ -19,8 +19,13 @@ final class LiveBackend: DateBackend {
 
   func sendCode(email: String) async throws {
     guard let normalized = Validation.email(email) else { throw AppError.invalid(.email) }
+    guard let redirect = AuthCallback.redirect else { throw AppError.server(code: "redirect") }
     try await run { client in
-      try await client.auth.signInWithOTP(email: normalized, shouldCreateUser: true)
+      try await client.auth.signInWithOTP(
+        email: normalized,
+        redirectTo: redirect,
+        shouldCreateUser: true
+      )
     }
   }
 
@@ -29,6 +34,14 @@ final class LiveBackend: DateBackend {
     return try await run { client in
       let response = try await client.auth.verifyOTP(email: normalized, token: digits, type: .email)
       guard let session = response.session else { throw AppError.notAuthenticated }
+      self.cachedUser = session.user.id
+      return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
+    }
+  }
+
+  func session(from url: URL) async throws -> SessionUser {
+    try await run { client in
+      let session = try await client.auth.session(from: url)
       self.cachedUser = session.user.id
       return SessionUser(id: session.user.id, email: session.user.email, displayHint: nil)
     }
