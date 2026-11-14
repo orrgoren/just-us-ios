@@ -59,6 +59,9 @@ enum ErrorMap {
     if let postgrest = error as? PostgrestError {
       return fromPostgrest(postgrest)
     }
+    if let auth = error as? AuthError {
+      return fromAuth(auth)
+    }
     let text = String(describing: error).lowercased()
     if text.contains("jwt") || text.contains("401") || text.contains("sessionmissing") {
       return .sessionExpired
@@ -66,6 +69,41 @@ enum ErrorMap {
     if text.contains("timed out") { return .timeout }
     if text.contains("offline") || text.contains("network") { return .offline }
     return .server(code: "unknown")
+  }
+
+  private static func fromAuth(_ error: AuthError) -> AppError {
+    switch error {
+    case .sessionMissing:
+      return .sessionExpired
+    case .pkceGrantCodeExchange(_, _, _), .implicitGrantRedirect(_):
+      return .linkExpired
+    case .api(let message, let code, _, let response):
+      if isStaleLink(code.rawValue, message) { return .linkExpired }
+      if isDeadSession(code.rawValue, message, status: response.statusCode) { return .sessionExpired }
+      return .server(code: code.rawValue)
+    default:
+      let text = error.message.lowercased()
+      if text.contains("session") || text.contains("jwt") { return .sessionExpired }
+      return .server(code: "auth")
+    }
+  }
+
+  private static func isStaleLink(_ code: String, _ message: String) -> Bool {
+    let blob = "\(code) \(message)".lowercased()
+    let markers = ["otp_expired", "flow_state_expired", "flow_state_not_found", "bad_code_verifier", "expired", "already used", "already been used"]
+    return markers.contains { blob.contains($0) }
+  }
+
+  private static func isDeadSession(_ code: String, _ message: String, status: Int) -> Bool {
+    let normalized = code.lowercased()
+    let sessionCodes = [
+      "session_expired", "session_not_found", "refresh_token_not_found",
+      "refresh_token_already_used", "bad_jwt", "invalid_jwt"
+    ]
+    if sessionCodes.contains(normalized) { return true }
+    let blob = "\(normalized) \(message.lowercased())"
+    if blob.contains("jwt") || blob.contains("session") { return true }
+    return status == 401
   }
 
   private static func fromPostgrest(_ error: PostgrestError) -> AppError {

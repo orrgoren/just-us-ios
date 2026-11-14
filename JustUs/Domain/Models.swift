@@ -158,6 +158,7 @@ enum AppError: Error, Equatable, Sendable {
   case offline
   case timeout
   case sessionExpired
+  case linkExpired
   case invalid(FieldIssue)
   case invalidCode
   case expiredCode

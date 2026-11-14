@@ -10,6 +10,18 @@ final class SessionModel {
     case loading, login, code, setup, inviteShare, softPrompt, invite, main
   }
 
+  enum Activity: Equatable {
+    case generic, sendCode, verify, apple, create, redeem, saveDate, reveal, finish, moment, settings
+  }
+
+  enum Celebration: Equatable {
+    case spaceReady, paired, nightSet
+  }
+
+  enum RetryKind: Equatable {
+    case sendCode, verify, create, redeem(Bool), saveDate, reveal, finish, moment, settings, openWeek, surprise
+  }
+
   var screen: Screen = .loading
   var tab: AppTab = .week
   var email = ""
@@ -23,6 +35,11 @@ final class SessionModel {
   var errorMessage: String?
   var offline = false
   var busy = false
+  var activity: Activity?
+  var celebration: Celebration?
+  var retryKind: RetryKind?
+  /// Set when a magic link is expired or already used, so login offers a new link instead of a dead end.
+  var offerNewLink = false
   var pushDenied = false
   var showDelete = false
   var deleteConfirm = ""
@@ -80,29 +97,35 @@ final class SessionModel {
   }
 
   func sendCode() async {
-    await work {
+    await work(activity: .sendCode, retry: .sendCode) {
       try await self.backend.sendCode(email: self.email)
+      self.rememberEmail()
+      self.offerNewLink = false
       self.screen = .code
       self.errorMessage = nil
     }
   }
 
   func verify() async {
-    await work {
-      _ = try await self.backend.verify(email: self.email, code: self.code)
+    await work(activity: .verify, retry: .verify) {
+      let user = try await self.backend.verify(email: self.email, code: self.code)
+      if let email = user.email, !email.isEmpty { self.email = email }
+      self.rememberEmail()
       await self.finishEmailSignIn()
     }
   }
 
   func completeEmailLink(_ url: URL) async {
-    await work {
-      _ = try await self.backend.session(from: url)
+    await work(retry: .sendCode) {
+      let user = try await self.backend.session(from: url)
+      if let email = user.email, !email.isEmpty { self.email = email }
+      self.rememberEmail()
       await self.finishEmailSignIn()
     }
   }
 
   func completeApple(token: String, nonce: String) async {
-    await work {
+    await work(activity: .apple) {
       _ = try await self.backend.signInWithApple(idToken: token, nonce: nonce)
       Telemetry.analytics.record(.signedIn(method: "apple"))
       self.signedIn = true
@@ -135,12 +158,13 @@ final class SessionModel {
   }
 
   func createCouple() async {
-    await work {
+    await work(activity: .create, retry: .create) {
       try await self.backend.createCouple(self.draft)
       self.inviteToken = try await self.backend.createInvite()
       Telemetry.analytics.record(.inviteSent)
       await self.refresh()
       self.screen = .inviteShare
+      self.celebrate(.spaceReady)
     }
   }
 
@@ -156,7 +180,7 @@ final class SessionModel {
   }
 
   func redeem(replaceEmpty: Bool) async {
-    await work {
+    await work(activity: .redeem, retry: .redeem(replaceEmpty)) {
       guard let token = InviteRules.token(from: self.inviteInput) else { throw AppError.invalidInvite }
       do {
         try await self.backend.redeem(token: token, replaceEmpty: replaceEmpty)
@@ -179,7 +203,30 @@ final class SessionModel {
       self.signedIn = true
       await self.refresh()
       self.screen = Launch.isUITest ? .main : .softPrompt
+      self.celebrate(.paired)
     }
+  }
+
+  func retryLast() async {
+    guard let retryKind else { return }
+    switch retryKind {
+    case .sendCode: await sendCode()
+    case .verify: await verify()
+    case .create: await createCouple()
+    case .redeem(let replace): await redeem(replaceEmpty: replace)
+    case .saveDate: await saveDate()
+    case .reveal: await revealPlan()
+    case .finish: await finishNight()
+    case .moment: await saveMoment()
+    case .settings: await saveSettings()
+    case .openWeek: await openNextWeek()
+    case .surprise: await surprise()
+    }
+  }
+
+  func celebrate(_ kind: Celebration) {
+    celebration = kind
+    Haptics.success()
   }
 
   func leaveInvite() {
@@ -225,14 +272,17 @@ final class SessionModel {
       errorMessage = L10n.message(for: .unsyncedChanges)
       return
     }
+    rememberEmail()
+    let kept = email
     await backend.signOut()
     clearSession()
+    email = kept
+    offerNewLink = false
     screen = .login
     Telemetry.analytics.record(.signedOut)
   }
 
   func clearSession() {
-    email = ""
     code = ""
     draft = CoupleDraft(selfName: "", partnerName: "", weekday: 4, localTime: "20:30", timezone: TimeZone.current.identifier, durationMinutes: 90)
     ritual = nil
@@ -258,40 +308,88 @@ final class SessionModel {
     blocked = false
     focusReveal = false
     signedIn = false
+    offerNewLink = false
     tab = .week
   }
 
+  func rememberEmail() {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    UserDefaults.standard.set(trimmed, forKey: Self.lastEmailKey)
+  }
+
+  func prefillEmail() {
+    guard !Launch.isUITest else { return }
+    guard email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    guard let saved = UserDefaults.standard.string(forKey: Self.lastEmailKey), !saved.isEmpty else { return }
+    email = saved
+  }
+
+  /// Drops the live session and any pending magic-link verifier, then returns to a login that can send a new link.
+  func recoverToLogin() async {
+    rememberEmail()
+    let kept = email
+    await backend.signOut()
+    clearSession()
+    email = kept
+    prefillEmail()
+    offerNewLink = true
+    signedIn = false
+    screen = .login
+  }
+
+  func applyFailure(_ error: Error, retry: RetryKind?) async {
+    let appError = ErrorMap.app(error)
+    if appError == .offline { offline = true }
+    if appError == .sessionExpired || appError == .linkExpired {
+      await recoverToLogin()
+      errorMessage = L10n.message(for: appError)
+      retryKind = .sendCode
+    } else {
+      errorMessage = L10n.message(for: appError)
+      retryKind = retry
+    }
+    Telemetry.crashes.record(appError)
+  }
+
+  private static let lastEmailKey = "justus.lastEmail"
+
   private func restoreOrLogin() async {
-    if let _ = try? await backend.restore() {
+    if let user = try? await backend.restore() {
+      if email.isEmpty, let restored = user.email, !restored.isEmpty { email = restored }
+      rememberEmail()
       signedIn = true
       await refresh()
       if screen == .loading || screen == .login || screen == .code {
         screen = ritual == nil ? .setup : .main
       }
     } else if !signedIn && screen == .loading {
+      prefillEmail()
       screen = .login
     }
   }
 
   private func finishEmailSignIn() async {
+    offerNewLink = false
     Telemetry.analytics.record(.signedIn(method: "otp"))
     signedIn = true
     await refresh()
     screen = ritual == nil ? .setup : .main
   }
 
-  private func work(_ body: () async throws -> Void) async {
+  private func work(activity: Activity = .generic, retry: RetryKind? = nil, _ body: () async throws -> Void) async {
+    self.activity = activity
     busy = true
-    defer { busy = false }
+    defer {
+      busy = false
+      self.activity = nil
+    }
     do {
       try await body()
       errorMessage = nil
+      retryKind = nil
     } catch {
-      let appError = ErrorMap.app(error)
-      if appError == .offline { offline = true }
-      if appError == .sessionExpired { screen = .login }
-      errorMessage = L10n.message(for: appError)
-      Telemetry.crashes.record(appError)
+      await applyFailure(error, retry: retry)
     }
   }
 

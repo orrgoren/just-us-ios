@@ -11,6 +11,7 @@ enum L10n {
   static var emailLabel: String { text("auth.email", "Email") }
   static var emailPrompt: String { text("auth.emailPrompt", "you@example.com") }
   static var sendCode: String { text("auth.sendCode", "Email me a sign-in link") }
+  static var newLink: String { text("auth.newLink", "Email me a new link") }
   static var apple: String { text("auth.apple", "Sign in with Apple") }
   static var haveInvite: String { text("auth.haveInvite", "I have an invite") }
   static var codeTitle: String { text("auth.codeTitle", "Check your email") }
@@ -26,7 +27,29 @@ enum L10n {
   static var ourDay: String { text("setup.day", "Our evening") }
   static var ourTime: String { text("setup.time", "Starts at") }
   static var timezone: String { text("setup.zone", "Time zone") }
-  static var duration: String { text("setup.duration", "Length in minutes") }
+  static var duration: String { text("setup.duration", "Length") }
+  static var durationHelp: String { text("setup.durationHelp", "90 minutes is the usual evening. Change it if yours runs longer.") }
+  static var setupNext: String { text("setup.next", "Your turn. Fill this in, then send them a link.") }
+  static var setupNamesHelp: String { text("setup.namesHelp", "They'll see the name you chose when they join.") }
+  static var settingUp: String { text("setup.settingUp", "Setting up your space…") }
+  static var required: String { text("field.required", "Required") }
+  static var optional: String { text("field.optional", "Optional") }
+  static var yourTurn: String { text("role.yours", "Your turn") }
+  static var waitingOnThem: String { text("role.waiting", "Waiting on them") }
+  static var loginNext: String { text("auth.next", "Next: sign in. Then make a space, or join theirs.") }
+  static var codeNext: String { text("auth.codeNext", "The link is the way in. The code is there if you already have it.") }
+  static var inviteShareNext: String { text("invite.next", "Send this, then wait. They open it on their phone.") }
+  static var joinNext: String { text("invite.joinNext", "Paste their code. You join their space, not a new one.") }
+  static var spaceReady: String { text("celebrate.space", "Your space is ready.") }
+  static var paired: String { text("celebrate.paired", "You're paired. The week is yours.") }
+  static var nightSet: String { text("celebrate.night", "The night is set.") }
+  static var waitForPartnerHelp: String { text("ritual.waitHelp", "Nothing else for you until they open the link.") }
+  static var plannerHelp: String { text("ritual.plannerHelp", "You're planning. They see the hint, not the surprise, until you reveal it.") }
+  static var partnerWaitPlan: String { text("ritual.partnerPlan", "They're planning. Pick your mood, then wait for the hint.") }
+  static var moodHelp: String { text("ritual.moodHelp", "One mood. They'll see yours. The plan stays with the planner.") }
+  static var memoriesNext: String { text("memories.next", "Optional. A line or a photo, once the night is done.") }
+  static var settingsNext: String { text("settings.next", "Names are required. The nudges are optional.") }
+  static var softNext: String { text("push.next", "Your turn. Say yes if you want a nudge when they join.") }
   static var createSpace: String { text("setup.create", "Create our space") }
   static var joinInstead: String { text("setup.join", "Join with a code instead") }
   static var inviteTitle: String { text("invite.title", "Bring them in") }
@@ -174,6 +197,10 @@ enum L10n {
     String(format: text("home.count", "%lld together"), locale: .current, count)
   }
 
+  static func minutes(_ count: Int) -> String {
+    String(format: text("setup.minutes", "%lld min"), locale: .current, count)
+  }
+
   static func cooldown(_ seconds: Int) -> String {
     String(format: text("auth.cooldown", "You can resend in %lld seconds."), locale: .current, seconds)
   }
@@ -207,6 +234,7 @@ enum L10n {
     case .offline: return offline
     case .timeout: return text("err.timeout", "That took too long. Nothing was marked as saved.")
     case .sessionExpired: return text("err.session", "Your session expired. Sign in again.")
+    case .linkExpired: return text("err.link", "That link expired or was already used. Email yourself a new one.")
     case .invalid(let issue): return fieldMessage(issue)
     case .invalidCode: return text("err.badCode", "That code isn't valid.")
     case .expiredCode: return text("err.expiredCode", "That code has expired. Resend a new one.")

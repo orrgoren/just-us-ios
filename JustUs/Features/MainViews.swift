@@ -6,7 +6,7 @@ struct MainScreen: View {
   @Bindable var model: SessionModel
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: Theme.Space.section) {
       Picker(L10n.tabWeek, selection: $model.tab) {
         Text(L10n.tabWeek).tag(AppTab.week)
         Text(L10n.tabMemories).tag(AppTab.memories)
@@ -38,18 +38,29 @@ struct RitualScreen: View {
   @Bindable var model: SessionModel
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: Theme.Space.section) {
       if let ritual = model.ritual {
         header(ritual)
         if ritual.partner == nil {
+          RoleLine(waiting: true, text: L10n.waitingOnThem)
           Text(L10n.waitingJoin)
+          HelperText(text: L10n.waitForPartnerHelp)
+        } else if ritual.isPlanner {
+          RoleLine(waiting: false, text: L10n.yourTurn)
+          HelperText(text: L10n.plannerHelp)
+        } else {
+          RoleLine(waiting: true, text: L10n.waitingOnThem)
+          HelperText(text: L10n.partnerWaitPlan)
         }
         moods(ritual)
         if ritual.isPlanner { planner(ritual) }
         reveal(ritual)
       } else {
+        RoleLine(waiting: false, text: L10n.yourTurn)
         Text(L10n.noDate)
-        WineButton(title: L10n.openWeek, identifier: A11y.homeRoot) { Task { await model.openNextWeek() } }
+        WineButton(title: L10n.openWeek, identifier: A11y.homeRoot, busy: model.busy, busyTitle: L10n.loading) {
+          Task { await model.openNextWeek() }
+        }
       }
     }
   }
@@ -71,8 +82,9 @@ struct RitualScreen: View {
   }
 
   private func moods(_ ritual: RitualSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.yourMood).font(Theme.title)
+      HelperText(text: L10n.moodHelp)
       ForEach(MoodKey.allCases) { mood in
         let selected = ritual.moods.first { $0.userId == ritual.selfMember.userId }?.mood == mood
         Button {
@@ -100,7 +112,7 @@ struct RitualScreen: View {
   }
 
   private func planner(_ ritual: RitualSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.whereTitle).font(Theme.title)
       Button(L10n.byTradition) { Task { await model.choose(place: .auto) } }
         .accessibilityIdentifier(A11y.place(.auto)).frame(minHeight: 44)
@@ -117,12 +129,14 @@ struct RitualScreen: View {
         Text(plan.title).font(Theme.title).accessibilityIdentifier(A11y.planTitle)
         Text(plan.summary)
       }
-      LabeledField(title: L10n.teaser, text: $model.teaser, identifier: A11y.teaser)
-      LabeledField(title: L10n.outfit, text: $model.outfit, identifier: A11y.outfit)
-      LabeledField(title: L10n.privateNotes, text: $model.privateNotes, identifier: A11y.notes)
+      LabeledField(title: L10n.teaser, text: $model.teaser, identifier: A11y.teaser, need: .optional)
+      LabeledField(title: L10n.outfit, text: $model.outfit, identifier: A11y.outfit, need: .optional)
+      LabeledField(title: L10n.privateNotes, text: $model.privateNotes, identifier: A11y.notes, need: .optional)
       LabeledField(title: L10n.dateLabel, text: $model.planDay, identifier: A11y.dayField)
       LabeledField(title: L10n.timeLabel, text: $model.planTime, identifier: A11y.timeField)
-      WineButton(title: L10n.saveDate, identifier: A11y.saveDate) { Task { await model.saveDate() } }
+      WineButton(title: L10n.saveDate, identifier: A11y.saveDate, busy: model.activity == .saveDate, busyTitle: L10n.loading) {
+        Task { await model.saveDate() }
+      }
       Button(L10n.skipWeek) { Task { await model.skip() } }
         .accessibilityIdentifier(A11y.skipWeek).frame(minHeight: 44)
     }
@@ -130,15 +144,19 @@ struct RitualScreen: View {
 
   @ViewBuilder private func reveal(_ ritual: RitualSnapshot) -> some View {
     if model.focusReveal || ritual.revealed || ritual.date?.status == .scheduled {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: Theme.Space.stack) {
         Text(ritual.plan == nil ? L10n.sealedTitle : L10n.revealedEyebrow).font(Theme.title)
         Text(ritual.plan == nil ? L10n.sealedBody : (ritual.plan?.summary ?? ""))
         if ritual.date?.status == .scheduled && ritual.revealed == false && ritual.isPlanner {
-          WineButton(title: L10n.revealButton, identifier: A11y.reveal) { Task { await model.revealPlan() } }
+          WineButton(title: L10n.revealButton, identifier: A11y.reveal, busy: model.activity == .reveal, busyTitle: L10n.loading) {
+            Task { await model.revealPlan() }
+          }
         }
         Button(L10n.addCalendar) { Task { await model.addCalendar() } }.frame(minHeight: 44)
-        LabeledField(title: L10n.moment, text: $model.momentDraft, identifier: A11y.memoryNote)
-        WineButton(title: L10n.finish, identifier: A11y.saveNote) { Task { await model.finishNight() } }
+        LabeledField(title: L10n.moment, text: $model.momentDraft, identifier: A11y.memoryNote, need: .optional)
+        WineButton(title: L10n.finish, identifier: A11y.saveNote, busy: model.activity == .finish, busyTitle: L10n.loading) {
+          Task { await model.finishNight() }
+        }
       }
     }
   }
@@ -149,8 +167,10 @@ struct MemoriesScreen: View {
   @State private var photo: PhotosPickerItem?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: Theme.Space.section) {
       Text(L10n.memoriesTitle).font(Theme.display).accessibilityIdentifier(A11y.memoriesRoot)
+      Text(L10n.memoriesBody)
+      HelperText(text: L10n.memoriesNext)
       if model.memories.isEmpty {
         Text(L10n.memoriesEmpty)
       }
@@ -182,8 +202,10 @@ struct MemoriesScreen: View {
         }
       }
       if model.editingDate != nil {
-        LabeledField(title: L10n.moment, text: $model.noteDraft, identifier: A11y.memoryNoteField)
-        WineButton(title: L10n.saveMoment, identifier: A11y.memorySave) { Task { await model.saveMoment() } }
+        LabeledField(title: L10n.moment, text: $model.noteDraft, identifier: A11y.memoryNoteField, need: .optional)
+        WineButton(title: L10n.saveMoment, identifier: A11y.memorySave, busy: model.activity == .moment, busyTitle: L10n.loading) {
+          Task { await model.saveMoment() }
+        }
         Button(L10n.deleteMoment) { Task { await model.deleteMoment() } }.frame(minHeight: 44)
         PhotosPicker(selection: $photo, matching: .images) { Text(L10n.addPhoto) }
         if Launch.isUITest {
@@ -208,9 +230,10 @@ struct SettingsScreen: View {
   @Bindable var model: SessionModel
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: Theme.Space.section) {
       Text(L10n.settingsTitle).font(Theme.display).accessibilityIdentifier(A11y.settingsRoot)
       Text(L10n.settingsBody)
+      HelperText(text: L10n.settingsNext)
       if let settings = model.settings {
         Text(settings.selfName)
         Text(settings.partnerName)
@@ -233,7 +256,9 @@ struct SettingsScreen: View {
       }
       LabeledField(title: L10n.myName, text: $model.draft.selfName, identifier: A11y.selfName)
       LabeledField(title: L10n.ourTime, text: $model.draft.localTime, identifier: A11y.timeField)
-      WineButton(title: L10n.saveSettings, identifier: A11y.saveSettings) { Task { await model.saveSettings() } }
+      WineButton(title: L10n.saveSettings, identifier: A11y.saveSettings, busy: model.activity == .settings, busyTitle: L10n.loading) {
+        Task { await model.saveSettings() }
+      }
       if let privacy = URL(string: AppConfig.privacyURL) {
         Link(L10n.privacy, destination: privacy)
       }
@@ -247,7 +272,9 @@ struct SettingsScreen: View {
       if model.showDelete {
         Text(L10n.deleteBody)
         LabeledField(title: L10n.confirmField, text: $model.deleteConfirm, identifier: A11y.deleteConfirm)
-        WineButton(title: L10n.deleteAccount, identifier: A11y.deleteSubmit) { Task { await model.deleteAccount() } }
+        WineButton(title: L10n.deleteAccount, identifier: A11y.deleteSubmit, busy: model.busy, busyTitle: L10n.loading) {
+          Task { await model.deleteAccount() }
+        }
       }
     }
   }

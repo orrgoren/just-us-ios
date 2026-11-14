@@ -157,6 +157,7 @@ jobs:
           SCREENSHOT_PREFIX: se
           TEST_RUNNER_SCREENSHOT_PREFIX: se
           FULL_UI: ${{ needs.changes.outputs.full }}
+          SCREENSHOTS: ${{ needs.changes.outputs.screenshots }}
         run: |
           set -euo pipefail
           UDID=$(python3 scripts/select-simulator.py se | tail -n 1)
@@ -176,11 +177,17 @@ jobs:
           if [ "${FULL_UI}" = "true" ]; then
             xcodebuild test "${common[@]}"
           else
-            xcodebuild test "${common[@]}" \
-              -only-testing:JustUsTests \
-              -only-testing:JustUsUITests/FlowUITests/testLaunchShowsLogin \
-              -only-testing:JustUsUITests/FlowUITests/testCreateCoupleAndInvite \
+            # UI changes also capture the named gallery. Pro Max and the rest of the flow suite stay manual.
+            only=(
+              -only-testing:JustUsTests
+              -only-testing:JustUsUITests/FlowUITests/testLaunchShowsLogin
+              -only-testing:JustUsUITests/FlowUITests/testCreateCoupleAndInvite
               -only-testing:JustUsUITests/FlowUITests/testSignOutReturnsToLogin
+            )
+            if [ "${SCREENSHOTS}" = "true" ]; then
+              only+=(-only-testing:JustUsUITests/ScreenshotUITests)
+            fi
+            xcodebuild test "${common[@]}" "${only[@]}"
           fi
       - name: Export screenshots
         if: always() && (needs.changes.outputs.screenshots == 'true' || needs.changes.outputs.full == 'true')

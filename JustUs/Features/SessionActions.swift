@@ -30,10 +30,7 @@ extension SessionModel {
       }
       offline = false
     } catch {
-      let appError = ErrorMap.app(error)
-      if appError == .offline { offline = true }
-      if appError == .sessionExpired { screen = .login }
-      errorMessage = L10n.message(for: appError)
+      await applyFailure(error, retry: nil)
     }
   }
 
@@ -61,21 +58,25 @@ extension SessionModel {
 
   func surprise() async {
     let excluding = ritual?.plan.map { [$0.ideaId] } ?? []
-    await act { try await self.backend.surprise(excluding: excluding); await self.refresh() }
+    await act(activity: .generic, retry: .surprise) {
+      try await self.backend.surprise(excluding: excluding)
+      await self.refresh()
+    }
   }
 
   func saveDate() async {
-    await act {
+    await act(activity: .saveDate, retry: .saveDate) {
       try await self.backend.saveDate(
         day: self.planDay, time: self.planTime, teaser: self.teaser, outfit: self.outfit, notes: self.privateNotes
       )
       Telemetry.analytics.record(.planSaved)
       await self.refresh()
+      self.celebrate(.nightSet)
     }
   }
 
   func revealPlan() async {
-    await act {
+    await act(activity: .reveal, retry: .reveal) {
       try await self.backend.reveal()
       Telemetry.analytics.record(.revealed)
       self.focusReveal = true
@@ -92,7 +93,7 @@ extension SessionModel {
   }
 
   func finishNight() async {
-    await act {
+    await act(activity: .finish, retry: .finish) {
       try await self.backend.complete(note: self.momentDraft)
       self.momentDraft = ""
       await self.refresh()
@@ -100,13 +101,15 @@ extension SessionModel {
     }
   }
 
-  func openNextWeek() async { await act { try await self.backend.ensureDraft(); await self.refresh() } }
+  func openNextWeek() async {
+    await act(activity: .generic, retry: .openWeek) { try await self.backend.ensureDraft(); await self.refresh() }
+  }
 
   func saveMoment() async {
     guard let dateId = editingDate else { return }
     let noteId = editingNote ?? UUID()
     editingNote = noteId
-    await act {
+    await act(activity: .moment, retry: .moment) {
       try await self.backend.saveNote(dateId: dateId, noteId: noteId, text: self.noteDraft)
       self.outbox["note"] = nil
       Telemetry.analytics.record(.memoryAdded)
@@ -140,7 +143,10 @@ extension SessionModel {
     settings.localTime = draft.localTime
     settings.timezone = draft.timezone
     settings.durationMinutes = draft.durationMinutes
-    await act { try await self.backend.saveSettings(settings); await self.refresh() }
+    await act(activity: .settings, retry: .settings) {
+      try await self.backend.saveSettings(settings)
+      await self.refresh()
+    }
   }
 
   func toggle(_ kind: PushKind, on: Bool) async {
@@ -302,21 +308,28 @@ extension SessionModel {
     await refresh()
   }
 
-  private func act(_ body: () async throws -> Void) async {
+  private func act(activity: Activity = .generic, retry: RetryKind? = nil, _ body: () async throws -> Void) async {
+    self.activity = activity
     busy = true
-    defer { busy = false }
+    defer {
+      busy = false
+      self.activity = nil
+    }
     do {
       try await body()
       errorMessage = nil
+      retryKind = nil
     } catch {
-      let appError = ErrorMap.app(error)
-      if appError == .offline { offline = true }
-      errorMessage = L10n.message(for: appError)
+      await applyFailure(error, retry: retry)
     }
   }
 
   private func remember(_ pending: Pending, key: String, error: Error) async {
     let appError = ErrorMap.app(error)
+    if appError == .sessionExpired || appError == .linkExpired {
+      await applyFailure(error, retry: .sendCode)
+      return
+    }
     if appError == .offline {
       offline = true
       outbox[key] = pending
