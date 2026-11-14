@@ -157,17 +157,26 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(element.waitForExistence(timeout: 8))
     dismissKeyboard(app)
     let scroll = app.scrollViews["mainContent"]
-    let hittable = NSPredicate(format: "isHittable == true")
     for _ in 0..<8 {
-      let ready = XCTNSPredicateExpectation(predicate: hittable, object: element)
-      if XCTWaiter().wait(for: [ready], timeout: 1) == .completed {
+      if shows(element, in: app) {
         element.tap()
         return
       }
       drag(scroll)
     }
-    XCTAssertTrue(element.isHittable)
+    XCTAssertTrue(shows(element, in: app))
     element.tap()
+  }
+
+  /// `isHittable` fails the test when a scrolled-away frame has no activation point.
+  private func shows(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+    guard element.exists else { return false }
+    let frame = element.frame
+    guard frame.isNull == false, frame.isInfinite == false, frame.width > 2, frame.height > 2 else {
+      return false
+    }
+    let screen = app.windows.firstMatch.frame.insetBy(dx: 1, dy: 24)
+    return screen.contains(CGPoint(x: frame.midX, y: frame.midY))
   }
 
   /// The keyboard pins the focused field, so Create stays below it until the keyboard closes.
@@ -186,8 +195,8 @@ final class FlowUITests: XCTestCase {
   }
 
   private func drag(_ scroll: XCUIElement) {
-    let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.22))
-    let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
+    let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+    let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
     start.press(forDuration: 0.05, thenDragTo: end)
   }
 
