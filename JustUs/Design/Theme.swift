@@ -64,8 +64,6 @@ struct Wordmark: View {
         .foregroundStyle(Theme.champagne)
         .accessibilityHidden(true)
     }
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(L10n.monogram)
   }
 }
 

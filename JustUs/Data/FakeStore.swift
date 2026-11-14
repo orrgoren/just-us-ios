@@ -21,18 +21,18 @@ final class FakeStore {
     try? data.write(to: url, options: .atomic)
   }
 
-  static func resetFiles() {
+  nonisolated static func resetFiles() {
     guard let url = fileURL() else { return }
     try? FileManager.default.removeItem(at: url)
     CacheStore.deleteAll()
   }
 
-  private static func read() -> FakeWorld? {
+  nonisolated private static func read() -> FakeWorld? {
     guard let url = fileURL(), let data = try? Data(contentsOf: url) else { return nil }
     return try? JSONDecoder().decode(FakeWorld.self, from: data)
   }
 
-  private static func fileURL() -> URL? {
+  nonisolated private static func fileURL() -> URL? {
     guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
       return nil
     }

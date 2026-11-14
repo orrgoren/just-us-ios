@@ -30,6 +30,7 @@ jobs:
           swiftlint lint
           python3 scripts/check-literals.py
           python3 scripts/check-apple-docs.py
+          python3 scripts/select-simulator.py --self-test
       - name: Test on iPhone SE
         env:
           SCREENSHOT_PREFIX: se
@@ -42,13 +43,25 @@ jobs:
             -project JustUs.xcodeproj \
             -scheme JustUs \
             -destination "platform=iOS Simulator,id=${UDID}" \
+            -parallel-testing-enabled NO \
             -resultBundlePath build/se.xcresult \
             CODE_SIGNING_ALLOWED=NO
       - name: Export screenshots
         if: always()
         run: |
           mkdir -p artifacts/screenshots
-          xcrun xcresulttool export attachments --path build/se.xcresult --output-path artifacts/screenshots || true
+          if [ -d build/se.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/se.xcresult --output-path artifacts/screenshots || true
+          fi
+          find artifacts/screenshots -type f | head -200
+          if [ ! -d build/se.xcresult ]; then
+            echo "Missing build/se.xcresult"
+            exit 1
+          fi
+          if ! find artifacts/screenshots -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
+            echo "No screenshot images were exported"
+            exit 1
+          fi
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,13 +102,25 @@ jobs:
             -scheme JustUs \
             -destination "platform=iOS Simulator,id=${UDID}" \
             -only-testing:JustUsUITests \
+            -parallel-testing-enabled NO \
             -resultBundlePath build/promax.xcresult \
             CODE_SIGNING_ALLOWED=NO
       - name: Export screenshots
         if: always()
         run: |
           mkdir -p artifacts/screenshots
-          xcrun xcresulttool export attachments --path build/promax.xcresult --output-path artifacts/screenshots || true
+          if [ -d build/promax.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/promax.xcresult --output-path artifacts/screenshots || true
+          fi
+          find artifacts/screenshots -type f | head -200
+          if [ ! -d build/promax.xcresult ]; then
+            echo "Missing build/promax.xcresult"
+            exit 1
+          fi
+          if ! find artifacts/screenshots -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
+            echo "No screenshot images were exported"
+            exit 1
+          fi
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
