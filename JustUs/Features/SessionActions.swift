@@ -21,14 +21,19 @@ extension SessionModel {
         privateNotes = ritual.plan?.privateNotes ?? ""
         planDay = ritual.date?.scheduledDate ?? ""
         planTime = ritual.date?.scheduledTime ?? ""
-      } else {
+      } else if signedIn {
         teaser = ""
         outfit = ""
         privateNotes = ""
         planDay = ""
         planTime = ""
         if await backend.takeSpaceClosed() {
+          rememberSpaceClosed()
+        } else if UserDefaults.standard.bool(forKey: Self.closedSpaceKey(email)) {
           spaceClosed = true
+        }
+        if spaceClosed {
+          screen = .setup
         }
       }
       offline = false
@@ -311,6 +316,7 @@ extension SessionModel {
   }
 
   private func signedIn(_ email: String) async {
+    self.email = email
     _ = try? await backend.sendCode(email: email)
     _ = try? await backend.verify(email: email, code: "000000")
     signedIn = true

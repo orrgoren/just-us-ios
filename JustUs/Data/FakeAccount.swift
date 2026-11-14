@@ -121,10 +121,11 @@ extension FakeBackend {
     try requireOnline()
     guard let mine = memberOfSession() else { throw AppError.notAuthenticated }
     let coupleId = mine.coupleId
-    store.world.members.removeAll { $0.userId == mine.userId }
-    if store.world.members.contains(where: { $0.coupleId == coupleId }) == false {
-      removeCouple(coupleId)
+    let partners = store.world.members.filter { $0.coupleId == coupleId && $0.userId != mine.userId }
+    for partner in partners {
+      store.markSpaceClosed(partner.userId)
     }
+    removeCouple(coupleId)
     store.save()
   }
 

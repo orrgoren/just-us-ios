@@ -1,10 +1,17 @@
 -- PROPOSED ONLY. Do not apply until Tom verifies.
--- This file is not a migration and CI never runs it.
+-- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
 -- Depends on nothing new. Replaces app_private.guard_date_update and
 -- public.leave_couple. The live copies stay in place until this is applied.
 --
--- Two additions to the live date guard, and nothing else:
+-- leave_couple closes the whole couple for both people. It does not hand the
+-- space to the partner and it does not delete either login. The other person
+-- gets a space_closures row. Photos stay in storage.objects: a direct delete
+-- raises 42501 and does not remove the file. The iOS client calls the
+-- proposed delete-couple-photos function, which uses the Storage API, before
+-- this RPC.
+--
+-- Two additions to the live date guard:
 --   1. A completed date may change memory_photo_path only, and only to
 --      {couple_id}/{date_id}.jpg. Skipped and canceled dates stay locked.
 --      The planner, snapshots, and every other column stay locked.
@@ -67,24 +74,140 @@ begin
 end;
 $$;
 
--- Couple deletion does not remove objects in the private date-photos bucket.
-create or replace function app_private.delete_couple_photos(p_couple uuid)
+-- Photos are removed by the Storage API in delete-couple-photos, not here.
+create table if not exists public.space_closures (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  closed_at timestamptz not null default now()
+);
+
+alter table public.space_closures enable row level security;
+revoke all on table public.space_closures from public, anon, authenticated;
+grant select, delete on table public.space_closures to authenticated;
+
+drop policy if exists space_closures_read on public.space_closures;
+create policy space_closures_read on public.space_closures
+  for select to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists space_closures_ack on public.space_closures;
+create policy space_closures_ack on public.space_closures
+  for delete to authenticated
+  using (user_id = auth.uid());
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'internal_ops_couple_id_fkey'
+      and conrelid = 'app_private.internal_ops'::regclass
+  ) then
+    alter table app_private.internal_ops
+      add constraint internal_ops_couple_id_fkey
+      foreign key (couple_id) references public.couples (id) on delete cascade;
+  end if;
+end $$;
+
+create or replace function app_private.couples_touched_by(p_uid uuid)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select couple.id from public.couples as couple where couple.created_by = p_uid
+  union
+  select member.couple_id from public.couple_members as member where member.user_id = p_uid
+  union
+  select night.couple_id from public.dates as night where night.planner_user_id = p_uid
+  union
+  select night.couple_id
+  from public.memory_notes as note
+  join public.dates as night on night.id = note.date_id
+  where note.author_user_id = p_uid
+  union
+  select night.couple_id
+  from public.mood_votes as vote
+  join public.dates as night on night.id = vote.date_id
+  where vote.user_id = p_uid
+  union
+  select invite.couple_id from public.couple_invites as invite
+  where invite.created_by = p_uid or invite.redeemed_by = p_uid
+$$;
+
+create or replace function public.couples_touching_me()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select touched.id
+  from app_private.couples_touched_by(auth.uid()) as touched(id)
+  where auth.uid() is not null
+$$;
+
+-- Deletes the couple and the rows that reference it. Explicit deletes match
+-- the live foreign keys from scripts/sql/live-fk-dump.sql, so this does not
+-- depend on ON DELETE CASCADE. storage.objects is not touched.
+create or replace function app_private.close_couple(p_couple uuid, p_actor uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public, storage
+set search_path = public
 as $$
+declare
+  v_members uuid[];
 begin
-  delete from storage.objects
-  where bucket_id = 'date-photos'
-    and split_part(name, '/', 1) = lower(p_couple::text);
+  if not exists (select 1 from public.couples where id = p_couple) then
+    return;
+  end if;
+  perform 1 from public.couples where id = p_couple for update;
+
+  select coalesce(array_agg(user_id), '{}') into v_members
+  from public.couple_members
+  where couple_id = p_couple;
+
+  insert into public.space_closures (user_id)
+  select member_id
+  from unnest(v_members) as member_id
+  where member_id is distinct from p_actor
+  on conflict (user_id) do update set closed_at = excluded.closed_at;
+
+  if to_regclass('public.push_outbox') is not null then
+    delete from public.push_outbox
+    where caller_user_id = any (v_members)
+       or recipient_user_id = any (v_members);
+  end if;
+  if to_regclass('public.push_deliveries') is not null then
+    delete from public.push_deliveries
+    where recipient_user_id = any (v_members);
+  end if;
+  delete from public.device_tokens where user_id = any (v_members);
+
+  delete from public.mood_votes
+  where date_id in (select id from public.dates where couple_id = p_couple);
+  delete from public.memory_notes
+  where date_id in (select id from public.dates where couple_id = p_couple);
+  delete from public.private_date_plans
+  where date_id in (select id from public.dates where couple_id = p_couple);
+  delete from public.dates where couple_id = p_couple;
+  delete from public.couple_invites where couple_id = p_couple;
+  delete from public.couple_members where couple_id = p_couple;
+  if to_regclass('public.import_fingerprints') is not null then
+    delete from public.import_fingerprints where couple_id = p_couple;
+  end if;
+  delete from app_private.internal_ops where couple_id = p_couple;
+  delete from public.couples where id = p_couple;
 end;
 $$;
 
 revoke all on function app_private.handoff_active() from public, anon, authenticated;
 revoke all on function app_private.begin_handoff() from public, anon, authenticated;
 revoke all on function app_private.end_handoff() from public, anon, authenticated;
-revoke all on function app_private.delete_couple_photos(uuid) from public, anon, authenticated;
+revoke all on function app_private.couples_touched_by(uuid) from public, anon, authenticated;
+revoke all on function app_private.close_couple(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.couples_touching_me() from public, anon, authenticated;
+grant execute on function public.couples_touching_me() to authenticated;
 
 create or replace function app_private.guard_date_update()
 returns trigger
@@ -340,9 +463,6 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_couple uuid;
-  membership public.couple_members%rowtype;
-  partner uuid;
-  remaining int;
 begin
   if v_uid is null then
     raise exception 'not_authenticated';
@@ -355,91 +475,17 @@ begin
     return;
   end if;
 
-  -- One couple row lock. Two members leaving at once take this in order,
-  -- then re-read membership, so the second sees the first leave and the
-  -- empty couple is deleted instead of erroring or being left behind.
+  -- One couple row lock. Two people leaving at once take this in order.
+  -- The second finds the couple already gone and returns.
   perform 1 from public.couples where id = v_couple for update;
-
-  select * into membership
-  from public.couple_members
-  where user_id = v_uid
-    and couple_id = v_couple
-  for update;
-  if not found then
+  if not exists (
+    select 1 from public.couple_members
+    where user_id = v_uid and couple_id = v_couple
+  ) then
     return;
   end if;
 
-  select user_id into partner
-  from public.couple_members
-  where couple_id = v_couple
-    and user_id <> v_uid
-  order by member_index
-  limit 1;
-
-  if partner is not null then
-    -- Cancel an unrevealed night while the leaver is still its planner.
-    -- Drop the sealed plan first so a later planner change cannot reveal it.
-    delete from public.private_date_plans as plan
-    using public.dates as night
-    where plan.date_id = night.id
-      and night.couple_id = v_couple
-      and night.planner_user_id = v_uid
-      and night.status = 'scheduled'
-      and night.revealed_at is null;
-
-    update public.dates
-    set status = 'canceled'
-    where couple_id = v_couple
-      and planner_user_id = v_uid
-      and status = 'scheduled'
-      and revealed_at is null;
-
-    delete from public.private_date_plans as plan
-    using public.dates as night
-    where plan.date_id = night.id
-      and night.couple_id = v_couple
-      and night.planner_user_id = v_uid
-      and night.status = 'draft'
-      and night.revealed_at is null;
-
-    perform app_private.begin_handoff();
-    update public.couples
-    set created_by = partner
-    where id = v_couple
-      and created_by = v_uid;
-
-    update public.couple_invites
-    set created_by = partner
-    where couple_id = v_couple
-      and created_by = v_uid;
-
-    update public.couple_invites
-    set redeemed_by = null
-    where couple_id = v_couple
-      and redeemed_by = v_uid;
-
-    update public.dates
-    set planner_user_id = partner
-    where couple_id = v_couple
-      and planner_user_id = v_uid;
-    perform app_private.end_handoff();
-  end if;
-
-  -- Keep the name on notes the partner can still read after this login is gone.
-  update public.memory_notes
-  set author_name = coalesce(nullif(btrim(author_name), ''), membership.display_name)
-  where author_user_id = v_uid
-    and (author_name is null or btrim(author_name) = '');
-
-  delete from public.couple_members where user_id = v_uid;
-
-  select count(*) into remaining
-  from public.couple_members
-  where couple_id = v_couple;
-  if remaining = 0 then
-    perform app_private.delete_couple_photos(v_couple);
-    delete from public.couples where id = v_couple;
-  end if;
+  perform app_private.close_couple(v_couple, v_uid);
 end;
 $$;
 

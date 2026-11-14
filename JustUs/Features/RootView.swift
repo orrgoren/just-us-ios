@@ -206,7 +206,7 @@ struct LabeledField: View {
           .font(Theme.caption)
           .foregroundStyle(Theme.muted(scheme))
       }
-      TextField(title, text: $text)
+      TextField(title, text: $text, prompt: Text(title).foregroundStyle(Theme.muted))
         .focused($focused)
         .textFieldStyle(.plain)
         .foregroundStyle(Theme.ink)

@@ -41,6 +41,8 @@ final class DomainTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.muted, Palette.canvas), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.wine), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.blush), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.champagne), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.muted, Palette.blush), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.canvas, Palette.wine), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.mutedDark, Palette.canvasDark), 4.5)

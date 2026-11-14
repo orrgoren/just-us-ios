@@ -16,7 +16,9 @@ The fake seeds two couples (Alex/Blair and Casey/Drew), Jordan’s open invite, 
 | Partner mood deep link | `FlowUITests` |
 | Sign out | `FlowUITests` |
 | Delete requires the word `delete` | `FlowUITests` |
-| Account deletion closes the shared space | `FakeFlowTests` |
+| Account deletion closes the shared space | `FakeFlowTests`, `AccountUITests` |
+| Unlink closes the shared space | `FakeFlowTests` |
+| Closed notice stays after the row is consumed | `FakeFlowTests`, `AccountUITests` |
 | Offline write is not reported as saved | `FakeFlowTests` |
 | Push, foreground | `PushUITests` via `simctl push` and `Fixtures/apns/plan-ready.apns` |
 | Dynamic Type, light/dark, RTL, accessibility audit | `ScreenshotUITests`, `FlowUITests` |

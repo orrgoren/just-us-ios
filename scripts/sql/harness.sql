@@ -1,6 +1,10 @@
 -- Throwaway schema for scripts/sql/lifecycle.sql. Not production.
 -- Postgres roles and tables the proposed files expect, with the foreign keys
 -- that block auth.users deletion. No network and no live project.
+--
+-- Cascades and the storage delete trigger match the live project. The
+-- read-only query is scripts/sql/live-fk-dump.sql. Do not treat a missing
+-- trigger here as permission to delete storage.objects.
 
 create schema if not exists auth;
 create schema if not exists app_private;
@@ -33,6 +37,28 @@ create table if not exists storage.objects (
   bucket_id text not null,
   name text not null
 );
+
+-- Live storage.protect_delete, from pg_get_functiondef on 2026-11-14.
+-- A direct delete raises 42501. Returning null would skip the row even when
+-- the storage GUC is set, so SQL never removes the file bytes.
+create or replace function storage.protect_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  if coalesce(current_setting('storage.allow_delete_query', true), 'false') != 'true' then
+    raise exception 'Direct deletion from storage tables is not allowed. Use the Storage API instead.'
+      using hint = 'This prevents accidental data loss from orphaned objects.',
+            errcode = '42501';
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists protect_objects_delete on storage.objects;
+create trigger protect_objects_delete
+  before delete on storage.objects
+  for each row execute function storage.protect_delete();
 
 create table if not exists public.couples (
   id uuid primary key,
@@ -126,9 +152,16 @@ create table if not exists public.device_tokens (
   primary key (user_id, token)
 );
 
+create table if not exists public.import_fingerprints (
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  fingerprint text not null,
+  created_at timestamptz not null default now(),
+  primary key (couple_id, fingerprint)
+);
+
 create table if not exists app_private.internal_ops (
-  couple_id uuid,
-  op text
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  op text not null
 );
 
 create or replace function public.is_couple_member(p_couple uuid)

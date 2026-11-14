@@ -2,6 +2,13 @@
 -- replacement send-push is deployed. This file is not a migration and CI
 -- never runs it.
 --
+-- 005_rollback.sql unschedules justus-push-flush when cron.job has that
+-- name. The deployed send-push is still v1. Do not redeploy v1. The
+-- replacement is supabase/proposed/functions/send-push/index.ts and is a
+-- separate reviewed deploy, only after 002 and 006:
+--   supabase functions deploy send-push --project-ref vowmukhhnfhtnjlswkun
+-- Rolling the SQL back does not deploy or replace the function.
+--
 -- Checked on vowmukhhnfhtnjlswkun on 2026-11-14: pg_cron is not installed
 -- and pg_net is not installed. Both are platform extensions. Enabling them
 -- does not add a separate charge. Each run counts as one Edge Function

@@ -62,6 +62,27 @@ insert into public.memory_notes (id, date_id, author_user_id, note) values
 insert into storage.objects (bucket_id, name) values
   ('date-photos', '11111111-1111-4111-8111-111111111111/aaaa1111-1111-4111-8111-111111111111.jpg');
 
+-- The harness trigger matches live storage.protect_delete. A direct delete
+-- raises 42501 and leaves the row in place.
+do $$
+begin
+  delete from storage.objects where bucket_id = 'date-photos';
+  raise exception 'storage_delete_was_allowed';
+exception
+  when insufficient_privilege then
+    null;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from storage.objects
+    where name = '11111111-1111-4111-8111-111111111111/aaaa1111-1111-4111-8111-111111111111.jpg'
+  ) then
+    raise exception 'storage_row_disappeared';
+  end if;
+end $$;
+
 -- A client-set GUC is not a handoff ticket.
 do $$
 begin
@@ -98,50 +119,55 @@ begin
 end $$;
 reset role;
 
--- A unlinks. created_by moves to B. The unrevealed night is canceled.
+-- A unlinks. The whole couple goes. B is told. Neither login is deleted.
+-- The photo row stays, because SQL cannot delete storage.objects.
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', false);
 select public.leave_couple();
 
 do $$
-declare
-  owner uuid;
-  night text;
-  plans int;
 begin
-  select created_by into owner from public.couples where id = '11111111-1111-4111-8111-111111111111';
-  if owner <> 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' then
-    raise exception 'created_by_stayed_on_leaver:%', owner;
+  if exists (select 1 from public.couples where id = '11111111-1111-4111-8111-111111111111') then
+    raise exception 'couple_remained_after_leave';
   end if;
-  select status into night from public.dates where id = 'aaaa1111-1111-4111-8111-111111111111';
-  if night <> 'canceled' then
-    raise exception 'unrevealed_not_canceled:%', night;
-  end if;
-  select count(*) into plans from public.private_date_plans where date_id = 'aaaa1111-1111-4111-8111-111111111111';
-  if plans <> 0 then
-    raise exception 'sealed_plan_survived_leave';
+  if exists (select 1 from public.dates where id = 'aaaa1111-1111-4111-8111-111111111111') then
+    raise exception 'night_remained_after_leave';
   end if;
   if exists (select 1 from public.couple_members where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
     raise exception 'leaver_still_a_member';
   end if;
+  if not exists (select 1 from auth.users where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
+    raise exception 'leave_deleted_the_user';
+  end if;
+  if not exists (
+    select 1 from public.space_closures where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  ) then
+    raise exception 'partner_was_not_told';
+  end if;
+  if not exists (
+    select 1 from storage.objects
+    where name = '11111111-1111-4111-8111-111111111111/aaaa1111-1111-4111-8111-111111111111.jpg'
+  ) then
+    raise exception 'sql_removed_the_photo';
+  end if;
 end $$;
 
--- B, the last member, deletes. The couple and its photo go, even though B did not create it.
+-- B's couple is already gone. Deleting the account removes B's login only.
 select set_config('request.jwt.claim.sub', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', false);
 select public.delete_my_account();
 
 do $$
 begin
-  if exists (select 1 from public.couples where id = '11111111-1111-4111-8111-111111111111') then
-    raise exception 'couple_remained_after_last_delete';
-  end if;
   if exists (select 1 from auth.users where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') then
     raise exception 'last_member_was_not_deleted';
   end if;
   if not exists (select 1 from auth.users where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
     raise exception 'unlinked_user_was_deleted';
   end if;
-  if exists (select 1 from storage.objects where bucket_id = 'date-photos') then
-    raise exception 'date_photo_was_not_deleted';
+  if not exists (
+    select 1 from storage.objects
+    where name = '11111111-1111-4111-8111-111111111111/aaaa1111-1111-4111-8111-111111111111.jpg'
+  ) then
+    raise exception 'sql_removed_the_photo';
   end if;
 end $$;
 
@@ -160,6 +186,10 @@ insert into public.push_outbox (caller_user_id, recipient_user_id, kind, not_bef
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'planReady', now());
 insert into storage.objects (bucket_id, name) values
   ('date-photos', '22222222-2222-4222-8222-222222222222/cccc2222-2222-4222-8222-222222222222.jpg');
+insert into public.import_fingerprints (couple_id, fingerprint) values
+  ('22222222-2222-4222-8222-222222222222', 'fp');
+insert into app_private.internal_ops (couple_id, op) values
+  ('22222222-2222-4222-8222-222222222222', 'redeem');
 
 select set_config('request.jwt.claim.sub', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', false);
 select public.delete_my_account();
@@ -183,8 +213,14 @@ begin
   if exists (select 1 from public.couple_invites where couple_id = '22222222-2222-4222-8222-222222222222') then
     raise exception 'invite_remained';
   end if;
-  if exists (select 1 from storage.objects where name like '22222222-2222-4222-8222-222222222222/%') then
-    raise exception 'couple_photo_remained';
+  if exists (select 1 from public.import_fingerprints where couple_id = '22222222-2222-4222-8222-222222222222') then
+    raise exception 'fingerprint_remained';
+  end if;
+  if exists (select 1 from app_private.internal_ops where couple_id = '22222222-2222-4222-8222-222222222222') then
+    raise exception 'internal_op_remained';
+  end if;
+  if not exists (select 1 from storage.objects where name like '22222222-2222-4222-8222-222222222222/%') then
+    raise exception 'sql_removed_the_photo';
   end if;
   if exists (select 1 from public.device_tokens where token in ('token-c', 'token-d')) then
     raise exception 'push_device_remained';
@@ -210,9 +246,21 @@ begin
   if not exists (select 1 from auth.users where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') then
     raise exception 'partner_was_deleted';
   end if;
-  select user_id into closed from public.space_closures;
-  if closed <> 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' then
-    raise exception 'partner_was_not_told:%', closed;
+  select user_id into closed from public.space_closures
+  where user_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  if closed is null then
+    raise exception 'partner_was_not_told';
+  end if;
+end $$;
+
+-- Calling delete again, with the same login already gone, does not raise.
+select set_config('request.jwt.claim.sub', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', false);
+select public.delete_my_account();
+
+do $$
+begin
+  if not exists (select 1 from auth.users where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd') then
+    raise exception 'repeat_delete_removed_the_partner';
   end if;
 end $$;
 
@@ -229,6 +277,87 @@ begin
   end if;
   if not exists (select 1 from auth.users where id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') then
     raise exception 'leave_deleted_the_user';
+  end if;
+end $$;
+
+-- Q already left an older couple the way the live function does: membership
+-- is gone, but the note, the mood vote, and created_by still point at Q.
+-- Q is now in a new couple with R. Deleting Q closes both couples. P and R
+-- keep their logins and get the notice. author_user_id stays NOT NULL.
+insert into auth.users (id) values
+  ('10101010-1010-4010-8010-101010101010'),
+  ('20202020-2020-4020-8020-202020202020'),
+  ('30303030-3030-4030-8030-303030303030');
+
+insert into public.couples (id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name) values
+  ('01010101-0101-4010-8010-010101010101', '20202020-2020-4020-8020-202020202020', 4, '20:30', 'Asia/Jerusalem', 90, 'Pat'),
+  ('02020202-0202-4020-8020-020202020202', '20202020-2020-4020-8020-202020202020', 4, '20:30', 'Asia/Jerusalem', 90, 'Rae');
+
+insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+  ('01010101-0101-4010-8010-010101010101', '10101010-1010-4010-8010-101010101010', 'Pat', 0),
+  ('02020202-0202-4020-8020-020202020202', '20202020-2020-4020-8020-202020202020', 'Quinn', 0),
+  ('02020202-0202-4020-8020-020202020202', '30303030-3030-4030-8030-303030303030', 'Rae', 1);
+
+insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, location) values
+  ('0101aaaa-0101-4010-8010-010101010101', '01010101-0101-4010-8010-010101010101', '20202020-2020-4020-8020-202020202020', 'completed', now(), 'home');
+
+insert into public.memory_notes (id, date_id, author_user_id, note) values
+  ('0101bbbb-0101-4010-8010-010101010101', '0101aaaa-0101-4010-8010-010101010101', '20202020-2020-4020-8020-202020202020', 'Old note');
+
+insert into public.mood_votes (date_id, user_id, mood) values
+  ('0101aaaa-0101-4010-8010-010101010101', '20202020-2020-4020-8020-202020202020', 'romance');
+
+insert into storage.objects (bucket_id, name) values
+  ('date-photos', '01010101-0101-4010-8010-010101010101/old.jpg');
+
+select set_config('request.jwt.claim.sub', '20202020-2020-4020-8020-202020202020', false);
+select public.delete_my_account();
+
+do $$
+begin
+  if exists (select 1 from auth.users where id = '20202020-2020-4020-8020-202020202020') then
+    raise exception 'ex_partner_was_not_deleted';
+  end if;
+  if exists (select 1 from public.couples where id in (
+    '01010101-0101-4010-8010-010101010101',
+    '02020202-0202-4020-8020-020202020202'
+  )) then
+    raise exception 'ex_partner_couple_remained';
+  end if;
+  if exists (select 1 from public.memory_notes where author_user_id = '20202020-2020-4020-8020-202020202020') then
+    raise exception 'ex_partner_note_remained';
+  end if;
+  if exists (select 1 from public.mood_votes where user_id = '20202020-2020-4020-8020-202020202020') then
+    raise exception 'ex_partner_mood_remained';
+  end if;
+  if not exists (select 1 from auth.users where id = '10101010-1010-4010-8010-101010101010') then
+    raise exception 'old_partner_was_deleted';
+  end if;
+  if not exists (select 1 from auth.users where id = '30303030-3030-4030-8030-303030303030') then
+    raise exception 'new_partner_was_deleted';
+  end if;
+  if not exists (
+    select 1 from public.space_closures
+    where user_id in (
+      '10101010-1010-4010-8010-101010101010',
+      '30303030-3030-4030-8030-303030303030'
+    )
+    having count(*) = 2
+  ) then
+    raise exception 'ex_partner_notices_missing';
+  end if;
+  if not exists (
+    select 1 from storage.objects where name = '01010101-0101-4010-8010-010101010101/old.jpg'
+  ) then
+    raise exception 'sql_removed_the_photo';
+  end if;
+  if not exists (
+    select 1 from pg_attribute
+    where attrelid = 'public.memory_notes'::regclass
+      and attname = 'author_user_id'
+      and attnotnull
+  ) then
+    raise exception 'author_user_id_became_nullable';
   end if;
 end $$;
 

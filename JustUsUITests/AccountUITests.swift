@@ -80,6 +80,36 @@ final class AccountUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Alexandra"].waitForExistence(timeout: 8))
   }
 
+  func testPartnerSeesTheClosedNotice() {
+    let token = UUID().uuidString
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-uitestReset", token]
+    app.launch()
+    signIn(app, email: "alex@couple-a.test")
+    app.buttons["Us"].tap()
+    let delete = app.buttons["deleteAccount"]
+    if !delete.waitForExistence(timeout: 2) { app.swipeUp() }
+    XCTAssertTrue(delete.waitForExistence(timeout: 4))
+    delete.tap()
+    let confirm = app.textFields["deleteConfirm"]
+    XCTAssertTrue(confirm.waitForExistence(timeout: 4))
+    confirm.tap()
+    confirm.typeText("delete")
+    app.buttons["deleteSubmit"].tap()
+    XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 8))
+    signInOnSetup(app, email: "blair@couple-a.test")
+    XCTAssertTrue(app.staticTexts["spaceClosed"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.textFields["selfName"].exists)
+
+    app.terminate()
+    let again = XCUIApplication()
+    again.launchArguments = ["-uitest", "-uitestReset", token]
+    again.launch()
+    XCTAssertTrue(again.staticTexts["spaceClosed"].waitForExistence(timeout: 12))
+    XCTAssertTrue(again.textFields["selfName"].exists)
+    XCTAssertFalse(again.buttons["Us"].exists)
+  }
+
   func testUnlinkAsksFirst() {
     let app = UITestLaunch.make()
     signIn(app, email: "alex@couple-a.test")
@@ -122,6 +152,19 @@ final class AccountUITests: XCTestCase {
       }
     }
     XCTAssertTrue(element.isHittable)
+  }
+
+  private func signInOnSetup(_ app: XCUIApplication, email: String) {
+    let field = app.textFields["emailField"]
+    XCTAssertTrue(field.waitForExistence(timeout: 8))
+    field.tap()
+    field.typeText(email)
+    app.buttons["sendCode"].tap()
+    let codeField = app.textFields["codeField"]
+    XCTAssertTrue(codeField.waitForExistence(timeout: 8))
+    codeField.tap()
+    codeField.typeText("000000")
+    app.buttons["verifyCode"].tap()
   }
 
   private func signIn(_ app: XCUIApplication, email: String, code: String = "000000") {

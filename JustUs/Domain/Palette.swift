@@ -28,6 +28,7 @@ enum Palette {
   static let mutedDark = RGB(0xD2C3B6)
   static let wine = RGB(0x6E2436)
   static let blush = RGB(0xF3D9D2)
+  static let champagne = RGB(0xE8D6B8)
   static let ivory = RGB(0xF6F0E6)
 
   static func contrast(_ a: RGB, _ b: RGB) -> Double {

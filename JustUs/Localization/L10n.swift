@@ -150,7 +150,9 @@ enum L10n {
   static var exportMemories: String { text("settings.export", "Export memories") }
   static var importLegacy: String { text("settings.import", "Import an older backup") }
   static var unlink: String { text("settings.unlink", "Unlink me") }
-  static var unlinkBody: String { text("settings.unlinkBody", "You leave the space. They keep the dates, notes, and photos.") }
+  static var unlinkBody: String {
+    text("settings.unlinkBody", "This closes the space for both of you, including the nights and memories.")
+  }
   static var deleteAccount: String { text("settings.delete", "Delete my account") }
   static var deleteBody: String {
     text(

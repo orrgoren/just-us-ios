@@ -208,6 +208,7 @@ final class LiveBackend: DateBackend {
   }
 
   func unlink() async throws {
+    try await deleteCouplePhotos()
     try await run { client in
       try await client.rpc("leave_couple").execute()
     }
@@ -234,10 +235,20 @@ final class LiveBackend: DateBackend {
   }
 
   func deleteAccount() async throws {
+    try await deleteCouplePhotos()
     try await run { client in
       try await client.rpc("delete_my_account").execute()
     }
     await signOut()
+  }
+
+  private func deleteCouplePhotos() async throws {
+    try await run { client in
+      let _: PhotoDeleteAck = try await client.functions.invoke(
+        "delete-couple-photos",
+        options: FunctionInvokeOptions(body: PhotoDeleteRequest())
+      )
+    }
   }
 
   private func run<T>(_ body: (SupabaseClient) async throws -> T) async throws -> T {
@@ -374,6 +385,12 @@ struct DeviceTokenEnvRow: Encodable {
 
 struct PushKindBody: Encodable {
   var kind: String
+}
+
+private struct PhotoDeleteRequest: Encodable {}
+
+private struct PhotoDeleteAck: Decodable {
+  var deleted: Int
 }
 
 struct PushAck: Decodable {

@@ -162,6 +162,7 @@ final class SessionModel {
   func createCouple() async {
     await work(activity: .create, retry: .create) {
       try await self.backend.createCouple(self.draft)
+      self.clearRememberedClosure()
       self.inviteToken = try await self.backend.createInvite()
       Telemetry.analytics.record(.inviteSent)
       await self.refresh()
@@ -202,6 +203,7 @@ final class SessionModel {
       Telemetry.analytics.record(.inviteRedeemed)
       self.pendingReplace = false
       self.blocked = false
+      self.clearRememberedClosure()
       self.signedIn = true
       await self.refresh()
       self.screen = Launch.isUITest ? .main : .softPrompt
@@ -278,13 +280,14 @@ final class SessionModel {
     let kept = email
     await backend.signOut()
     clearSession()
-    email = kept
+    email = Launch.isUITest ? "" : kept
     offerNewLink = false
     screen = .login
     Telemetry.analytics.record(.signedOut)
   }
 
   func clearSession() {
+    email = ""
     code = ""
     draft = CoupleDraft(selfName: "", partnerName: "", weekday: 4, localTime: "20:30", timezone: TimeZone.current.identifier, durationMinutes: 90)
     ritual = nil
@@ -356,6 +359,25 @@ final class SessionModel {
   }
 
   private static let lastEmailKey = "justus.lastEmail"
+
+  static func closedSpaceKey(_ email: String) -> String {
+    "justus.spaceClosed.\(email.lowercased())"
+  }
+
+  func rememberSpaceClosed() {
+    spaceClosed = true
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    UserDefaults.standard.set(true, forKey: Self.closedSpaceKey(trimmed))
+  }
+
+  func clearRememberedClosure() {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      UserDefaults.standard.removeObject(forKey: Self.closedSpaceKey(trimmed))
+    }
+    spaceClosed = false
+  }
 
   private func restoreOrLogin() async {
     if let user = try? await backend.restore() {
