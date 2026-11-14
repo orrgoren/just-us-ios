@@ -40,6 +40,8 @@ final class DomainTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.canvas), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.muted, Palette.canvas), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.wine), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.blush), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.canvas, Palette.wine), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.mutedDark, Palette.canvasDark), 4.5)
   }
@@ -70,7 +72,7 @@ final class DomainTests: XCTestCase {
     )
     XCTAssertEqual(
       PushPolicy.decide(kind: .planReady, now: noon.addingTimeInterval(60), timeZone: zone, history: [prior], preferences: .allOn),
-      .send
+      .suppress("daily_non_transactional")
     )
   }
 
@@ -89,6 +91,7 @@ final class DomainTests: XCTestCase {
     let url = try XCTUnwrap(URL(string: "justus://invite/\(String(repeating: "a", count: 43))"))
     XCTAssertEqual(DeepLinks.route(from: url), .invite(String(repeating: "a", count: 43)))
     XCTAssertEqual(DeepLinks.route(userInfo: ["type": "plan_ready"]), .reveal)
+    XCTAssertEqual(DeepLinks.pushRoute("inviteNudge"), .settings)
   }
 
   func testLiveTestsRefuseProductionHost() throws {
