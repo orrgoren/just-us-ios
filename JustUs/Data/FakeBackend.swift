@@ -37,6 +37,18 @@ final class FakeBackend: DateBackend {
     return SessionUser(id: user.id, email: user.email, displayHint: nil)
   }
 
+  func session(from url: URL) async throws -> SessionUser {
+    try guardOnline()
+    guard AuthCallback.isCallback(url) else { throw AppError.notAuthenticated }
+    guard let email = store.world.otpSentAt.max(by: { $0.value < $1.value })?.key else {
+      throw AppError.notAuthenticated
+    }
+    let account = user(email: email)
+    store.world.sessionUserId = account.id
+    store.save()
+    return SessionUser(id: account.id, email: account.email, displayHint: nil)
+  }
+
   func signInWithApple(idToken: String, nonce: String) async throws -> SessionUser {
     _ = idToken
     _ = nonce

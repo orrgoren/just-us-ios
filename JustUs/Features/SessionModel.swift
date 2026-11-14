@@ -89,10 +89,14 @@ final class SessionModel {
   func verify() async {
     await work {
       _ = try await self.backend.verify(email: self.email, code: self.code)
-      Telemetry.analytics.record(.signedIn(method: "otp"))
-      self.signedIn = true
-      await self.refresh()
-      self.screen = self.ritual == nil ? .setup : .main
+      await self.finishEmailSignIn()
+    }
+  }
+
+  func completeEmailLink(_ url: URL) async {
+    await work {
+      _ = try await self.backend.session(from: url)
+      await self.finishEmailSignIn()
     }
   }
 
@@ -178,6 +182,10 @@ final class SessionModel {
       await uitest(url)
       return
     }
+    if AuthCallback.isCallback(url) {
+      await completeEmailLink(url)
+      return
+    }
     guard let route = DeepLinks.route(from: url) else { return }
     if case .invite(let token) = route {
       inviteInput = token
@@ -244,11 +252,19 @@ final class SessionModel {
     if let _ = try? await backend.restore() {
       signedIn = true
       await refresh()
-      screen = ritual == nil ? .setup : .main
-    } else {
-      signedIn = false
+      if screen == .loading || screen == .login || screen == .code {
+        screen = ritual == nil ? .setup : .main
+      }
+    } else if !signedIn && screen == .loading {
       screen = .login
     }
+  }
+
+  private func finishEmailSignIn() async {
+    Telemetry.analytics.record(.signedIn(method: "otp"))
+    signedIn = true
+    await refresh()
+    screen = ritual == nil ? .setup : .main
   }
 
   private func work(_ body: () async throws -> Void) async {

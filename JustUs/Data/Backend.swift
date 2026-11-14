@@ -7,6 +7,7 @@ protocol DateBackend: AnyObject {
   var onRemoteChange: (@MainActor () -> Void)? { get set }
   func sendCode(email: String) async throws
   func verify(email: String, code: String) async throws -> SessionUser
+  func session(from url: URL) async throws -> SessionUser
   func signInWithApple(idToken: String, nonce: String) async throws -> SessionUser
   func restore() async throws -> SessionUser?
   func signOut() async
