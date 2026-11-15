@@ -15,8 +15,9 @@
 -- Those foreign keys are NO ACTION and author_user_id is NOT NULL, so this
 -- function closes each leftover couple instead of handing it off or nulling
 -- the author. It does not drop NOT NULL. It returns only the couple ids it
--- closed. Photos are not deleted here. The client calls
--- delete-couple-photos after this RPC, and only for those ids.
+-- closed. Photos are not deleted here. The login is gone when this
+-- returns, so the client does not call delete-couple-photos. The sweep
+-- drains closed_couples.
 --
 -- A second call, after the login is already gone, deletes nothing and
 -- does not raise. Two deletes of the same couple take the couple row lock

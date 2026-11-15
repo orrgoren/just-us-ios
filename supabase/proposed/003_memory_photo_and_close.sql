@@ -2,9 +2,10 @@
 -- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
 -- Deploy order: this file first, then the delete-couple-photos edge
--- function, then the TestFlight build. The build calls leave_couple or
--- delete_my_account and only then the function. Shipping the build first
--- calls an RPC shape that is not live yet.
+-- function, then the TestFlight build. The build calls leave_couple and
+-- then the function. Account deletion does not call the function: the
+-- login is already gone, so the sweep removes those photos. Shipping the
+-- build first calls an RPC shape that is not live yet.
 --
 -- A failed function call leaves the couple id in app_private.closed_couples.
 -- The schedule at the bottom of this file uses pg_cron and pg_net, both
@@ -265,7 +266,9 @@ $$;
 
 -- Removes swept rows. A user JWT cannot call this: closed_by is often a
 -- login that delete_my_account already removed, so auth.uid() would match
--- nothing. The service role is the sweep's caller.
+-- nothing. The service role is the sweep's caller. PostgREST sets
+-- request.jwt.claims, not request.jwt.claim.role. auth.role() reads the
+-- JSON. Execute is also granted only to service_role below.
 create or replace function public.ack_swept_couples(p_ids uuid[])
 returns void
 language plpgsql
@@ -273,7 +276,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if coalesce(current_setting('request.jwt.claim.role', true), '') is distinct from 'service_role' then
+  if coalesce(auth.role(), '') is distinct from 'service_role' then
     raise exception 'forbidden';
   end if;
   if p_ids is null or cardinality(p_ids) > 50 then

@@ -18,12 +18,30 @@ create table if not exists auth.users (
   id uuid primary key
 );
 
+-- Matches live auth.uid() and auth.role(). Current PostgREST sets
+-- request.jwt.claims and does not set request.jwt.claim.sub or
+-- request.jwt.claim.role. The old settings stay in the coalesce so a
+-- fixture that still sets them keeps working.
 create or replace function auth.uid()
 returns uuid
 language sql
 stable
 as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid
+$$;
+
+create or replace function auth.role()
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
+  )
 $$;
 
 create table if not exists storage.buckets (

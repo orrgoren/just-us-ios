@@ -41,7 +41,7 @@ struct RootView: View {
           .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.screen)
         }
         .padding(Theme.Space.screen)
-        .padding(.bottom, keyboardOverlap > 0 ? 200 : 0)
+        .padding(.bottom, keyboardOverlap)
       }
       .padding(.bottom, keyboardOverlap)
       .scrollDismissesKeyboard(.immediately)

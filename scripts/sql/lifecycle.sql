@@ -400,9 +400,20 @@ begin
   end if;
 end $$;
 
-select set_config('request.jwt.claim.role', 'authenticated', false);
+-- Live PostgREST sets this JSON and leaves request.jwt.claim.role unset.
+select set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"40404040-4040-4040-8040-404040404040"}',
+  false
+);
 do $$
 begin
+  if coalesce(current_setting('request.jwt.claim.role', true), '') <> '' then
+    raise exception 'fixture_set_the_old_role_guc';
+  end if;
+  if coalesce(auth.role(), '') is distinct from 'authenticated' then
+    raise exception 'auth_role_missed_the_claims_json';
+  end if;
   begin
     perform public.ack_swept_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
     raise exception 'user_swept_a_couple';
@@ -414,7 +425,17 @@ begin
   end;
 end $$;
 
-select set_config('request.jwt.claim.role', 'service_role', false);
+select set_config(
+  'request.jwt.claims',
+  '{"role":"service_role","sub":"40404040-4040-4040-8040-404040404040"}',
+  false
+);
+do $$
+begin
+  if coalesce(auth.role(), '') is distinct from 'service_role' then
+    raise exception 'auth_role_missed_the_service_role_claim';
+  end if;
+end $$;
 select public.ack_swept_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
 
 do $$
@@ -426,7 +447,11 @@ end $$;
 
 insert into app_private.closed_couples (couple_id, closed_by)
 values ('05050505-0505-4050-8050-050505050505', '40404040-4040-4040-8040-404040404040');
-select set_config('request.jwt.claim.role', '', false);
+select set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"40404040-4040-4040-8040-404040404040"}',
+  false
+);
 select public.ack_closed_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
 
 do $$

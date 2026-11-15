@@ -2,8 +2,10 @@
 // before the TestFlight build that calls it. The pg_cron sweep in 003
 // calls this same function with {"sweep":true} and the service role.
 //
-// A signed-in caller sends the couple ids leave_couple or delete_my_account
-// just returned. The function also reads closed_couple_ids for that caller.
+// A signed-in caller sends the couple ids leave_couple just returned. The
+// function also reads closed_couple_ids for that caller. Account deletion
+// does not call this function: the user row is already gone, so
+// /auth/v1/user rejects the JWT. The sweep covers that path.
 // A sweep reads closed_couples_pending and can run after the login is gone.
 // Either path deletes date-photos only when public.photo_delete_allowed
 // says the couple row is already gone. That function is

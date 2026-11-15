@@ -236,11 +236,13 @@ final class LiveBackend: DateBackend {
   }
 
   func deleteAccount() async throws {
-    let closed = try await run { client in
+    _ = try await run { client in
       let response: PostgrestResponse<[UUID]> = try await client.rpc("delete_my_account").execute()
       return response.value
     }
-    await forgetPhotos(closed)
+    // The login is already gone, so /auth/v1/user rejects this JWT. The
+    // sweep deletes the photos and clears closed_couples. Leave still
+    // calls the function, because that login remains.
     await signOut()
   }
 
