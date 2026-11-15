@@ -62,6 +62,10 @@ final class JustUsDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
     NotificationCenter.default.post(name: .justUsDeviceToken, object: token)
   }
 
+  func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+    PushLog.registrationFailed(error)
+  }
+
   func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     didReceive response: UNNotificationResponse

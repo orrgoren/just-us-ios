@@ -25,6 +25,7 @@ enum A11y {
   static let replaceEmpty = "replaceEmpty"
   static let stay = "stayHere"
   static let shareInvite = "shareInvite"
+  static let appInviteLink = "appInviteLink"
   static let skipInvite = "skipInvite"
   static let softYes = "softPushYes"
   static let softNo = "softPushNo"

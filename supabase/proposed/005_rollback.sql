@@ -1,41 +1,24 @@
--- PROPOSED ROLLBACK. Do not apply to vowmukhhnfhtnjlswkun unless Tom is
--- undoing 003, 004, and 006.
+-- Do not apply. This file undoes 003, 004, and push together.
+-- 008_push_rollback.sql is the push-only rollback.
 --
--- Dependencies, in order:
---   1. Ship the previous TestFlight build first if the current build calls
---      leave_couple or delete_my_account and then delete-couple-photos.
---      This file restores the live leave_couple, which returns nothing.
---   2. Delete the delete-couple-photos edge function in the dashboard if
---      it was deployed. This file does not remove it.
---   3. Then run this file. It unschedules justus-push-flush only when 007
---      created that job, and justus-photo-sweep only when 003 created that
---      job. It drops push_outbox and push_deliveries only because 002 and
---      006 created them. It does not delete the vault secrets.
--- The deployed send-push is still v1. This file does not redeploy it.
+-- It would unschedule justus-push-flush and justus-photo-sweep, restore the
+-- previous leave_couple, and drop push_outbox and push_deliveries. It does
+-- not delete the vault secrets. Live send-push is v3. This file does not
+-- deploy or replace it.
 --
--- One transaction. Paste this whole file into the Supabase SQL editor.
--- The live function bodies are inlined below, copied from
--- supabase/proposed/live/. This file has no include directive.
---
--- psql, including scripts/sql-lifecycle.sh:
---   psql -v ON_ERROR_STOP=1 -f supabase/proposed/005_rollback.sql
--- The SQL editor has no ON_ERROR_STOP. The transaction is the stop: any
--- error rolls the whole file back.
+-- One transaction. The live function bodies are inlined below, copied from
+-- supabase/proposed/live/. This file has no include directive. Any error
+-- rolls the whole file back.
 --
 -- Unschedules justus-push-flush and justus-photo-sweep when those jobs
 -- exist. pg_cron and pg_net are installed live as of 2026-11-15. This file
 -- undoes 003 and 004 as well as push. Push alone is 008_push_rollback.sql,
 -- which leaves the photo sweep scheduled.
 --
--- send-push v1 is what is deployed (verify_jwt on, body token / kind /
--- partnerName / localHour). This file does not deploy or replace it.
--- If the proposed replacement in
--- supabase/proposed/functions/send-push/index.ts was deployed and you are
--- undoing 002 and 006, restore v1 from that function's deployment history
--- in the dashboard before dropping push_deliveries. Do not redeploy v1
--- from git; the copy in git is the replacement, not v1. Leave the deployed
--- function alone when v1 is still the one that is live. The schedule is
--- removed first so it cannot call send-push after the tables are gone.
+-- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
+-- This file does not deploy or replace it. 008_push_rollback.sql is the
+-- push-only rollback. The schedule is removed first so it cannot call
+-- send-push after the tables are gone.
 --
 -- author_name, memory_photo_path, device_tokens, notification_preferences,
 -- and the date-photos bucket are already live. This file does not drop them.

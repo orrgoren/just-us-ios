@@ -10,6 +10,7 @@ final class LiveBackend: DateBackend {
   private var deviceToken: String?
 
   init() {
+    deviceToken = DeviceTokenStore.load().token
     guard let url = URL(string: AppConfig.supabaseURL), AppConfig.supabaseURL.hasPrefix("https://"), !AppConfig.anonKey.isEmpty else {
       client = nil
       return
@@ -92,23 +93,91 @@ final class LiveBackend: DateBackend {
     }
   }
 
-  func signOut() async {
+  func signOut() async throws {
     watchTask?.cancel()
-    if let client, let cachedUser, let deviceToken {
-      _ = try? await client.from("device_tokens").delete()
-        .eq("user_id", value: cachedUser.uuidString)
-        .eq("token", value: deviceToken)
-        .execute()
+    try await deleteTokenThenSignOut()
+    wipeAfterSignOut()
+  }
+
+  func dropExpiredSession() async {
+    watchTask?.cancel()
+    DeviceTokenStore.clearDelete()
+    await authSignOut()
+    wipeAfterSignOut()
+  }
+
+  /// The saved device row is deleted while this session still matches `device_tokens_own`.
+  /// Zero rows from that saved token leave the session in place. A newer unsaved token may
+  /// delete nothing. When no save has succeeded, the delete is skipped.
+  private func deleteTokenThenSignOut() async throws {
+    try await deleteOwnDeviceToken(authSignOut: { await self.authSignOut() })
+  }
+
+  private func deleteOwnDeviceToken(
+    authSignOut: @escaping () async -> Void = {},
+    blocked: AppError = .signOutBlocked
+  ) async throws {
+    DeviceTokenStore.clearDelete()
+    if deviceToken?.isEmpty != false {
+      deviceToken = DeviceTokenStore.load().token
     }
+    let stored = DeviceTokenStore.load()
+    let saveSucceeded = cachedUser.map { stored.saveSucceeded(for: $0.uuidString) } ?? false
+    let savedToken = stored.savedToken
+    do {
+      try await DeviceTokenSignOut.perform(
+        current: deviceToken,
+        saved: savedToken,
+        saveSucceeded: saveSucceeded,
+        delete: { token in
+          let count = try await self.deletedDeviceTokenCount(token)
+          if token == savedToken, count > 0 {
+            var record = DeviceTokenStore.load()
+            record.removedFromAccount()
+            record.savedUserId = nil
+            record.savedToken = nil
+            DeviceTokenStore.save(record)
+          }
+          return count
+        },
+        authSignOut: authSignOut
+      )
+    } catch {
+      PushLog.deleteFailed(error)
+      throw blocked
+    }
+    deviceToken = nil
+  }
+
+  private func authSignOut() async {
     if let client {
       try? await client.auth.signOut()
     }
+  }
+
+  private func deletedDeviceTokenCount(_ token: String) async throws -> Int {
+    guard let client, let user = cachedUser, !token.isEmpty else {
+      throw DeviceTokenSignOut.Failure.removedNoRows
+    }
+    let response: PostgrestResponse<[DeviceTokenIdentity]> = try await client
+      .from("device_tokens")
+      .delete(returning: .representation)
+      .eq("user_id", value: user.uuidString)
+      .eq("token", value: token)
+      .execute()
+    return response.value.count
+  }
+
+  private func wipeAfterSignOut() {
     // supabase-swift skips signOut when the access token is already gone, and it never deletes the
     // PKCE code verifier. Wipe both so the next launch cannot revive a dead session or an old link.
     AuthStorageReset.clear()
-    if let cachedUser { CacheStore.deleteAll() }
+    if cachedUser != nil { CacheStore.deleteAll() }
     cachedUser = nil
-    deviceToken = nil
+    var record = DeviceTokenStore.load()
+    record.removedFromAccount()
+    DeviceTokenStore.save(record)
+    DeviceTokenStore.clearDelete()
   }
 
   func membership() async throws -> MembershipKind {
@@ -158,22 +227,60 @@ final class LiveBackend: DateBackend {
   }
 
   func registerDevice(token: String) async {
+    var record = DeviceTokenStore.load()
+    record.received(token)
+    DeviceTokenStore.save(record)
     deviceToken = token
     await uploadDeviceToken()
   }
 
   /// The APNs callback can arrive before the session exists. The token stays
-  /// in memory, and the next sign-in or restore uploads it.
+  /// on disk until the upsert succeeds, and the next launch or sign-in retries it.
   private func uploadDeviceToken() async {
-    guard AppConfig.pushEnabled, let user = cachedUser, let token = deviceToken, let client else { return }
-    let environment = AppConfig.pushSandbox ? "sandbox" : "production"
-    let withEnvironment = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
-    do {
-      try await client.from("device_tokens").upsert(withEnvironment, onConflict: "user_id,token").execute()
-    } catch {
-      let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
-      _ = try? await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+    DeviceTokenStore.clearDelete()
+    let stored = DeviceTokenStore.load()
+    guard stored.awaitingSave, let token = stored.token else { return }
+    deviceToken = token
+    guard let user = cachedUser else { return }
+    guard AppConfig.pushEnabled else { return }
+    guard let client else {
+      PushLog.saveFailed("Supabase client is not configured")
+      return
     }
+    let environment = AppConfig.pushSandbox ? "sandbox" : "production"
+    let row = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
+    do {
+      try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+      markTokenSaved(token, userId: user)
+    } catch {
+      switch DeviceTokenSave.afterFailure(error, attemptedPlain: false) {
+      case .upsertPlain:
+        await uploadDeviceTokenWithoutEnvironment(user: user, token: token)
+      case .giveUp:
+        PushLog.saveFailed(error)
+      }
+    }
+  }
+
+  private func uploadDeviceTokenWithoutEnvironment(user: UUID, token: String) async {
+    guard let client else {
+      PushLog.saveFailed("Supabase client is not configured")
+      return
+    }
+    let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
+    do {
+      try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+      markTokenSaved(token, userId: user)
+    } catch {
+      PushLog.saveFailed(error)
+    }
+  }
+
+  /// `userId` is the account the upsert was sent for, captured before the request.
+  private func markTokenSaved(_ token: String, userId: UUID) {
+    var current = DeviceTokenStore.load()
+    current.saved(for: userId.uuidString, token: token)
+    DeviceTokenStore.save(current)
   }
 
   func notify(_ kind: String) async {
@@ -236,6 +343,9 @@ final class LiveBackend: DateBackend {
   }
 
   func deleteAccount() async throws {
+    watchTask?.cancel()
+    // The row has to go before delete_my_account, while this login still matches device_tokens_own.
+    try await deleteOwnDeviceToken(blocked: .accountDeleteBlocked)
     _ = try await run { client in
       let response: PostgrestResponse<[UUID]> = try await client.rpc("delete_my_account").execute()
       return response.value
@@ -243,7 +353,7 @@ final class LiveBackend: DateBackend {
     // The login is already gone, so /auth/v1/user rejects this JWT. The
     // sweep deletes the photos and clears closed_couples. Leave still
     // calls the function, because that login remains.
-    await signOut()
+    await dropExpiredSession()
   }
 
   func retryClosedPhotos() async {
@@ -378,6 +488,15 @@ struct NewInvite: Encodable {
     case createdBy = "created_by"
     case tokenHash = "token_hash"
     case expiresAt = "expires_at"
+  }
+}
+
+struct DeviceTokenIdentity: Decodable {
+  var userId: UUID
+  var token: String
+  enum CodingKeys: String, CodingKey {
+    case userId = "user_id"
+    case token
   }
 }
 

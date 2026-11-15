@@ -179,6 +179,8 @@ enum AppError: Error, Equatable, Sendable {
   case rateLimited
   case confirmationRequired
   case unsyncedChanges
+  case signOutBlocked
+  case accountDeleteBlocked
   case server(code: String)
 }
 

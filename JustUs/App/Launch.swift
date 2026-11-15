@@ -7,11 +7,19 @@ enum Launch {
     let arguments = ProcessInfo.processInfo.arguments
     guard arguments.contains("-uitest") else { return }
     UserDefaults.standard.removeObject(forKey: uitestKey)
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
     if !arguments.contains("-uitestKeep") {
       resetFakeStoreIfNeeded(arguments)
     }
     UIView.setAnimationsEnabled(false)
   }
+
+  #if DEBUG
+  /// The test scheme passes `-uitest` to unit tests. A test of the real join landing sets this
+  /// so redeem opens the soft prompt, which is what a normal launch does.
+  static var productionJoin = false
+  #endif
 
   static var isUITest: Bool {
     ProcessInfo.processInfo.arguments.contains("-uitest")

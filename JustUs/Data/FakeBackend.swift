@@ -75,7 +75,14 @@ final class FakeBackend: DateBackend {
     return SessionUser(id: user.id, email: user.email, displayHint: nil)
   }
 
-  func signOut() async {
+  var blockSignOut = false
+
+  func signOut() async throws {
+    if blockSignOut { throw AppError.signOutBlocked }
+    await dropExpiredSession()
+  }
+
+  func dropExpiredSession() async {
     store.world.sessionUserId = nil
     store.world.otpSentAt = [:]
     codeVerifier = nil

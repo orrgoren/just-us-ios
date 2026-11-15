@@ -4,6 +4,18 @@ import XCTest
 
 @MainActor
 final class AppleSignInTests: XCTestCase {
+  override nonisolated func setUp() {
+    super.setUp()
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
+  }
+
+  override nonisolated func tearDown() {
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
+    super.tearDown()
+  }
+
   func testCanceledAppleSignInStaysQuiet() {
     let model = SessionModel(backend: FakeBackend(store: FakeStore(inMemory: true), cooldown: 0))
     model.screen = .login
