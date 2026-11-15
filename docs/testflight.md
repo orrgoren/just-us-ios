@@ -1,8 +1,10 @@
 # TestFlight
 
-Uploads run in Xcode Cloud. The steps, the two required secrets, and the workflow Orr creates are in [xcode-cloud.md](xcode-cloud.md).
+Two upload paths exist. Use one at a time.
 
-The GitHub workflow `.github/workflows/testflight.yml` is only a bookmark. Dispatching it does not archive and does not sign.
+GitHub Actions runs `.github/workflows/testflight.yml` after the pull request is green and QA has signed off. The input `confirm` must be the word `upload`. Any other value exits before the archive. The lane is fastlane `ios beta`. It checks that Sign in with Apple is present on the Release entitlements, the App Store profile, and the exported app, and it sets the build number one above the latest TestFlight build.
+
+Xcode Cloud is the other path. The steps, the two required secrets, and the workflow Orr creates are in [xcode-cloud.md](xcode-cloud.md).
 
 | Check | Expected |
 | --- | --- |
