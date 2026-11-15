@@ -46,6 +46,7 @@ struct RootView: View {
         }
         .padding(Theme.Space.screen)
         .padding(.bottom, pinReplace ? 0 : keyboardOverlap)
+        .id("screenTop")
       }
       .ignoresSafeArea(.keyboard, edges: .bottom)
       .scrollDismissesKeyboard(.immediately)
@@ -69,6 +70,12 @@ struct RootView: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
           proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.16))
+        }
+      }
+      .onChange(of: model.screen) { _, newScreen in
+        guard newScreen == .main else { return }
+        Task { @MainActor in
+          proxy.scrollTo("screenTop", anchor: .top)
         }
       }
       .environment(\.keyboardDismiss, keyboardDismiss)
