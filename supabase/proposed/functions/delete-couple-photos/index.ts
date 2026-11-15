@@ -21,7 +21,7 @@
 // SQL must not delete storage.objects: protect_objects_delete raises
 // 42501 and does not remove the file bytes.
 
-import { ackAccepted, drainPrefix, eligibleIds, isUuid, jwtRole, maxCoupleIds, settleEach, tooMany } from "./drain.mjs";
+import { ackAccepted, drainPrefix, eligibleIds, isServiceCaller, isUuid, maxCoupleIds, settleEach, tooMany } from "./drain.mjs";
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "method" }, 405);
@@ -35,7 +35,7 @@ Deno.serve(async (request) => {
   if (!token) return json({ error: "not_authenticated" }, 401);
   // The env key and the vault JWT differ. The role check covers the JWT
   // the scheduled sweep sends. The gateway already verified its signature.
-  const sweep = token === serviceKey || jwtRole(token) === "service_role";
+  const sweep = isServiceCaller(token, serviceKey);
 
   let requested: string[] = [];
   let sweepBody = false;

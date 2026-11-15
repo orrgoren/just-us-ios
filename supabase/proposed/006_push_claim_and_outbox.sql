@@ -7,9 +7,10 @@
 -- requests cannot both pass.
 --
 -- push_outbox holds a quiet-hours send until not_before. The edge function
--- accepts a service-role body { "kind": "flush" } and sends due rows. Nothing
--- here schedules that call. pg_cron is not enabled by this file. A later
--- apply can add, outside this proposal:
+-- accepts a service-role body { "kind": "flush" } and sends due rows. A row
+-- stays queued when the send fails. Nothing here schedules that call.
+-- pg_cron is not enabled by this file. A later apply can add, outside this
+-- proposal:
 --   select cron.schedule('justus-push-flush', '*/15 * * * *', $$select net.http_post(...)$$);
 -- Do not install that until the function is redeployed.
 

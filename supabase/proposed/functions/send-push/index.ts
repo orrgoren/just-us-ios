@@ -11,10 +11,20 @@
 // a user. Quiet hours, the daily cap, the six-hour dedupe, and the invite
 // nudge windows match JustUs/Domain/PushPolicy.swift.
 //
+// A flush is { "kind": "flush" } from the justus-push-flush cron. The bearer
+// is the legacy service_role JWT in the justus_service_role vault secret.
+// SUPABASE_SERVICE_ROLE_KEY may be the newer sb_secret key, so a string
+// compare is not enough. verify_jwt is on, and the payload role is what
+// identifies the cron. A queued row is deleted only after the send succeeds.
+// The APNs provider token is reused for 50 minutes.
+//
 // Secrets stay on the function and are never committed:
 //   APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, APNS_KEY_P8
 //   APNS_USE_SANDBOX=true only for a development-entitlement build
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
+
+import { isServiceCaller } from "../_shared/jwt-role.mjs";
+import { flushDue, freshApnsToken } from "./push.mjs";
 
 const QUIET_START = 22;
 const QUIET_END = 8;
@@ -46,7 +56,7 @@ Deno.serve(async (request) => {
 
   const header = request.headers.get("authorization") ?? "";
   const bearer = header.replace(/^Bearer\s+/i, "").trim();
-  if (bearer && bearer === serviceKey && kind === "flush") {
+  if (isServiceCaller(bearer, serviceKey) && kind === "flush") {
     try {
       const flushed = await flushOutbox(supabaseUrl, serviceKey);
       return json(flushed, 200);
@@ -383,13 +393,14 @@ async function flushOutbox(supabaseUrl: string, serviceKey: string): Promise<Rec
   const due = await db.select<{ id: string; caller_user_id: string; kind: Kind }[]>(
     `push_outbox?not_before=lte.${encodeURIComponent(new Date().toISOString())}&select=id,caller_user_id,kind&limit=50`,
   );
-  let sent = 0;
-  for (const row of due) {
-    await db.remove("push_outbox", `id=eq.${row.id}`);
-    const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey);
-    if (decision.body.decision === "send") sent += 1;
-  }
-  return { decision: "flush", sent };
+  const outcome = await flushDue(due, {
+    deliver: async (row) => {
+      const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey);
+      return decision.body;
+    },
+    remove: (row) => db.remove("push_outbox", `id=eq.${row.id}`),
+  });
+  return { decision: "flush", sent: outcome.sent };
 }
 
 async function send(token: string, text: string, kind: Kind, jwt: string, sandbox: boolean): Promise<number> {
@@ -410,7 +421,18 @@ async function send(token: string, text: string, kind: Kind, jwt: string, sandbo
   return response.status;
 }
 
+let apnsCached: { token: string; mintedAt: number } | null = null;
+
 async function apnsJwt(): Promise<string> {
+  const now = Date.now();
+  const cached = freshApnsToken(apnsCached, now);
+  if (cached) return cached;
+  const token = await mintApnsJwt();
+  apnsCached = { token, mintedAt: now };
+  return token;
+}
+
+async function mintApnsJwt(): Promise<string> {
   const keyId = Deno.env.get("APNS_KEY_ID") ?? "";
   const teamId = Deno.env.get("APNS_TEAM_ID") ?? "";
   const pem = Deno.env.get("APNS_KEY_P8") ?? "";

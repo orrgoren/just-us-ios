@@ -28,7 +28,7 @@ The app sends Sign in with Apple as an ID token, not as a web OAuth redirect:
 
 ## Edge Function secrets
 
-`send-push` is deployed with `verify_jwt` on. The replacement source is `supabase/proposed/functions/send-push/index.ts`. Do not redeploy it until `supabase/proposed/002_push_deliveries.sql` is applied. Set the function secrets to:
+`send-push` is deployed with `verify_jwt` on. The replacement source is `supabase/proposed/functions/send-push/index.ts`. Do not redeploy it until `supabase/proposed/002_push_deliveries.sql` is applied. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the replacement accepts that flush by the JWT `role` claim. A queued push is removed only after the send succeeds, and the APNs provider token is reused for 50 minutes. Set the function secrets to:
 
 | Secret | What to enter |
 | --- | --- |

@@ -14,10 +14,14 @@
 -- does not add a separate charge. Each run counts as one Edge Function
 -- invocation.
 --
--- The job posts { "kind": "flush" } every 15 minutes. The function accepts
--- that only when the bearer is the service role, and it only sends rows
--- already waiting in push_outbox (quiet hours). It does not create a weekly
--- reminder or an invite nudge. The iOS app never calls those kinds.
+-- The job posts { "kind": "flush" } every 15 minutes. The bearer is the
+-- justus_service_role vault secret, the legacy service_role JWT.
+-- SUPABASE_SERVICE_ROLE_KEY may be the newer sb_secret key, so the function
+-- accepts the flush when the JWT role is service_role. verify_jwt is on, so
+-- the gateway checks the signature first. It only sends rows already waiting
+-- in push_outbox (quiet hours), and it deletes a row only after that send
+-- succeeds. It does not create a weekly reminder or an invite nudge. The
+-- iOS app never calls those kinds.
 --
 -- Create these two Vault secrets in the dashboard first. Do not paste the
 -- service role into this file or into git.
