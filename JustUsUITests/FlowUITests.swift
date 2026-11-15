@@ -209,14 +209,42 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(field.waitForExistence(timeout: 12))
     field.tap()
     field.typeText(email)
-    app.buttons["sendCode"].tap()
+    tapAboveKeyboard("sendCode", in: app, record: true)
     let codeField = app.textFields["codeField"]
     XCTAssertTrue(codeField.waitForExistence(timeout: 8))
     codeField.tap()
     codeField.typeText(code)
-    app.buttons["verifyCode"].tap()
+    tapAboveKeyboard("verifyCode", in: app, record: false)
     if expectHome {
       XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))
     }
+  }
+
+  private static var recordedKeyboard = false
+
+  /// The send and verify buttons have to sit above the keyboard. The first
+  /// one keeps a screenshot so the SE job shows the keyboard-up layout.
+  private func tapAboveKeyboard(_ identifier: String, in app: XCUIApplication, record: Bool) {
+    let button = app.buttons[identifier]
+    XCTAssertTrue(button.waitForExistence(timeout: 4))
+    let keyboard = app.keyboards.firstMatch
+    guard keyboard.waitForExistence(timeout: 2), keyboard.frame.height > 20 else {
+      button.tap()
+      return
+    }
+    let above = NSPredicate { _, _ in
+      let frame = button.frame
+      return frame.height > 2 && frame.midY > 12 && frame.midY <= keyboard.frame.minY
+    }
+    let ready = XCTNSPredicateExpectation(predicate: above, object: nil)
+    XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 3), .completed)
+    if record && !Self.recordedKeyboard {
+      Self.recordedKeyboard = true
+      let shot = XCTAttachment(screenshot: app.screenshot())
+      shot.name = "se-keyboard-login"
+      shot.lifetime = .keepAlways
+      add(shot)
+    }
+    button.tap()
   }
 }

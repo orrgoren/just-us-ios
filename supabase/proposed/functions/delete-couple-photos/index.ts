@@ -11,15 +11,16 @@
 // says the couple row is already gone. That function is
 // app_private.photo_delete_allowed. More than 50 ids is rejected.
 //
-// After the objects are gone, the confirm call has to succeed. A user
-// confirm is ack_closed_couples. A sweep confirm is ack_swept_couples.
-// A failed confirm leaves the row so the next sweep tries again.
+// After that couple's objects are gone, its confirm call has to succeed.
+// A user confirm is ack_closed_couples. A sweep confirm is ack_swept_couples.
+// Each id is drained and confirmed on its own. A failed one stays for the
+// next sweep and does not block the rest of the batch.
 // SQL must not delete storage.objects: protect_objects_delete raises
 // 42501 and does not remove the file bytes.
 //
 // This file is not deployed.
 
-import { ackAccepted, drainPrefix, eligibleIds, isUuid, maxCoupleIds, tooMany } from "./drain.mjs";
+import { ackAccepted, drainPrefix, eligibleIds, isUuid, maxCoupleIds, settleEach, tooMany } from "./drain.mjs";
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "method" }, 405);
@@ -71,27 +72,30 @@ Deno.serve(async (request) => {
   }
 
   const ids = eligibleIds(candidates, denied);
-  try {
-    let deleted = 0;
-    for (const id of ids) {
-      const prefixes = [...new Set([id, id.toUpperCase()])];
-      for (const prefix of prefixes) {
-        deleted += await drainPrefix(
-          prefix,
-          (value) => listPrefix(supabaseUrl, serviceKey, value),
-          (paths) => deletePaths(supabaseUrl, serviceKey, paths),
-        );
-      }
-    }
-    if (ids.length > 0) {
-      if (sweep) await ackSwept(supabaseUrl, serviceKey, ids);
-      else await ackClosed(supabaseUrl, anonKey, authorization, ids);
-    }
-    return json({ deleted, couples: ids.length }, 200);
-  } catch {
-    return json({ error: "storage" }, 502);
+  const outcome = await settleEach(ids, {
+    drain: (id) => drainCouple(supabaseUrl, serviceKey, id),
+    confirm: (id) => sweep
+      ? ackSwept(supabaseUrl, serviceKey, [id])
+      : ackClosed(supabaseUrl, anonKey, authorization, [id]),
+  });
+  if (outcome.failed.length > 0) {
+    return json({ error: "storage", deleted: outcome.deleted, couples: outcome.confirmed.length }, 502);
   }
+  return json({ deleted: outcome.deleted, couples: outcome.confirmed.length }, 200);
 });
+
+async function drainCouple(url: string, serviceKey: string, id: string): Promise<number> {
+  let deleted = 0;
+  const prefixes = [...new Set([id, id.toUpperCase()])];
+  for (const prefix of prefixes) {
+    deleted += await drainPrefix(
+      prefix,
+      (value) => listPrefix(url, serviceKey, value),
+      (paths) => deletePaths(url, serviceKey, paths),
+    );
+  }
+  return deleted;
+}
 
 function cappedIds(requested: string[], recorded: string[]): string[] {
   const chosen: string[] = [];

@@ -8,6 +8,10 @@ struct RootView: View {
   @State private var keyboardDismiss = 0
   @State private var keyboardOverlap: CGFloat = 0
 
+  private var pinReplace: Bool {
+    keyboardOverlap > 0 && model.screen == .invite && model.pendingReplace
+  }
+
   var body: some View {
     JustScreen {
       ScrollViewReader { proxy in
@@ -41,14 +45,15 @@ struct RootView: View {
           .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.screen)
         }
         .padding(Theme.Space.screen)
-        .padding(.bottom, keyboardOverlap)
+        .padding(.bottom, pinReplace ? 0 : keyboardOverlap)
       }
-      .padding(.bottom, keyboardOverlap)
+      .ignoresSafeArea(.keyboard, edges: .bottom)
       .scrollDismissesKeyboard(.immediately)
       .accessibilityIdentifier(A11y.content)
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        if keyboardOverlap > 0, model.screen == .invite, model.pendingReplace {
+        if pinReplace {
           PinnedReplaceActions(model: model)
+            .padding(.bottom, keyboardOverlap)
         }
       }
       .toolbar {
@@ -67,10 +72,12 @@ struct RootView: View {
       }
       .environment(\.keyboardDismiss, keyboardDismiss)
       .environment(\.keyboardOverlap, keyboardOverlap)
+      .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+        let next = KeyboardOverlap.height(from: note)
+        guard abs(next - keyboardOverlap) > 1 else { return }
+        keyboardOverlap = next
       }
-    }
-    .background {
-      KeyboardOverlapReader(overlap: $keyboardOverlap)
+      }
     }
     .preferredColorScheme(Launch.preferredScheme)
     .onOpenURL { url in Task { await model.open(url) } }
@@ -233,21 +240,20 @@ private struct PinnedReplaceActions: View {
   }
 }
 
-private struct KeyboardOverlapReader: View {
-  @Binding var overlap: CGFloat
-
-  var body: some View {
-    GeometryReader { geo in
-      Color.clear
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-          let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
-          let covered = geo.frame(in: .global).intersection(frame)
-          let next = covered.isNull || covered.isInfinite ? 0 : max(0, covered.height)
-          guard abs(next - overlap) > 1 else { return }
-          overlap = next
-        }
-    }
-    .allowsHitTesting(false)
+private enum KeyboardOverlap {
+  /// Height of the keyboard over the screen. The frame comes from the
+  /// notification, not from a background view that SwiftUI may have
+  /// already lifted clear of the keyboard.
+  static func height(from note: Notification) -> CGFloat {
+    guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return 0 }
+    let screen = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .first { $0.activationState == .foregroundActive }?
+      .screen.bounds
+      ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.screen.bounds
+      ?? .zero
+    guard screen.height > 1, frame.minY < screen.maxY else { return 0 }
+    return min(max(0, screen.maxY - frame.minY), screen.height)
   }
 }
 

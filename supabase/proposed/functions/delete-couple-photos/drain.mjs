@@ -45,6 +45,24 @@ export function ackAccepted(status) {
   return status >= 200 && status < 300;
 }
 
+// One couple at a time. A drain or confirm failure is recorded and the
+// next id still runs, so one stuck folder cannot pin the whole sweep.
+export async function settleEach(ids, work) {
+  let deleted = 0;
+  const confirmed = [];
+  const failed = [];
+  for (const id of ids) {
+    try {
+      deleted += await work.drain(id);
+      await work.confirm(id);
+      confirmed.push(id);
+    } catch {
+      failed.push(id);
+    }
+  }
+  return { deleted, confirmed, failed };
+}
+
 export async function drainPrefix(prefix, list, remove) {
   let removed = 0;
   let emptyReads = 0;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ackAccepted, drainPrefix, eligibleIds, tooMany } from "./drain.mjs";
+import { ackAccepted, drainPrefix, eligibleIds, settleEach, tooMany } from "./drain.mjs";
 
 const closed = "11111111-1111-4111-8111-111111111111";
 const living = "22222222-2222-4222-8222-222222222222";
@@ -31,6 +31,40 @@ test("an unknown id is eligible only because that couple row is gone", () => {
   const gone = "33333333-3333-4333-8333-333333333333";
   assert.deepEqual(eligibleIds([gone], []), [gone]);
   assert.deepEqual(eligibleIds([gone], [gone]), []);
+});
+
+test("one failed couple does not stop the sweep from confirming the others", async () => {
+  const drained = [];
+  const confirmed = [];
+  const outcome = await settleEach(["alpha", "stuck", "later"], {
+    drain: async (id) => {
+      drained.push(id);
+      if (id === "stuck") throw new Error("storage");
+      return id === "alpha" ? 2 : 1;
+    },
+    confirm: async (id) => {
+      confirmed.push(id);
+    },
+  });
+  assert.deepEqual(drained, ["alpha", "stuck", "later"]);
+  assert.deepEqual(confirmed, ["alpha", "later"]);
+  assert.deepEqual(outcome.failed, ["stuck"]);
+  assert.equal(outcome.deleted, 3);
+});
+
+test("a failed confirm leaves that couple and still settles the next one", async () => {
+  const confirmed = [];
+  const outcome = await settleEach(["first", "second"], {
+    drain: async () => 1,
+    confirm: async (id) => {
+      if (id === "first") throw new Error("ack");
+      confirmed.push(id);
+    },
+  });
+  assert.deepEqual(confirmed, ["second"]);
+  assert.deepEqual(outcome.failed, ["first"]);
+  assert.deepEqual(outcome.confirmed, ["second"]);
+  assert.equal(outcome.deleted, 2);
 });
 
 test("a folder entry is not deleted and does not keep the loop running", async () => {
