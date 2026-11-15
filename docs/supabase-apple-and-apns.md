@@ -57,11 +57,11 @@ Applied live on 2026-11-15. Do not re-apply. The push migrations went on in this
 - `supabase/proposed/010_device_tokens_authenticated_grant.sql` — applied live as migration `device_tokens_authenticated_grant`. `authenticated` can select, insert, update, and delete `device_tokens`. `device_tokens_own` was already the policy. Do not re-apply it.
 - `supabase/proposed/011_notification_preferences_authenticated_grant.sql` — applied live as migration `notification_preferences_authenticated_grant`. `authenticated` can select, insert, and update `notification_preferences`. `notification_preferences_own` was already the policy. Do not re-apply it. `001` includes both grants so a fresh project does not create the tables without them.
 - `supabase/proposed/012_scheduled_hint_notes.sql` — applied live as migration `plans_update_until_reveal` on 2026-11-15 at 20:52 Asia/Jerusalem. The planner can change `private_notes` on a scheduled date that has not been revealed. `app_private.guard_plan_update` still lets a draft replace `idea_id` and `prepared_at`, and freezes both after the date leaves draft. Do not re-apply it.
+- `supabase/proposed/013_mood_until_reveal.sql` — applied live as migration `mood_until_reveal` on 2026-11-16 at 00:30 Asia/Jerusalem. A member can change their own mood while the date is draft, or scheduled and not yet revealed. Do not re-apply it.
 - `supabase/proposed/functions/delete-couple-photos/index.ts` — live as v3, deployed from `main` at `a12f1d1` with `verify_jwt` on. The app calls it after unlink. Account deletion leaves the rows for the sweep, because that login is already gone. The sweep bearer is the legacy service_role JWT in the vault. The function env may hold the newer `sb_secret` key, so the sweep is recognized by the JWT `role` claim after the gateway has checked the signature.
 
 Not applied, and must never be applied:
 
-- `supabase/proposed/013_mood_until_reveal.sql` — not applied. It lets a member change their own mood while the date is draft, or scheduled and not yet revealed. Do not apply it until it is approved.
 - `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush` and also undoes 003 and 004. Not applied. Do not apply it.
 - `supabase/proposed/008_push_rollback.sql` — the push-only rollback. It unschedules `justus-push-flush` and drops the push tables. It leaves 003, 004, `leave_couple`, `delete_my_account`, and the photo sweep alone.
 

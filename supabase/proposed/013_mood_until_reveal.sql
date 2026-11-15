@@ -1,5 +1,5 @@
--- Not applied. Do not run this on the live project until it is approved.
--- Numbered 013 because 012 is already live.
+-- Applied live as migration mood_until_reveal on 2026-11-16 at 00:30 Asia/Jerusalem.
+-- Do not re-apply. Numbered 013 because 012 is already live.
 --
 -- mood_votes_insert, mood_votes_update, and mood_votes_delete let a member
 -- change only their own mood, and only while the date is a draft. A scheduled
