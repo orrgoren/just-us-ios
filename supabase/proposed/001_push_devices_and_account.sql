@@ -23,6 +23,11 @@ create policy device_tokens_own on public.device_tokens
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- RLS never runs until authenticated has a table privilege. Without this
+-- grant every token upsert fails with permission denied. Already live as
+-- device_tokens_authenticated_grant. Do not re-apply that migration.
+grant select, insert, update, delete on public.device_tokens to authenticated;
+
 create table if not exists public.notification_preferences (
   user_id uuid primary key references auth.users (id) on delete cascade,
   partner_mood boolean not null default true,
@@ -37,6 +42,10 @@ create policy notification_preferences_own on public.notification_preferences
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Same gap as device_tokens. Preference writes failed silently. Already live
+-- as notification_preferences_authenticated_grant. Do not re-apply it.
+grant select, insert, update on public.notification_preferences to authenticated;
 
 alter table public.memory_notes add column if not exists author_name text;
 -- NOT live. memory_notes.author_user_id is still NOT NULL on
