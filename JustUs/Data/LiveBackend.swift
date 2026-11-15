@@ -108,7 +108,8 @@ final class LiveBackend: DateBackend {
 
   /// The saved device row is deleted while this session still matches `device_tokens_own`.
   /// Zero rows from that saved token leave the session in place. A newer unsaved token may
-  /// delete nothing. When no save has succeeded, the delete is skipped.
+  /// delete nothing. A token with no recorded save is deleted on a best-effort basis, and
+  /// a miss or a network error does not block sign-out.
   private func deleteTokenThenSignOut() async throws {
     try await deleteOwnDeviceToken(authSignOut: { await self.authSignOut() })
   }
