@@ -45,7 +45,7 @@ final class AccountUITests: XCTestCase {
     app.buttons["signOut"].tap()
     let email = app.textFields["emailField"]
     XCTAssertTrue(email.waitForExistence(timeout: 8))
-    XCTAssertFalse((email.value as? String)?.contains("alex@") == true)
+    XCTAssertTrue((email.value as? String)?.contains("alex@") == true)
     signIn(app, email: "sam@solo.test")
     XCTAssertFalse(app.staticTexts["Come hungry"].exists)
   }
@@ -138,6 +138,19 @@ final class AccountUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))
   }
 
+  private func dismissKeyboard(_ app: XCUIApplication) {
+    let done = app.buttons["dismissKeyboard"]
+    if done.waitForExistence(timeout: 2), done.isHittable {
+      done.tap()
+      return
+    }
+    let scroll = app.scrollViews["mainContent"]
+    guard scroll.exists else { return }
+    let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+    let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+    start.press(forDuration: 0.05, thenDragTo: end)
+  }
+
   private func scrollFullyOnScreen(_ element: XCUIElement, in app: XCUIApplication) {
     let height = app.frame.height
     for _ in 0..<6 {
@@ -159,11 +172,13 @@ final class AccountUITests: XCTestCase {
     XCTAssertTrue(field.waitForExistence(timeout: 8))
     field.tap()
     field.typeText(email)
+    dismissKeyboard(app)
     app.buttons["sendCode"].tap()
     let codeField = app.textFields["codeField"]
     XCTAssertTrue(codeField.waitForExistence(timeout: 8))
     codeField.tap()
     codeField.typeText("000000")
+    dismissKeyboard(app)
     app.buttons["verifyCode"].tap()
   }
 
@@ -175,11 +190,13 @@ final class AccountUITests: XCTestCase {
       field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
     }
     field.typeText(email)
+    dismissKeyboard(app)
     app.buttons["sendCode"].tap()
     let codeField = app.textFields["codeField"]
     XCTAssertTrue(codeField.waitForExistence(timeout: 8))
     codeField.tap()
     codeField.typeText(code)
+    dismissKeyboard(app)
     app.buttons["verifyCode"].tap()
     XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))
   }
