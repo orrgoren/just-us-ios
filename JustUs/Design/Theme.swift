@@ -262,7 +262,7 @@ struct ActionButton: View {
       Text(title)
     }
     .buttonStyle(JustButtonStyle(kind: kind))
-    .modifier(AccessIdentifier(identifier))
+    .modifier(AccessIdentifier(identifier: identifier))
   }
 }
 
