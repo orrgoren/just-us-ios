@@ -28,7 +28,7 @@ The app sends Sign in with Apple as an ID token, not as a web OAuth redirect:
 
 ## Edge Function secrets
 
-`send-push` is deployed with `verify_jwt` on. The replacement source is `supabase/proposed/functions/send-push/index.ts`. `002_push_deliveries.sql`, `006_push_claim_and_outbox.sql`, and `007_push_flush_schedule.sql` are already live, in that order. Do not re-apply them. The deployed sender is still v1, so do not redeploy the rewritten send-push from this repository until that deploy is reviewed on its own. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the replacement accepts that flush by the JWT `role` claim. A queued push is removed on a final decision and kept only for a retryable APNs failure, up to the attempt cap. The APNs provider token is reused for 50 minutes. `verify_jwt` is pinned on in `supabase/config.toml`. Set the function secrets to:
+Live `send-push` is v3, deployed from `main` at `a12f1d1` with `verify_jwt` on. That deployed source is `supabase/proposed/functions/send-push/index.ts`. `002_push_deliveries.sql`, `006_push_claim_and_outbox.sql`, and `007_push_flush_schedule.sql` are already live, in that order. Do not re-apply them. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the live sender accepts that flush by the JWT `role` claim. A queued push is removed on a final decision and kept only for a retryable APNs failure, up to the attempt cap. The APNs provider token is reused for 50 minutes. `verify_jwt` is pinned on in `supabase/config.toml`. Set the function secrets to:
 
 | Secret | What to enter |
 | --- | --- |
@@ -40,7 +40,7 @@ The app sends Sign in with Apple as an ID token, not as a web OAuth redirect:
 
 A person who already has the `.p8` sets those secrets from their own machine. CI does not. The function also needs the service role to read `device_tokens`. Supabase injects `SUPABASE_SERVICE_ROLE_KEY` into Edge Functions. Do not copy that key into the iOS app or into GitHub Actions.
 
-Copy for a notification is chosen in `JustUs/Domain/PushPolicy.swift` and in the proposed function. The two have to match. The message does not include the place, the outfit, or the idea title.
+Copy for a notification is chosen in `JustUs/Domain/PushPolicy.swift` and in the live `send-push` function. The two have to match. The message does not include the place, the outfit, or the idea title.
 
 ## Related schema
 
@@ -53,14 +53,13 @@ Applied live on 2026-11-15. Do not re-apply. The push migrations went on in this
 - `supabase/proposed/007_push_flush_schedule.sql` — applied after 006. The push flush schedule is live.
 - `supabase/proposed/003_memory_photo_and_close.sql` — photo path on a completed date. Unlink closes the whole couple for both people and returns that couple id. pg_cron, pg_net, and `justus-photo-sweep` are on.
 - `supabase/proposed/004_delete_my_account.sql` — account deletion. Either partner closes every couple they still touch. The other person stays unpaired.
-- `supabase/proposed/functions/delete-couple-photos/index.ts` — deployed. The app calls it after unlink. Account deletion leaves the rows for the sweep, because that login is already gone. The sweep bearer is the legacy service_role JWT in the vault. The function env may hold the newer `sb_secret` key, so the sweep is recognized by the JWT `role` claim after the gateway has checked the signature.
+- `supabase/proposed/functions/delete-couple-photos/index.ts` — live as v3, deployed from `main` at `a12f1d1` with `verify_jwt` on. The app calls it after unlink. Account deletion leaves the rows for the sweep, because that login is already gone. The sweep bearer is the legacy service_role JWT in the vault. The function env may hold the newer `sb_secret` key, so the sweep is recognized by the JWT `role` claim after the gateway has checked the signature.
 
-Not applied, and waiting for review:
+Not applied, and must never be applied:
 
-- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. It does not redeploy send-push. Not applied.
-- The rewritten `send-push` source. The deployed sender is still v1.
+- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. Not applied. Do not apply it.
 
-The TestFlight build calls `leave_couple` and then `delete-couple-photos`. It does not call the function after `delete_my_account`. The function deletes photos only for couple ids the leave closed, and only when `photo_delete_allowed` says that couple row is already gone. A failed call leaves the id in `closed_couples`. `justus-photo-sweep` posts `{"sweep":true}` with the `justus_service_role` vault secret. The sweep is what clears photos after account deletion. The next launch also retries for the person who left. `005_rollback.sql` restores the previous `leave_couple`, unschedules the sweep, and does not remove the edge function or the vault secret, so ship the previous build and delete the function before running it. Do not apply `003` or `004` again. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
+The TestFlight build calls `leave_couple` and then `delete-couple-photos`. It does not call the function after `delete_my_account`. The function deletes photos only for couple ids the leave closed, and only when `photo_delete_allowed` says that couple row is already gone. A failed call leaves the id in `closed_couples`. `justus-photo-sweep` posts `{"sweep":true}` with the `justus_service_role` vault secret. The sweep is what clears photos after account deletion. The next launch also retries for the person who left. `005_rollback.sql` would restore the previous `leave_couple` and unschedule the sweep. It is not applied and must never be applied. Do not apply `003` or `004` again. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
 
 ## What GitHub Actions already has
 
