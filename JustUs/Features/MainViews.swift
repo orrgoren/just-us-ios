@@ -46,11 +46,12 @@ struct RitualScreen: View {
           Text(L10n.waitingJoin)
           HelperText(text: L10n.waitForPartnerHelp)
         } else if ritual.isPlanner {
-          RoleLine(waiting: false, text: L10n.yourTurn)
+          RoleLine(waiting: false, text: L10n.yourTurnToPlan)
           HelperText(text: L10n.plannerHelp)
         } else {
-          RoleLine(waiting: true, text: L10n.waitingOnThem)
-          HelperText(text: L10n.partnerWaitPlan)
+          let name = ritual.date?.plannerName ?? ritual.partner?.displayName ?? ""
+          RoleLine(waiting: false, text: L10n.partnerTurn(name))
+          HelperText(text: L10n.partnerPlanning(name))
         }
         moods(ritual)
         if ritual.isPlanner, ritual.date?.status == .scheduled, ritual.revealed == false {
@@ -60,7 +61,7 @@ struct RitualScreen: View {
         }
         reveal(ritual)
       } else {
-        RoleLine(waiting: false, text: L10n.yourTurn)
+        RoleLine(waiting: false, text: L10n.yourTurnToPlan)
         Text(L10n.noDate)
         WineButton(title: L10n.openWeek, identifier: A11y.homeRoot, busy: model.busy, busyTitle: L10n.loading) {
           Task { await model.openNextWeek() }
@@ -75,6 +76,9 @@ struct RitualScreen: View {
         MonogramView(names: [ritual.selfMember.displayName, ritual.partner?.displayName ?? ritual.inviteeName])
         Text(L10n.homeTitle).font(Theme.display).accessibilityIdentifier(A11y.homeRoot)
         Text(L10n.datesCount(ritual.completedCount))
+        if ritual.streakWeeks > 0 {
+          Text(L10n.weeksInARow(ritual.streakWeeks)).accessibilityIdentifier(A11y.streak)
+        }
         Text(L10n.rhythm)
         if let date = ritual.date {
           Text(ZonedTime.formatWhen(date.scheduledAt, timeZone: ritual.timezone))

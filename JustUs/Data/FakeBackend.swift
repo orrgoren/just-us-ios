@@ -291,9 +291,14 @@ final class FakeBackend: DateBackend {
       weekday: couple.weekday, time: couple.localTime, timeZone: couple.timezone, from: Date()
     )
     let completed = store.world.dates.filter { $0.coupleId == coupleId && $0.status == .completed }.count
-    let plannerIndex = try Recommendation.defaultPlannerIndex(completedCount: completed)
     let members = store.world.members.filter { $0.coupleId == coupleId }.sorted { $0.memberIndex < $1.memberIndex }
-    let plannerId = members.indices.contains(plannerIndex) ? members[plannerIndex].userId : planner
+    let nights = store.world.dates.filter { $0.coupleId == coupleId }.map {
+      DatedNight(status: $0.status, scheduledAt: $0.scheduledAt, plannerUserId: $0.plannerUserId)
+    }
+    let memberRefs = members.map {
+      MemberRef(userId: $0.userId, displayName: $0.displayName, memberIndex: $0.memberIndex)
+    }
+    let plannerId = PlannerTurn.nextPlanner(nights: nights, members: memberRefs) ?? planner
     let location = try Recommendation.suggestedLocation(completedCount: completed)
     store.world.dates.append(FakeDate(
       id: UUID(), coupleId: coupleId, status: .draft, scheduledAt: when,

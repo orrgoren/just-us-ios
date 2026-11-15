@@ -15,6 +15,31 @@ final class FakeFlowTests: XCTestCase {
     super.tearDown()
   }
 
+  func testTurnFollowsTheLastPlanner() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    let alex = try XCTUnwrap(try await backend.ritual())
+    XCTAssertTrue(alex.isPlanner)
+    XCTAssertEqual(alex.date?.plannerUserId, SeedID.alex)
+    XCTAssertEqual(alex.streakWeeks, 2)
+    try await backend.complete(note: "A good night")
+    let handedOn = try XCTUnwrap(try await backend.ritual())
+    XCTAssertEqual(handedOn.date?.plannerUserId, SeedID.blair)
+    XCTAssertFalse(handedOn.isPlanner)
+    XCTAssertEqual(handedOn.streakWeeks, 3)
+  }
+
+  func testSkipDoesNotHandTheTurnOver() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    try await backend.skipWeek()
+    let again = try XCTUnwrap(try await backend.ritual())
+    XCTAssertEqual(again.date?.plannerUserId, SeedID.alex)
+    XCTAssertTrue(again.isPlanner)
+  }
+
   func testPartnerCannotSeePlan() async throws {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     _ = try await backend.sendCode(email: "blair@couple-a.test")

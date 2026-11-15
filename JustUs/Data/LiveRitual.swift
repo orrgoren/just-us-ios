@@ -331,6 +331,20 @@ extension LiveBackend {
     return rows.first
   }
 
+  private func datedNights(_ context: LiveContext) async throws -> [DatedNight] {
+    let rows: [NightRow] = try await runWrite { client in
+      let response: PostgrestResponse<[NightRow]> = try await client.from("dates")
+        .select("planner_user_id, status, scheduled_at")
+        .eq("couple_id", value: context.couple.id.uuidString)
+        .execute()
+      return response.value
+    }
+    return rows.compactMap { row in
+      guard let scheduled = row.scheduledAt, let when = APIDate.parse(scheduled) else { return nil }
+      return DatedNight(status: row.status, scheduledAt: when, plannerUserId: row.plannerUserId)
+    }
+  }
+
   private func makeRitual(context: LiveContext, completed: Int, active: DateRow?) async throws -> RitualSnapshot {
     let partner = context.members.first { $0.userId != context.userId }
     var plan: FullPlan?
@@ -365,7 +379,8 @@ extension LiveBackend {
       date: dateCard, moods: moods,
       isPlanner: active?.plannerUserId == context.userId,
       revealed: active?.revealedAt != nil,
-      plan: plan
+      plan: plan,
+      streakWeeks: TogetherStreak.weeks(nights: try await datedNights(context), timeZone: context.couple.timezone)
     )
     return RitualPrivacy.seal(view)
   }

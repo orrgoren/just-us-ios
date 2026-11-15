@@ -36,6 +36,17 @@ enum L10n {
   static var dismissKeyboard: String { text("field.done", "Done") }
   static var optional: String { text("field.optional", "Optional") }
   static var yourTurn: String { text("role.yours", "Your turn") }
+  static var yourTurnToPlan: String { text("role.yourPlan", "Your turn to plan") }
+  static func partnerTurn(_ name: String) -> String {
+    String(format: text("role.partnerTurn", "%@'s turn to plan"), locale: .current, name)
+  }
+  static func partnerPlanning(_ name: String) -> String {
+    String(format: text("ritual.partnerPlanning", "%@ is planning this one. Pick a mood. The hint shows up when it's ready."), locale: .current, name)
+  }
+  static func weeksInARow(_ count: Int) -> String {
+    if count == 1 { return text("home.oneWeek", "One week together") }
+    return String(format: text("home.weeksInARow", "%lld weeks in a row"), locale: .current, count)
+  }
   static var waitingOnThem: String { text("role.waiting", "Waiting on them") }
   static var loginNext: String { text("auth.next", "Next: sign in. Then make a space, or join theirs.") }
   static var codeNext: String { text("auth.codeNext", "The link is the way in. The code is there if you already have it.") }

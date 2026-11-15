@@ -151,6 +151,31 @@ enum SeedBuilder {
       snapshotTitle: nil, snapshotEmoji: nil, snapshotSummary: nil, completedAt: nil
     ))
     world.moods.append(FakeMood(dateId: SeedID.dateA, userId: SeedID.alex, mood: .romance))
+    // Blair planned the latest finished night, so this draft is Alex's turn.
+    // The November skip is the one free skip that month.
+    pastNight(&world, id: "15151515-1515-4151-8151-151515151515", status: .completed, day: "2026-10-29", planner: SeedID.alex)
+    pastNight(&world, id: "16161616-1616-4161-8161-161616161616", status: .skipped, day: "2026-11-05", planner: SeedID.blair)
+    pastNight(&world, id: "17171717-1717-4171-8171-171717171717", status: .completed, day: "2026-11-12", planner: SeedID.blair)
+  }
+
+  private static func pastNight(
+    _ world: inout FakeWorld,
+    id: String,
+    status: DateStatus,
+    day: String,
+    planner: UUID
+  ) {
+    let when = (try? ZonedTime.zonedLocalToUtc(date: day, time: "20:30", timeZone: "Asia/Jerusalem")) ?? Date()
+    let finished = status == .completed
+    world.dates.append(FakeDate(
+      id: SeedID.uuid(id), coupleId: SeedID.coupleA, status: status, scheduledAt: when,
+      durationMinutes: 90, location: .home, locationIsOverride: false,
+      publicTeaser: nil, outfitHint: nil, revealedAt: finished ? when : nil,
+      plannerUserId: planner, ideaId: finished ? "h1" : nil, planTitle: nil,
+      privateNotes: nil, photoJPEG: nil,
+      snapshotTitle: finished ? "A week together" : nil, snapshotEmoji: finished ? "♥" : nil,
+      snapshotSummary: nil, completedAt: finished ? when : nil
+    ))
   }
 
   private static func addCoupleB(_ world: inout FakeWorld, now: Date) {

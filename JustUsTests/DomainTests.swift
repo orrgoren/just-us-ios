@@ -170,6 +170,65 @@ final class DomainTests: XCTestCase {
     XCTAssertEqual(DeepLinks.pushRoute("inviteNudge"), .settings)
   }
 
+  func testPlannerAlternatesFromTheLastPlannedNight() throws {
+    let alex = MemberRef(userId: SeedID.alex, displayName: "Alex", memberIndex: 0)
+    let blair = MemberRef(userId: SeedID.blair, displayName: "Blair", memberIndex: 1)
+    let members = [blair, alex]
+    XCTAssertEqual(PlannerTurn.nextPlanner(nights: [], members: members), SeedID.alex)
+    let finished = try night("2026-11-12", .completed, SeedID.blair)
+    let skipped = try night("2026-11-19", .skipped, SeedID.alex)
+    XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished, skipped], members: members), SeedID.alex)
+    let scheduled = try night("2026-11-19", .scheduled, SeedID.alex)
+    XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished, scheduled], members: members), SeedID.blair)
+    XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished], members: [alex]), SeedID.alex)
+  }
+
+  func testOneSkipAMonthKeepsTheWeeksTogether() throws {
+    let kept = try [
+      night("2026-10-29", .completed, SeedID.alex),
+      night("2026-11-05", .skipped, SeedID.blair),
+      night("2026-11-12", .completed, SeedID.blair)
+    ]
+    XCTAssertEqual(TogetherStreak.weeks(nights: kept, timeZone: "Asia/Jerusalem"), 2)
+    let secondSkip = try [
+      night("2026-11-05", .completed, SeedID.alex),
+      night("2026-11-12", .skipped, SeedID.blair),
+      night("2026-11-19", .skipped, SeedID.alex)
+    ]
+    XCTAssertEqual(TogetherStreak.weeks(nights: secondSkip, timeZone: "Asia/Jerusalem"), 0)
+    let gap = try [
+      night("2026-10-29", .completed, SeedID.alex),
+      night("2026-11-12", .completed, SeedID.blair)
+    ]
+    XCTAssertEqual(TogetherStreak.weeks(nights: gap, timeZone: "Asia/Jerusalem"), 1)
+    XCTAssertEqual(TogetherStreak.weeks(nights: [try night("2026-11-12", .draft, SeedID.alex)], timeZone: "Asia/Jerusalem"), 0)
+    let yearTurn = try [
+      night("2026-12-31", .completed, SeedID.alex),
+      night("2027-01-07", .completed, SeedID.blair)
+    ]
+    XCTAssertEqual(TogetherStreak.weeks(nights: yearTurn, timeZone: "Asia/Jerusalem"), 2)
+    let lines = [
+      L10n.weeksInARow(1), L10n.weeksInARow(2), L10n.yourTurnToPlan,
+      L10n.partnerTurn("Blair"), L10n.partnerPlanning("Blair")
+    ]
+    for line in lines {
+      XCTAssertFalse(line.localizedCaseInsensitiveContains("miss"))
+      XCTAssertFalse(line.localizedCaseInsensitiveContains("break"))
+      XCTAssertFalse(line.localizedCaseInsensitiveContains("lose"))
+      XCTAssertFalse(line.localizedCaseInsensitiveContains("only"))
+    }
+    XCTAssertEqual(L10n.weeksInARow(1), "One week together")
+    XCTAssertEqual(L10n.weeksInARow(2), "2 weeks in a row")
+  }
+
+  private func night(_ day: String, _ status: DateStatus, _ planner: UUID) throws -> DatedNight {
+    DatedNight(
+      status: status,
+      scheduledAt: try ZonedTime.zonedLocalToUtc(date: day, time: "20:30", timeZone: "Asia/Jerusalem"),
+      plannerUserId: planner
+    )
+  }
+
   func testLiveTestsRefuseProductionHost() throws {
     guard ProcessInfo.processInfo.environment["JUSTUS_ALLOW_LIVE_TESTS"] == "1" else {
       throw XCTSkip("Live tests stay off unless JUSTUS_ALLOW_LIVE_TESTS=1")

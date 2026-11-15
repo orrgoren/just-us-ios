@@ -90,6 +90,7 @@ struct RitualSnapshot: Codable, Equatable, Sendable {
   var isPlanner: Bool
   var revealed: Bool
   var plan: FullPlan?
+  var streakWeeks: Int
 }
 
 struct MemoryNote: Codable, Equatable, Identifiable, Sendable {

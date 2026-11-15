@@ -25,5 +25,6 @@ The fake seeds two couples (Alex/Blair and Casey/Drew), Jordan’s open invite, 
 | Daily cap, six-hour dedupe, invite windows, contrast, mood chips | `DomainTests` |
 | Mood save stays queued offline, rolls back otherwise, and a rejected replay can sign out | `FakeFlowTests` |
 | Mood chips disable once the night is revealed | `DomainTests`, `FakeFlowTests` |
+| Planner turn and one skip a month | `DomainTests`, `FakeFlowTests` |
 
 Screenshots are test attachments named `se-` or `promax-` plus the screen, appearance, and text size. They are not committed.

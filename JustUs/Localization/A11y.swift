@@ -68,6 +68,7 @@ enum A11y {
   static let content = "mainContent"
   static let dismissKeyboard = "dismissKeyboard"
   static let homeRoot = "homeRoot"
+  static let streak = "streakWeeks"
   static let loginRoot = "loginRoot"
   static let settingsRoot = "settingsRoot"
   static let memoriesRoot = "memoriesRoot"

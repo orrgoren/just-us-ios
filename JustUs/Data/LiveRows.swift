@@ -48,6 +48,17 @@ struct CoupleRow: Decodable {
   }
 }
 
+struct NightRow: Decodable {
+  var plannerUserId: UUID
+  var status: DateStatus
+  var scheduledAt: String?
+  enum CodingKeys: String, CodingKey {
+    case plannerUserId = "planner_user_id"
+    case status
+    case scheduledAt = "scheduled_at"
+  }
+}
+
 struct DateRow: Decodable {
   var id: UUID
   var plannerUserId: UUID
