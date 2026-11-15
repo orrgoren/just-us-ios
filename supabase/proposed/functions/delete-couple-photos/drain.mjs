@@ -45,6 +45,28 @@ export function ackAccepted(status) {
   return status >= 200 && status < 300;
 }
 
+// The gateway has already checked the signature when verify_jwt is on.
+// Reading the payload role is then enough to tell a legacy service_role
+// JWT from a user JWT. The newer sb_secret key is not a JWT, so this
+// returns "" and the caller falls back to a direct key compare.
+export function jwtRole(token) {
+  if (typeof token !== "string") return "";
+  const payload = token.split(".")[1];
+  if (!payload) return "";
+  try {
+    const claims = JSON.parse(base64UrlDecode(payload));
+    return typeof claims.role === "string" ? claims.role : "";
+  } catch {
+    return "";
+  }
+}
+
+function base64UrlDecode(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  return atob(padded);
+}
+
 // One couple at a time. A drain or confirm failure is recorded and the
 // next id still runs, so one stuck folder cannot pin the whole sweep.
 export async function settleEach(ids, work) {

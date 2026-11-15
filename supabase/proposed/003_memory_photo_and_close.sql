@@ -1,24 +1,20 @@
--- PROPOSED ONLY. Do not apply until Tom verifies.
--- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
+-- APPLIED LIVE on 2026-11-15. Do not re-apply.
+-- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI
+-- against a throwaway database only.
 --
--- Deploy order: this file first, then the delete-couple-photos edge
--- function, then the TestFlight build. The build calls leave_couple and
--- then the function. Account deletion does not call the function: the
--- login is already gone, so the sweep removes those photos. Shipping the
--- build first calls an RPC shape that is not live yet.
+-- Live already has this SQL, pg_cron, pg_net, and the justus-photo-sweep
+-- schedule. delete-couple-photos is deployed. Running this file again on
+-- the live project would replace leave_couple and that cron job.
 --
--- A failed function call leaves the couple id in app_private.closed_couples.
--- The schedule at the bottom of this file uses pg_cron and pg_net, both
--- free platform extensions, to post {"sweep":true} to the function every
--- 15 minutes. The bearer is the justus_service_role vault secret. The
--- function drains those rows and deletes a row only after its photos are
--- gone. Enable pg_cron and pg_net, and create the vault secrets
--- justus_project_url and justus_service_role, before relying on the
--- schedule. The block skips itself when those are missing, so re-run this
--- file after they exist. Do not paste the service role into git.
+-- The build calls leave_couple and then the function. Account deletion
+-- does not call the function: the login is already gone, so the sweep
+-- removes those photos. A failed function call leaves the couple id in
+-- app_private.closed_couples. The schedule posts {"sweep":true} every 15
+-- minutes. The bearer is the justus_service_role vault secret, which is
+-- the legacy service_role JWT. Do not paste the service role into git.
 --
 -- Depends on nothing new. Replaces app_private.guard_date_update and
--- public.leave_couple. The live copies stay in place until this is applied.
+-- public.leave_couple. Those replacements are already live.
 --
 -- leave_couple closes the whole couple for both people. It does not hand
 -- the space to anyone and it does not delete either login. It returns the
@@ -550,8 +546,9 @@ revoke all on function public.leave_couple() from public, anon, authenticated;
 grant execute on function public.set_memory_photo_path(uuid, text) to authenticated;
 grant execute on function public.leave_couple() to authenticated;
 
--- Photo sweep. Free extensions only. Skipped until pg_cron, pg_net, and the
--- two vault secrets exist. Re-running this block replaces the job.
+-- Photo sweep. Already scheduled live as justus-photo-sweep. Do not run
+-- this block on the live project again. On a database without pg_cron,
+-- pg_net, or the two vault secrets, the block skips itself.
 do $$
 begin
   if to_regnamespace('cron') is null
