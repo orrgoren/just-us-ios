@@ -39,6 +39,7 @@ enum A11y {
   static let outfit = "outfitField"
   static let notes = "notesField"
   static let saveDate = "saveDate"
+  static let saveHint = "saveHint"
   static let reveal = "revealButton"
   static let skipWeek = "skipWeek"
   static let swap = "swapPlanner"

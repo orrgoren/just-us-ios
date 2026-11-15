@@ -25,7 +25,8 @@ extension LiveBackend {
 
   func setPlace(_ choice: PlaceChoice) async throws {
     guard let context = try await loadContext(), let date = try await activeDate(context) else { throw AppError.saveFailed }
-    guard date.plannerUserId == context.userId, date.status == .draft else { throw AppError.notPlanner }
+    guard date.plannerUserId == context.userId else { throw AppError.notPlanner }
+    guard date.status == .draft else { throw AppError.notEditable }
     let completed = try await completedCount(context)
     let resolved = try Recommendation.resolve(completedCount: completed, choice: choice)
     try await runWrite { client in
@@ -36,7 +37,8 @@ extension LiveBackend {
 
   func surprise(excluding: [String]) async throws {
     guard let context = try await loadContext(), let date = try await activeDate(context) else { throw AppError.saveFailed }
-    guard date.plannerUserId == context.userId, date.status == .draft else { throw AppError.notPlanner }
+    guard date.plannerUserId == context.userId else { throw AppError.notPlanner }
+    guard date.status == .draft else { throw AppError.notEditable }
     let votes: [MoodRow] = try await fetch("mood_votes", column: "date_id", value: date.id.uuidString)
     let recent: [RecentIdea] = try await runWrite { client in
       let response: PostgrestResponse<[RecentIdea]> = try await client.from("dates")
@@ -60,23 +62,25 @@ extension LiveBackend {
 
   func saveHint(teaser: String, outfit: String, notes: String) async throws {
     guard let context = try await loadContext(), let date = try await activeDate(context) else { throw AppError.saveFailed }
-    guard let teaserValue = Validation.teaser(teaser), let outfitValue = Validation.teaser(outfit), Validation.note(notes) != nil else {
+    guard date.plannerUserId == context.userId else { throw AppError.notPlanner }
+    guard HintEdit.allowed(status: date.status, revealed: date.revealedAt != nil) else { throw AppError.notEditable }
+    guard let teaserValue = Validation.teaser(teaser), let outfitValue = Validation.teaser(outfit) else {
       throw AppError.invalid(.teaser)
     }
+    guard let noteValue = Validation.note(notes) else { throw AppError.invalid(.note) }
     try await runWrite { client in
       try await client.from("dates").update(HintPatch(
         publicTeaser: teaserValue.nilIfEmpty, outfitHint: outfitValue.nilIfEmpty
       )).eq("id", value: date.id.uuidString).eq("couple_id", value: context.couple.id.uuidString).execute()
-      if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        try await client.from("private_date_plans").update(NotesPatch(privateNotes: notes))
-          .eq("date_id", value: date.id.uuidString).execute()
-      }
+      try await client.from("private_date_plans").update(NotesPatch(privateNotes: noteValue.nilIfEmpty))
+        .eq("date_id", value: date.id.uuidString).execute()
     }
   }
 
   func saveDate(day: String, time: String, teaser: String, outfit: String, notes: String) async throws {
     guard let context = try await loadContext(), let date = try await activeDate(context) else { throw AppError.saveFailed }
-    guard date.status == .draft, date.plannerUserId == context.userId else { throw AppError.notPlanner }
+    guard date.plannerUserId == context.userId else { throw AppError.notPlanner }
+    guard date.status == .draft else { throw AppError.notEditable }
     let plans: [PlanRow] = try await fetch("private_date_plans", column: "date_id", value: date.id.uuidString)
     guard let ideaId = plans.first?.ideaId, let idea = IdeasCatalog.idea(ideaId, in: IdeasCatalog.load()), idea.loc == date.location else {
       throw AppError.missingPlan
@@ -444,8 +448,17 @@ private struct HintPatch: Encodable {
 }
 
 private struct NotesPatch: Encodable {
-  var privateNotes: String
+  var privateNotes: String?
   enum CodingKeys: String, CodingKey { case privateNotes = "private_notes" }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    if let privateNotes {
+      try container.encode(privateNotes, forKey: .privateNotes)
+    } else {
+      try container.encodeNil(forKey: .privateNotes)
+    }
+  }
 }
 
 private struct SchedulePatch: Encodable {

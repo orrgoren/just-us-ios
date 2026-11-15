@@ -6,12 +6,12 @@ final class ScreenshotUITests: XCTestCase {
       "login", "code", "setup", "inviteShare", "softPrompt", "inviteRedeem",
       "inviteReplace", "inviteBlocked", "homeSolo", "homePlanner", "homePartner",
       "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount", "offline",
-      "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan",
+      "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan", "editHint",
       "errorBanner", "unlinkConfirm", "postDeletion", "spaceClosed", "notificationTap", "signOut"
     ]
     let scrolled: Set<String> = [
       "homePlanner", "reveal", "memories", "settings", "deleteAccount",
-      "plannerTools", "settingsBottom", "photoMemory", "revealedPlan", "unlinkConfirm", "signOut"
+      "plannerTools", "settingsBottom", "photoMemory", "revealedPlan", "editHint", "unlinkConfirm", "signOut"
     ]
     for screen in screens {
       capture(screen: screen, appearance: "light", size: nil, swipe: scrolled.contains(screen))

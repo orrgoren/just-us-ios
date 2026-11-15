@@ -27,7 +27,7 @@ extension FakeBackend {
       throw AppError.saveFailed
     }
     guard store.world.dates[index].plannerUserId == user.id else { throw AppError.notPlanner }
-    guard store.world.dates[index].status == .draft else { throw AppError.saveFailed }
+    guard store.world.dates[index].status == .draft else { throw AppError.notEditable }
     let completed = store.world.dates.filter { $0.coupleId == mine.coupleId && $0.status == .completed }.count
     let resolved = try Recommendation.resolve(completedCount: completed, choice: choice)
     store.world.dates[index].location = resolved.location
@@ -45,7 +45,8 @@ extension FakeBackend {
       throw AppError.saveFailed
     }
     let date = store.world.dates[index]
-    guard date.plannerUserId == user.id, date.status == .draft else { throw AppError.notPlanner }
+    guard date.plannerUserId == user.id else { throw AppError.notPlanner }
+    guard date.status == .draft else { throw AppError.notEditable }
     let moods = store.world.moods.filter { $0.dateId == date.id }.map(\.mood)
     let recent = store.world.dates.filter { $0.coupleId == mine.coupleId && $0.status == .completed }.compactMap(\.ideaId)
     guard let picked = Recommendation.pick(
@@ -63,13 +64,17 @@ extension FakeBackend {
       throw AppError.saveFailed
     }
     guard store.world.dates[index].plannerUserId == user.id else { throw AppError.notPlanner }
+    let revealed = store.world.dates[index].revealedAt != nil
+    guard HintEdit.allowed(status: store.world.dates[index].status, revealed: revealed) else {
+      throw AppError.notEditable
+    }
     guard let teaserValue = Validation.teaser(teaser), let outfitValue = Validation.teaser(outfit) else {
       throw AppError.invalid(.teaser)
     }
-    guard Validation.note(notes) != nil else { throw AppError.invalid(.note) }
+    guard let noteValue = Validation.note(notes) else { throw AppError.invalid(.note) }
     store.world.dates[index].publicTeaser = teaserValue.isEmpty ? nil : teaserValue
     store.world.dates[index].outfitHint = outfitValue.isEmpty ? nil : outfitValue
-    store.world.dates[index].privateNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    store.world.dates[index].privateNotes = noteValue.nilIfEmpty
     store.save()
   }
 
@@ -78,9 +83,8 @@ extension FakeBackend {
     guard let user = currentUser(), let mine = member(user.id), let couple = couple(mine.coupleId), let index = dateIndex(mine.coupleId) else {
       throw AppError.saveFailed
     }
-    guard store.world.dates[index].status == .draft, store.world.dates[index].plannerUserId == user.id else {
-      throw AppError.notPlanner
-    }
+    guard store.world.dates[index].plannerUserId == user.id else { throw AppError.notPlanner }
+    guard store.world.dates[index].status == .draft else { throw AppError.notEditable }
     guard store.world.dates[index].ideaId != nil else { throw AppError.missingPlan }
     try await saveHint(teaser: teaser, outfit: outfit, notes: notes)
     guard let fresh = dateIndex(mine.coupleId) else { throw AppError.saveFailed }

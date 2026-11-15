@@ -173,6 +173,7 @@ enum AppError: Error, Equatable, Sendable {
   case selfRedeem
   case notAuthenticated
   case notPlanner
+  case notEditable
   case missingPlan
   case unavailable
   case saveFailed

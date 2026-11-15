@@ -185,6 +185,13 @@ final class FakeBackend: DateBackend {
     _ = token
   }
 
+  func scheduleUnrevealed() {
+    guard let index = store.world.dates.firstIndex(where: { $0.id == SeedID.dateA }) else { return }
+    store.world.dates[index].status = .scheduled
+    store.world.dates[index].revealedAt = nil
+    store.save()
+  }
+
   func markRevealed() {
     guard let index = store.world.dates.firstIndex(where: { $0.id == SeedID.dateA }) else { return }
     store.world.dates[index].status = .scheduled

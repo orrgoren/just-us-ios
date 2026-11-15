@@ -83,6 +83,13 @@ extension SessionModel {
     }
   }
 
+  func saveHint() async {
+    await act(activity: .saveHint, retry: .saveHint) {
+      try await self.backend.saveHint(teaser: self.teaser, outfit: self.outfit, notes: self.privateNotes)
+      await self.refresh()
+    }
+  }
+
   func revealPlan() async {
     await act(activity: .reveal, retry: .reveal) {
       try await self.backend.reveal()
@@ -245,6 +252,11 @@ extension SessionModel {
       screen = .main
     case "homePlanner":
       await signedIn("alex@couple-a.test")
+      screen = .main
+    case "editHint":
+      await signedIn("alex@couple-a.test")
+      (backend as? FakeBackend)?.scheduleUnrevealed()
+      await refresh()
       screen = .main
     case "homePartner":
       await signedIn("blair@couple-a.test")
