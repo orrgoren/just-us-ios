@@ -53,7 +53,11 @@ struct RitualScreen: View {
           HelperText(text: L10n.partnerWaitPlan)
         }
         moods(ritual)
-        if ritual.isPlanner { planner(ritual) }
+        if ritual.isPlanner, ritual.date?.status == .scheduled, ritual.revealed == false {
+          hintEditor(ritual)
+        } else if ritual.isPlanner, ritual.date?.status == .draft {
+          planner(ritual)
+        }
         reveal(ritual)
       } else {
         RoleLine(waiting: false, text: L10n.yourTurn)
@@ -111,6 +115,22 @@ struct RitualScreen: View {
     }
   }
 
+  private func hintEditor(_ ritual: RitualSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: Theme.Space.stack) {
+      HelperText(text: L10n.editHintHelp)
+      if let plan = ritual.plan {
+        Text(plan.title).font(Theme.title).accessibilityIdentifier(A11y.planTitle)
+        Text(plan.summary)
+      }
+      LabeledField(title: L10n.teaser, text: $model.teaser, identifier: A11y.teaser, need: .optional)
+      LabeledField(title: L10n.outfit, text: $model.outfit, identifier: A11y.outfit, need: .optional)
+      LabeledField(title: L10n.privateNotes, text: $model.privateNotes, identifier: A11y.notes, need: .optional)
+      WineButton(title: L10n.saveHint, identifier: A11y.saveHint, busy: model.activity == .saveHint, busyTitle: L10n.loading) {
+        Task { await model.saveHint() }
+      }
+    }
+  }
+
   private func planner(_ ritual: RitualSnapshot) -> some View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.whereTitle).font(Theme.title)
@@ -151,6 +171,10 @@ struct RitualScreen: View {
           WineButton(title: L10n.revealButton, identifier: A11y.reveal, busy: model.activity == .reveal, busyTitle: L10n.loading) {
             Task { await model.revealPlan() }
           }
+        }
+        if ritual.isPlanner && ritual.date?.status == .scheduled {
+          Button(L10n.skipWeek) { Task { await model.skip() } }
+            .accessibilityIdentifier(A11y.skipWeek).frame(minHeight: 44)
         }
         Button(L10n.addCalendar) { Task { await model.addCalendar() } }.frame(minHeight: 44)
         LabeledField(title: L10n.moment, text: $model.momentDraft, identifier: A11y.memoryNote, need: .optional)

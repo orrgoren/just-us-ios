@@ -2,6 +2,21 @@ import CryptoKit
 import Foundation
 import Security
 
+enum HintEdit {
+  /// A draft can still change the idea. A scheduled date can change the hint
+  /// until it is revealed.
+  static func allowed(status: DateStatus, revealed: Bool) -> Bool {
+    guard revealed == false else { return false }
+    return status == .draft || status == .scheduled
+  }
+
+  /// PostgREST reports success when row level security matches nothing.
+  /// Zero updated rows means the hint was not saved.
+  static func requireUpdated(dateRows: Int, planRows: Int) throws {
+    guard dateRows > 0, planRows > 0 else { throw AppError.notEditable }
+  }
+}
+
 enum RitualPrivacy {
   static func seal(_ view: RitualSnapshot) -> RitualSnapshot {
     guard !view.isPlanner, !view.revealed else { return view }

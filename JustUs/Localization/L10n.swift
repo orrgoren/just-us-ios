@@ -98,6 +98,7 @@ enum L10n {
   static var outfit: String { text("plan.outfit", "What to wear") }
   static var privateNotes: String { text("plan.notes", "Private notes, only for the planner") }
   static var saveHint: String { text("plan.saveHint", "Save hint") }
+  static var editHintHelp: String { text("plan.editHint", "You can change the hint until you reveal the surprise.") }
   static var saveDate: String { text("plan.save", "Save our date") }
   static var skipWeek: String { text("plan.skip", "Skip this week") }
   static var presetHungry: String { text("plan.hungry", "Come hungry") }
@@ -283,6 +284,7 @@ enum L10n {
     case .selfRedeem: return text("err.self", "You can't redeem an invite you created.")
     case .notAuthenticated: return text("err.auth", "Sign in again.")
     case .notPlanner: return text("err.planner", "Only this week's planner can do that.")
+    case .notEditable: return text("err.notEditable", "That can't be edited now.")
     case .missingPlan: return text("err.plan", "Pick an idea first.")
     case .unavailable: return text("err.unavailable", "That needs a server update that isn't on yet. Nothing was changed.")
     case .saveFailed: return text("err.save", "We couldn't save. Nothing was marked as done.")

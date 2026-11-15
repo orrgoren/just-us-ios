@@ -186,4 +186,116 @@ final class FakeFlowTests: XCTestCase {
       XCTAssertEqual(error, .invalidCode)
     }
   }
+
+  func testPlannerCanEditTheHintUntilReveal() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    try await backend.saveDate(
+      day: "2026-11-19", time: "20:30", teaser: "Come hungry", outfit: "Cozy", notes: "Only the planner knows"
+    )
+    let scheduledLoaded = try await backend.ritual()
+    let scheduled = try XCTUnwrap(scheduledLoaded)
+    XCTAssertEqual(scheduled.date?.status, .scheduled)
+    XCTAssertFalse(scheduled.revealed)
+
+    try await backend.saveHint(teaser: "Bring a sweater", outfit: "Pajamas", notes: "Candles")
+    let editedLoaded = try await backend.ritual()
+    let edited = try XCTUnwrap(editedLoaded)
+    XCTAssertEqual(edited.date?.status, .scheduled)
+    XCTAssertEqual(edited.date?.publicTeaser, "Bring a sweater")
+    XCTAssertEqual(edited.date?.outfitHint, "Pajamas")
+    XCTAssertEqual(edited.plan?.privateNotes, "Candles")
+    XCTAssertEqual(edited.plan?.ideaId, "h6")
+
+    do {
+      try await backend.saveDate(day: "2026-11-19", time: "21:00", teaser: "Later", outfit: "Nope", notes: "No")
+      XCTFail("Saving the date again should not reschedule it")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .notEditable)
+    }
+    do {
+      try await backend.surprise(excluding: [])
+      XCTFail("A scheduled idea stays put")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .notEditable)
+    }
+
+    try await backend.reveal()
+    do {
+      try await backend.saveHint(teaser: "Too late", outfit: "Nope", notes: "Hidden")
+      XCTFail("A revealed hint stays")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .notEditable)
+    }
+    let revealedLoaded = try await backend.ritual()
+    let revealed = try XCTUnwrap(revealedLoaded)
+    XCTAssertEqual(revealed.date?.publicTeaser, "Bring a sweater")
+    XCTAssertEqual(revealed.plan?.privateNotes, "Candles")
+  }
+
+  func testPartnerCannotEditTheScheduledHint() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    try await backend.saveDate(
+      day: "2026-11-19", time: "20:30", teaser: "Come hungry", outfit: "Cozy", notes: "Only the planner knows"
+    )
+    try await backend.signOut()
+    _ = try await backend.sendCode(email: "blair@couple-a.test")
+    _ = try await backend.verify(email: "blair@couple-a.test", code: "000000")
+    do {
+      try await backend.saveHint(teaser: "Stolen", outfit: "Stolen", notes: "Stolen")
+      XCTFail("The partner is not the planner")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .notPlanner)
+    }
+    let loaded = try await backend.ritual()
+    let ritual = try XCTUnwrap(loaded)
+    XCTAssertEqual(ritual.date?.publicTeaser, "Come hungry")
+    XCTAssertNil(ritual.plan)
+  }
+
+  func testSaveHintActionLeavesTheDateScheduled() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    try await backend.saveDate(
+      day: "2026-11-19", time: "20:30", teaser: "Come hungry", outfit: "Cozy", notes: "Only the planner knows"
+    )
+    await model.refresh()
+    model.teaser = "Bring a sweater"
+    model.outfit = "Pajamas"
+    model.privateNotes = "Candles"
+    await model.saveHint()
+    XCTAssertNil(model.errorMessage)
+    XCTAssertEqual(model.ritual?.date?.status, .scheduled)
+    XCTAssertEqual(model.ritual?.date?.publicTeaser, "Bring a sweater")
+    XCTAssertEqual(model.ritual?.plan?.privateNotes, "Candles")
+    await model.saveDate()
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+    XCTAssertNotEqual(model.errorMessage, L10n.message(for: .notPlanner))
+    XCTAssertEqual(model.ritual?.date?.status, .scheduled)
+  }
+
+  func testHintEditRuleAndCopy() {
+    XCTAssertTrue(HintEdit.allowed(status: .draft, revealed: false))
+    XCTAssertTrue(HintEdit.allowed(status: .scheduled, revealed: false))
+    XCTAssertFalse(HintEdit.allowed(status: .scheduled, revealed: true))
+    XCTAssertFalse(HintEdit.allowed(status: .completed, revealed: false))
+    XCTAssertFalse(L10n.message(for: .notEditable).localizedCaseInsensitiveContains("planner"))
+    XCTAssertTrue(L10n.message(for: .notPlanner).localizedCaseInsensitiveContains("planner"))
+  }
+
+  func testHintSaveRejectsAnUpdateThatTouchesNoRows() {
+    XCTAssertNoThrow(try HintEdit.requireUpdated(dateRows: 1, planRows: 1))
+    for (dates, plans) in [(0, 1), (1, 0), (0, 0)] {
+      XCTAssertThrowsError(try HintEdit.requireUpdated(dateRows: dates, planRows: plans)) { error in
+        XCTAssertEqual(error as? AppError, .notEditable)
+      }
+    }
+  }
 }

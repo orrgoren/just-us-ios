@@ -135,7 +135,8 @@ create table if not exists public.dates (
 create table if not exists public.private_date_plans (
   date_id uuid primary key references public.dates (id) on delete cascade,
   idea_id text,
-  private_notes text
+  private_notes text,
+  prepared_at timestamptz
 );
 
 create table if not exists public.ideas (
@@ -186,6 +187,23 @@ create table if not exists app_private.internal_ops (
 
 insert into app_private.internal_ops (couple_id, op)
 values ('00000000-0000-4000-8000-000000000099', 'orphan');
+
+create or replace function public.is_date_planner(p_date_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.dates d
+    join public.couple_members m on m.couple_id = d.couple_id
+    where d.id = p_date_id
+      and m.user_id = auth.uid()
+      and d.planner_user_id = auth.uid()
+  );
+$$;
 
 create or replace function public.is_couple_member(p_couple uuid)
 returns boolean

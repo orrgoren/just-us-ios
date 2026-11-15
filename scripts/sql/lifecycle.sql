@@ -548,3 +548,138 @@ begin
     raise exception 'leave_has_no_membership_lock';
   end if;
 end $$;
+
+-- 012. A scheduled, unrevealed plan can change private notes. The idea and
+-- prepared_at stay put until the date is a draft again. After reveal the
+-- policy matches nothing, so the update changes zero rows.
+do $$
+declare
+  n int;
+  target_date uuid := '34343434-3434-4434-8434-343434343434';
+  planner uuid := '10101010-1010-4010-8010-101010101010';
+  partner uuid := '30303030-3030-4030-8030-303030303030';
+  couple uuid := '12121212-1212-4212-8212-121212121212';
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'private_date_plans'
+      and column_name = 'prepared_at'
+  ) then
+    raise exception 'prepared_at_missing';
+  end if;
+
+  alter table public.private_date_plans enable row level security;
+  grant update on public.private_date_plans to authenticated;
+  -- UPDATE also has to pass SELECT policies. Live already has one. This
+  -- throwaway policy only makes the row visible so plans_update is what decides.
+  create policy plans_select_test on public.private_date_plans
+    for select to authenticated
+    using (true);
+
+  insert into public.couples (
+    id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name
+  ) values (
+    couple, planner, 4, '20:30', 'Asia/Jerusalem', 90, 'Blair'
+  );
+  insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+    (couple, planner, 'Alex', 0),
+    (couple, partner, 'Rae', 1);
+  insert into public.dates (
+    id, couple_id, planner_user_id, status, scheduled_at, location
+  ) values (
+    target_date, couple, planner, 'scheduled', timestamptz '2026-11-19 18:30:00+00', 'home'
+  );
+  insert into public.private_date_plans (date_id, idea_id, private_notes, prepared_at) values (
+    target_date, 'h1', 'old', timestamptz '2026-11-15 18:00:00+00'
+  );
+
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  execute 'set local role authenticated';
+
+  update public.private_date_plans
+    set private_notes = 'still editable'
+    where date_id = target_date;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'scheduled_notes_not_updated';
+  end if;
+  if exists (
+    select 1 from public.private_date_plans
+    where date_id = target_date and idea_id is distinct from 'h1'
+  ) then
+    raise exception 'scheduled_note_edit_moved_the_idea';
+  end if;
+
+  begin
+    update public.private_date_plans
+      set idea_id = 'h9'
+      where date_id = target_date;
+    raise exception 'scheduled_idea_change_was_allowed';
+  exception
+    when others then
+      if sqlerrm <> 'forbidden' then
+        raise;
+      end if;
+  end;
+
+  begin
+    update public.private_date_plans
+      set prepared_at = timestamptz '2026-11-15 21:00:00+00'
+      where date_id = target_date;
+    raise exception 'scheduled_prepared_at_change_was_allowed';
+  exception
+    when others then
+      if sqlerrm <> 'forbidden' then
+        raise;
+      end if;
+  end;
+
+  execute 'reset role';
+  update public.dates
+    set status = 'draft', revealed_at = null
+    where id = target_date;
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  execute 'set local role authenticated';
+
+  update public.private_date_plans
+    set idea_id = 'h2',
+        prepared_at = timestamptz '2026-11-15 19:00:00+00'
+    where date_id = target_date;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'draft_idea_change_blocked';
+  end if;
+
+  execute 'reset role';
+  update public.dates
+    set status = 'scheduled', revealed_at = null
+    where id = target_date;
+  perform set_config('request.jwt.claim.sub', partner::text, true);
+  execute 'set local role authenticated';
+
+  update public.private_date_plans
+    set private_notes = 'not the planner'
+    where date_id = target_date;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'partner_notes_updated';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  update public.dates
+    set revealed_at = timestamptz '2026-11-15 20:00:00+00'
+    where id = target_date;
+  execute 'set local role authenticated';
+
+  update public.private_date_plans
+    set private_notes = 'too late'
+    where date_id = target_date;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'revealed_notes_updated';
+  end if;
+
+  execute 'reset role';
+end $$;

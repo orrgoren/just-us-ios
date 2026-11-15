@@ -11,7 +11,7 @@ final class SessionModel {
   }
 
   enum Activity: Equatable {
-    case generic, sendCode, verify, apple, create, redeem, saveDate, reveal, finish, moment, settings
+    case generic, sendCode, verify, apple, create, redeem, saveDate, saveHint, reveal, finish, moment, settings
   }
 
   enum Celebration: Equatable {
@@ -19,7 +19,7 @@ final class SessionModel {
   }
 
   enum RetryKind: Equatable {
-    case sendCode, verify, create, redeem(Bool), saveDate, reveal, finish, moment, settings, openWeek, surprise, signOut
+    case sendCode, verify, create, redeem(Bool), saveDate, saveHint, reveal, finish, moment, settings, openWeek, surprise, signOut
   }
 
   var screen: Screen = .loading
@@ -233,6 +233,7 @@ final class SessionModel {
     case .create: await createCouple()
     case .redeem(let replace): await redeem(replaceEmpty: replace)
     case .saveDate: await saveDate()
+    case .saveHint: await saveHint()
     case .reveal: await revealPlan()
     case .finish: await finishNight()
     case .moment: await saveMoment()
