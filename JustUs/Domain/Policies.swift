@@ -18,7 +18,7 @@ enum RitualPrivacy {
 }
 
 enum InviteRules {
-  static let pattern = #"^[A-Za-z0-9_-]{40,128}$"#
+  static let pattern = #"^[A-Za-z0-9_-]{40,128}\z"#
 
   static func isTokenShape(_ token: String) -> Bool {
     token.range(of: pattern, options: .regularExpression) != nil
@@ -92,7 +92,7 @@ enum DeepLinks {
       case "settings": return .settings
       case "invite":
         let token = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard InviteRules.isTokenShape(token) else { return .home }
+        guard InviteRules.isTokenShape(token) else { return nil }
         return .invite(token)
       case "push":
         return pushRoute(url.lastPathComponent)

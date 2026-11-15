@@ -49,6 +49,7 @@ final class SessionModel {
   var deleteConfirm = ""
   var confirmUnlink = false
   var signedIn = false
+  private var authAccount: String?
   var pendingReplace = false
   var blocked = false
   var noteDraft = ""
@@ -118,7 +119,7 @@ final class SessionModel {
       let user = try await self.backend.verify(email: self.email, code: self.code)
       if let email = user.email, !email.isEmpty { self.email = email }
       self.rememberEmail()
-      await self.finishEmailSignIn()
+      await self.finishEmailSignIn(userId: user.id)
     }
   }
 
@@ -127,14 +128,15 @@ final class SessionModel {
       let user = try await self.backend.session(from: url)
       if let email = user.email, !email.isEmpty { self.email = email }
       self.rememberEmail()
-      await self.finishEmailSignIn()
+      await self.finishEmailSignIn(userId: user.id)
     }
   }
 
   func completeApple(token: String, nonce: String) async {
     await work(activity: .apple) {
-      _ = try await self.backend.signInWithApple(idToken: token, nonce: nonce)
-      await self.finishSignIn(method: "apple")
+      let user = try await self.backend.signInWithApple(idToken: token, nonce: nonce)
+      if let email = user.email, !email.isEmpty { self.email = email }
+      await self.finishSignIn(method: "apple", userId: user.id)
     }
   }
 
@@ -147,8 +149,9 @@ final class SessionModel {
       return
     }
     await work {
-      _ = try await self.backend.signInWithApple(idToken: result.token, nonce: result.nonce)
-      await self.finishSignIn(method: "apple")
+      let user = try await self.backend.signInWithApple(idToken: result.token, nonce: result.nonce)
+      if let email = user.email, !email.isEmpty { self.email = email }
+      await self.finishSignIn(method: "apple", userId: user.id)
     }
   }
 
@@ -164,6 +167,7 @@ final class SessionModel {
       self.clearRememberedClosure()
       self.inviteToken = try await self.backend.createInvite()
       Telemetry.analytics.record(.inviteSent)
+      self.dropPendingInvite()
       await self.refresh()
       self.screen = .inviteShare
       self.celebrate(.spaceReady)
@@ -244,6 +248,7 @@ final class SessionModel {
   }
 
   func leaveInvite() {
+    dropPendingInvite()
     if signedIn {
       screen = ritual == nil ? .setup : .main
     } else {
@@ -312,6 +317,8 @@ final class SessionModel {
     settings = nil
     inviteToken = nil
     inviteInput = ""
+    PendingInviteStore.clear()
+    authAccount = nil
     teaser = ""
     outfit = ""
     privateNotes = ""
@@ -403,37 +410,40 @@ final class SessionModel {
     if let user = try? await backend.restore() {
       if email.isEmpty, let restored = user.email, !restored.isEmpty { email = restored }
       rememberEmail()
+      syncAccount(user.id.uuidString)
       signedIn = true
       let deciding = screen == .loading || screen == .login || screen == .code
       await refresh()
       if deciding {
-        routeAfterAuth()
+        routeColdLaunch()
       }
     } else if !signedIn && screen == .loading {
       prefillEmail()
-      if let token = PendingInviteStore.current() {
-        inviteInput = token
-        screen = .invite
-      } else {
-        screen = .login
-      }
+      screen = .login
     }
   }
 
-  private func finishEmailSignIn() async {
+  private func finishEmailSignIn(userId: UUID) async {
     offerNewLink = false
-    await finishSignIn(method: "otp")
+    await finishSignIn(method: "otp", userId: userId)
   }
 
-  private func finishSignIn(method: String) async {
+  private func finishSignIn(method: String, userId: UUID) async {
+    syncAccount(userId.uuidString)
     Telemetry.analytics.record(.signedIn(method: method))
     signedIn = true
     await refresh()
-    routeAfterAuth()
+    routeAfterSignIn()
     await refreshPushRegistration(promptIfNeeded: false)
   }
 
-  private func routeAfterAuth() {
+  /// Sign-in can open join once. A cold launch never does, and a full couple goes home.
+  private func routeAfterSignIn() {
+    if paired {
+      dropPendingInvite()
+      screen = .main
+      return
+    }
     if let token = PendingInviteStore.current() {
       inviteInput = token
       screen = .invite
@@ -442,12 +452,41 @@ final class SessionModel {
     screen = ritual == nil ? .setup : .main
   }
 
-  private func rememberInviteDraft() {
-    if let token = InviteRules.token(from: inviteInput) {
-      PendingInviteStore.save(token)
+  private func routeColdLaunch() {
+    if paired {
+      dropPendingInvite()
+      screen = .main
       return
     }
-    if inviteInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
+    screen = ritual == nil ? .setup : .main
+  }
+
+  private var paired: Bool { ritual?.partner != nil }
+
+  private func syncAccount(_ raw: String?) {
+    let next = Self.accountKey(raw)
+    let switched = authAccount != nil && next != nil && authAccount != next
+    if switched || (next != nil && !PendingInviteStore.belongs(to: next)) {
+      dropPendingInvite()
+    }
+    if let next { authAccount = next }
+  }
+
+  private static func accountKey(_ raw: String?) -> String? {
+    let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private func dropPendingInvite() {
+    inviteInput = ""
+    PendingInviteStore.clear()
+  }
+
+  private func rememberInviteDraft() {
+    if let token = InviteRules.token(from: inviteInput) {
+      PendingInviteStore.save(token, account: authAccount)
+      return
+    }
     PendingInviteStore.clear()
   }
 

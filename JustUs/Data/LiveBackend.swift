@@ -95,15 +95,9 @@ final class LiveBackend: DateBackend {
 
   func signOut() async {
     watchTask?.cancel()
-    if let client, let cachedUser, let deviceToken {
-      do {
-        try await client.from("device_tokens").delete()
-          .eq("user_id", value: cachedUser.uuidString)
-          .eq("token", value: deviceToken)
-          .execute()
-      } catch {
-        PushLog.deleteFailed(error)
-      }
+    let previousCleared = await retryPendingDelete()
+    if let cachedUser, let deviceToken {
+      await deleteDeviceToken(userId: cachedUser, token: deviceToken, replacePending: previousCleared)
     }
     if let client {
       try? await client.auth.signOut()
@@ -174,27 +168,93 @@ final class LiveBackend: DateBackend {
 
   /// The APNs callback can arrive before the session exists. The token stays
   /// on disk until the upsert succeeds, and the next launch or sign-in retries it.
+  /// A failed sign-out delete is retried before the next account's token is saved.
   private func uploadDeviceToken() async {
+    guard await retryPendingDelete() else { return }
     let stored = DeviceTokenStore.load()
     guard stored.awaitingSave, let token = stored.token else { return }
     deviceToken = token
     guard let user = cachedUser else { return }
     guard AppConfig.pushEnabled else { return }
     guard let client else {
-      PushLog.saveFailed(PushFailure(description: "Supabase client is not configured"))
+      PushLog.saveFailed("Supabase client is not configured")
       return
     }
     let environment = AppConfig.pushSandbox ? "sandbox" : "production"
     let row = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
     do {
       try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
-      var current = DeviceTokenStore.load()
-      if current.token == token {
-        current.saved()
-        DeviceTokenStore.save(current)
+      markTokenSaved(token)
+    } catch {
+      switch DeviceTokenSave.afterFailure(error, attemptedPlain: false) {
+      case .upsertPlain:
+        await uploadDeviceTokenWithoutEnvironment(user: user, token: token)
+      case .giveUp:
+        PushLog.saveFailed(error)
       }
+    }
+  }
+
+  private func uploadDeviceTokenWithoutEnvironment(user: UUID, token: String) async {
+    guard let client else {
+      PushLog.saveFailed("Supabase client is not configured")
+      return
+    }
+    let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
+    do {
+      try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+      markTokenSaved(token)
     } catch {
       PushLog.saveFailed(error)
+    }
+  }
+
+  private func markTokenSaved(_ token: String) {
+    var current = DeviceTokenStore.load()
+    if current.token == token {
+      current.saved()
+      DeviceTokenStore.save(current)
+    }
+  }
+
+  /// True when there is nothing left to delete. A failure stays pending and blocks the next upsert.
+  private func retryPendingDelete() async -> Bool {
+    guard let pending = DeviceTokenStore.loadDelete() else { return true }
+    return await deleteDeviceToken(userId: pending.userId, token: pending.token, replacePending: true)
+  }
+
+  private func deleteDeviceToken(userId: UUID, token: String, replacePending: Bool) async -> Bool {
+    let failed = PendingTokenDelete(userId: userId, token: token)
+    guard let client else {
+      DeviceTokenStore.saveDelete(
+        PendingDelete.replacement(
+          existing: DeviceTokenStore.loadDelete(),
+          retryCleared: replacePending,
+          failed: failed
+        )
+      )
+      PushLog.deleteFailed("Supabase client is not configured")
+      return false
+    }
+    do {
+      try await client.from("device_tokens").delete()
+        .eq("user_id", value: userId.uuidString)
+        .eq("token", value: token)
+        .execute()
+      if let pending = DeviceTokenStore.loadDelete(), pending == failed {
+        DeviceTokenStore.clearDelete()
+      }
+      return true
+    } catch {
+      PushLog.deleteFailed(error)
+      DeviceTokenStore.saveDelete(
+        PendingDelete.replacement(
+          existing: DeviceTokenStore.loadDelete(),
+          retryCleared: replacePending,
+          failed: failed
+        )
+      )
+      return false
     }
   }
 
@@ -400,6 +460,17 @@ struct NewInvite: Encodable {
     case createdBy = "created_by"
     case tokenHash = "token_hash"
     case expiresAt = "expires_at"
+  }
+}
+
+struct DeviceTokenRow: Encodable {
+  var userId: UUID
+  var token: String
+  var platform: String
+  enum CodingKeys: String, CodingKey {
+    case userId = "user_id"
+    case token
+    case platform
   }
 }
 

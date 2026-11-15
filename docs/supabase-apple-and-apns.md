@@ -50,13 +50,13 @@ Applied live on 2026-11-15. Do not re-apply:
 
 - `supabase/proposed/003_memory_photo_and_close.sql` — photo path on a completed date. Unlink closes the whole couple for both people and returns that couple id. pg_cron, pg_net, and `justus-photo-sweep` are on.
 - `supabase/proposed/004_delete_my_account.sql` — account deletion. Either partner closes every couple they still touch. The other person stays unpaired.
+- `supabase/proposed/006_push_claim_and_outbox.sql` — applied. `device_tokens.environment` is live, with columns `user_id`, `token`, `platform`, `updated_at`, and `environment`. Do not re-apply.
 - `supabase/proposed/functions/delete-couple-photos/index.ts` — deployed. The app calls it after unlink. Account deletion leaves the rows for the sweep, because that login is already gone. The sweep bearer is the legacy service_role JWT in the vault. The function env may hold the newer `sb_secret` key, so the sweep is recognized by the JWT `role` claim after the gateway has checked the signature.
 
 Not applied, and waiting for review:
 
 - `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs.
 - `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. It does not redeploy send-push. Not applied.
-- `supabase/proposed/006_push_claim_and_outbox.sql` — the push claim, the outbox, and a sandbox or production token column. Not applied.
 
 The TestFlight build calls `leave_couple` and then `delete-couple-photos`. It does not call the function after `delete_my_account`. The function deletes photos only for couple ids the leave closed, and only when `photo_delete_allowed` says that couple row is already gone. A failed call leaves the id in `closed_couples`. `justus-photo-sweep` posts `{"sweep":true}` with the `justus_service_role` vault secret. The sweep is what clears photos after account deletion. The next launch also retries for the person who left. `005_rollback.sql` restores the previous `leave_couple`, unschedules the sweep, and does not remove the edge function or the vault secret, so ship the previous build and delete the function before running it. Do not apply `003` or `004` again. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
 
