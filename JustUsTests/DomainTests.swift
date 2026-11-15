@@ -57,9 +57,20 @@ final class DomainTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.wine, Palette.blush), 4.5)
     for mood in MoodKey.allCases {
       XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.moodSelected(mood)), 4.5, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.moodSelected(mood), Palette.canvasDark), 3, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.moodBorderDark(mood), Palette.canvasDark), 3, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.moodBorderDark(mood), Palette.moodTintDark(mood)), 3, String(describing: mood))
       XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.moodTint(mood)), 4.5, String(describing: mood))
       XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.moodTintDark(mood)), 4.5, String(describing: mood))
     }
+  }
+
+  func testMoodChipsDisableOnceRevealed() {
+    XCTAssertTrue(MoodChips.isEnabled(status: .draft, revealed: false))
+    XCTAssertTrue(MoodChips.isEnabled(status: .scheduled, revealed: false))
+    XCTAssertFalse(MoodChips.isEnabled(status: .scheduled, revealed: true))
+    XCTAssertFalse(MoodChips.isEnabled(status: .completed, revealed: true))
+    XCTAssertFalse(MoodChips.isEnabled(status: nil, revealed: false))
   }
 
   func testMoodStaysEditableUntilReveal() {

@@ -11,6 +11,12 @@ enum MoodEdit {
   }
 }
 
+enum MoodChips {
+  static func isEnabled(status: DateStatus?, revealed: Bool) -> Bool {
+    MoodEdit.allowed(status: status, revealed: revealed)
+  }
+}
+
 enum HintEdit {
   /// A draft can still change the idea. A scheduled date can change the hint
   /// until it is revealed.

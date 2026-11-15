@@ -776,6 +776,18 @@ begin
     raise exception 'draft_mood_not_updated';
   end if;
 
+  begin
+    update public.mood_votes
+      set date_id = '99999999-9999-4999-8999-999999999999'
+      where date_id = target_date and user_id = planner;
+    raise exception 'mood_date_change_was_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'forbidden' then
+        raise;
+      end if;
+  end;
+
   delete from public.mood_votes
     where date_id = target_date and user_id = planner;
   get diagnostics n = row_count;
@@ -801,15 +813,13 @@ begin
     set revealed_at = timestamptz '2026-11-15 20:00:00+00'
     where id = target_date;
   execute 'set local role authenticated';
-  begin
-    update public.mood_votes
-      set mood = 'adventure'
-      where date_id = target_date and user_id = planner;
+  update public.mood_votes
+    set mood = 'adventure'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 0 then
     raise exception 'revealed_mood_was_allowed';
-  exception
-    when insufficient_privilege then
-      null;
-  end;
+  end if;
 
   delete from public.mood_votes
     where date_id = target_date and user_id = planner;
@@ -824,15 +834,13 @@ begin
     set status = 'completed'
     where id = target_date;
   execute 'set local role authenticated';
-  begin
-    update public.mood_votes
-      set mood = 'fun'
-      where date_id = target_date and user_id = planner;
+  update public.mood_votes
+    set mood = 'fun'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 0 then
     raise exception 'completed_mood_was_allowed';
-  exception
-    when insufficient_privilege then
-      null;
-  end;
+  end if;
 
   execute 'reset role';
 end $$;

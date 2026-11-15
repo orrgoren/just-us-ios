@@ -17,6 +17,9 @@ extension FakeBackend {
     guard let user = currentUser(), let mine = member(user.id), let date = activeDate(mine.coupleId) else {
       throw AppError.saveFailed
     }
+    guard MoodEdit.allowed(status: date.status, revealed: date.revealedAt != nil) else {
+      throw AppError.notEditable
+    }
     upsertMood(dateId: date.id, userId: user.id, mood: mood)
     store.save()
   }

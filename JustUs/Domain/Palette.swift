@@ -39,12 +39,23 @@ enum Palette {
 
   static func moodSelected(_ mood: MoodKey) -> RGB {
     switch mood {
-    case .fun: return RGB(0x8A520C)
-    case .romance: return wine
-    case .deep: return RGB(0x2C4A6E)
-    case .intimacy: return RGB(0x8E3A55)
-    case .adventure: return RGB(0x1F6A4A)
-    case .chill: return RGB(0x2F6158)
+    case .fun: return RGB(0x8E5713)
+    case .romance: return RGB(0x8C5260)
+    case .deep: return RGB(0x4C6584)
+    case .intimacy: return RGB(0x974A63)
+    case .adventure: return RGB(0x287051)
+    case .chill: return RGB(0x3E6C64)
+    }
+  }
+
+  static func moodBorderDark(_ mood: MoodKey) -> RGB {
+    switch mood {
+    case .fun: return RGB(0x9E6F34)
+    case .romance: return RGB(0x9A6773)
+    case .deep: return RGB(0x5E7490)
+    case .intimacy: return RGB(0xA56277)
+    case .adventure: return RGB(0x448368)
+    case .chill: return RGB(0x577F78)
     }
   }
 

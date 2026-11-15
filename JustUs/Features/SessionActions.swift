@@ -63,7 +63,8 @@ extension SessionModel {
       Telemetry.analytics.record(.moodSet)
       errorMessage = nil
     } catch {
-      if var rolled = ritual {
+      let appError = ErrorMap.app(error)
+      if appError != .offline, var rolled = ritual {
         rolled.moods = previous
         ritual = rolled
       }
@@ -230,7 +231,11 @@ extension SessionModel {
       outbox["mood"] = nil
       offline = false
     } catch {
-      errorMessage = L10n.message(for: ErrorMap.app(error))
+      let appError = ErrorMap.app(error)
+      if appError == .notEditable {
+        outbox["mood"] = nil
+      }
+      errorMessage = L10n.message(for: appError)
     }
   }
 

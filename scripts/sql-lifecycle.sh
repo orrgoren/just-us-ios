@@ -38,6 +38,8 @@ run -f supabase/proposed/006_push_claim_and_outbox.sql
 run -f supabase/proposed/007_push_flush_schedule.sql
 run -f supabase/proposed/012_scheduled_hint_notes.sql
 run -f supabase/proposed/013_mood_until_reveal.sql
+run -f supabase/proposed/live/touch_mood.sql
+run -f supabase/proposed/014_mood_update_using.sql
 run -v ON_ERROR_STOP=1 -c "
 insert into auth.users (id) values ('10101010-1010-4010-8010-101010101010');
 insert into public.push_outbox (id, caller_user_id, recipient_user_id, kind, not_before) values

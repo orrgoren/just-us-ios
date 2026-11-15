@@ -89,7 +89,7 @@ struct RitualScreen: View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.yourMood).font(Theme.title)
       HelperText(text: L10n.moodHelp)
-      let editable = MoodEdit.allowed(status: ritual.date?.status, revealed: ritual.revealed)
+      let editable = MoodChips.isEnabled(status: ritual.date?.status, revealed: ritual.revealed)
       ForEach(MoodKey.allCases) { mood in
         let selected = ritual.moods.first { $0.userId == ritual.selfMember.userId }?.mood == mood
         MoodChip(mood: mood, selected: selected, enabled: editable) {

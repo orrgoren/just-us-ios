@@ -235,12 +235,13 @@ struct WineButton: View {
         if busy {
           ProgressView()
             .controlSize(.small)
+            .tint(Theme.canvas)
         }
         Text(label)
       }
     }
     .buttonStyle(JustButtonStyle(kind: .primary))
-    .disabled(busy)
+    .allowsHitTesting(!busy)
     .accessibilityIdentifier(identifier)
     .accessibilityLabel(label)
   }
@@ -361,6 +362,7 @@ struct MoodChipStyle: ButtonStyle {
 
   private var border: Color {
     if !enabled { return Theme.muted(scheme) }
+    if scheme == .dark { return Theme.color(Palette.moodBorderDark(mood)) }
     return Theme.color(Palette.moodSelected(mood))
   }
 }
