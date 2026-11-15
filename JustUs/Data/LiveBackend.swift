@@ -106,9 +106,9 @@ final class LiveBackend: DateBackend {
     wipeAfterSignOut()
   }
 
-  /// The device row is deleted while this session still matches `device_tokens_own`.
-  /// A failed delete leaves the session in place. Zero rows are accepted only when this
-  /// user has never had a successful save.
+  /// The saved device row is deleted while this session still matches `device_tokens_own`.
+  /// Zero rows from that saved token leave the session in place. A newer unsaved token may
+  /// delete nothing. When no save has succeeded, the delete is skipped.
   private func deleteTokenThenSignOut() async throws {
     try await deleteOwnDeviceToken(authSignOut: { await self.authSignOut() })
   }
@@ -123,17 +123,25 @@ final class LiveBackend: DateBackend {
     }
     let stored = DeviceTokenStore.load()
     let saveSucceeded = cachedUser.map { stored.saveSucceeded(for: $0.uuidString) } ?? false
+    let savedToken = stored.savedToken
     do {
-      try await DeviceTokenSignOut.perform(token: deviceToken, saveSucceeded: saveSucceeded, delete: {
-        let count = try await self.deletedDeviceTokenCount()
-        if count > 0 {
-          var record = DeviceTokenStore.load()
-          record.removedFromAccount()
-          record.savedUserId = nil
-          DeviceTokenStore.save(record)
-        }
-        return count
-      }, authSignOut: authSignOut)
+      try await DeviceTokenSignOut.perform(
+        current: deviceToken,
+        saved: savedToken,
+        saveSucceeded: saveSucceeded,
+        delete: { token in
+          let count = try await self.deletedDeviceTokenCount(token)
+          if token == savedToken, count > 0 {
+            var record = DeviceTokenStore.load()
+            record.removedFromAccount()
+            record.savedUserId = nil
+            record.savedToken = nil
+            DeviceTokenStore.save(record)
+          }
+          return count
+        },
+        authSignOut: authSignOut
+      )
     } catch {
       PushLog.deleteFailed(error)
       throw blocked
@@ -147,8 +155,8 @@ final class LiveBackend: DateBackend {
     }
   }
 
-  private func deletedDeviceTokenCount() async throws -> Int {
-    guard let client, let user = cachedUser, let token = deviceToken, !token.isEmpty else {
+  private func deletedDeviceTokenCount(_ token: String) async throws -> Int {
+    guard let client, let user = cachedUser, !token.isEmpty else {
       throw DeviceTokenSignOut.Failure.removedNoRows
     }
     let response: PostgrestResponse<[DeviceTokenIdentity]> = try await client
@@ -243,7 +251,7 @@ final class LiveBackend: DateBackend {
     let row = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
     do {
       try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
-      markTokenSaved(token)
+      markTokenSaved(token, userId: user)
     } catch {
       switch DeviceTokenSave.afterFailure(error, attemptedPlain: false) {
       case .upsertPlain:
@@ -262,18 +270,17 @@ final class LiveBackend: DateBackend {
     let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
     do {
       try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
-      markTokenSaved(token)
+      markTokenSaved(token, userId: user)
     } catch {
       PushLog.saveFailed(error)
     }
   }
 
-  private func markTokenSaved(_ token: String) {
+  /// `userId` is the account the upsert was sent for, captured before the request.
+  private func markTokenSaved(_ token: String, userId: UUID) {
     var current = DeviceTokenStore.load()
-    if current.token == token, let user = cachedUser {
-      current.saved(for: user.uuidString)
-      DeviceTokenStore.save(current)
-    }
+    current.saved(for: userId.uuidString, token: token)
+    DeviceTokenStore.save(current)
   }
 
   func notify(_ kind: String) async {

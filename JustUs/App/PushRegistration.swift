@@ -39,9 +39,17 @@ enum PushRegistration {
 struct DeviceTokenRecord: Equatable {
   var token: String?
   var awaitingSave: Bool
-  /// The user whose upsert succeeded. A later launch sets `awaitingSave` again, so that flag
-  /// cannot mean the server row is absent.
-  var savedUserId: String? = nil
+  /// The user and token of the last upsert that succeeded. A later launch sets `awaitingSave`
+  /// again, and a newer token can fail to save, so neither flag means the server row is absent.
+  var savedUserId: String?
+  var savedToken: String?
+
+  init(token: String? = nil, awaitingSave: Bool, savedUserId: String? = nil, savedToken: String? = nil) {
+    self.token = token
+    self.awaitingSave = awaitingSave
+    self.savedUserId = savedUserId
+    self.savedToken = savedToken
+  }
 
   mutating func received(_ token: String) {
     self.token = token
@@ -52,13 +60,17 @@ struct DeviceTokenRecord: Equatable {
     awaitingSave = false
   }
 
-  mutating func saved(for userId: String) {
-    saved()
+  /// Records the user the upsert was sent for, and the token that upsert used.
+  mutating func saved(for userId: String, token saved: String) {
     savedUserId = userId
+    savedToken = saved
+    if token == saved {
+      awaitingSave = false
+    }
   }
 
   func saveSucceeded(for userId: String) -> Bool {
-    savedUserId == userId
+    savedUserId == userId && savedToken?.isEmpty == false
   }
 
   /// Sign-out deletes the server row. The same device token has to be saved for the next account.
@@ -79,19 +91,25 @@ enum DeviceTokenSignOut {
     case removedNoRows
   }
 
-  /// Deletes the row while the old session is still the caller, then signs out.
-  /// A known token is always deleted. Zero returned rows block sign-out only when this
-  /// user has already had a successful save, because that row can still be on the server
-  /// while a later save is pending or failed. A token that was never saved has no row.
+  /// Deletes while the old session is still the caller, then signs out.
+  /// The saved token is the one that must come back. A newer token whose save failed may
+  /// delete zero rows. When no save has succeeded, there is no row, so the delete is skipped.
   static func perform(
-    token: String?,
+    current: String?,
+    saved: String?,
     saveSucceeded: Bool,
-    delete: () async throws -> Int,
+    delete: (String) async throws -> Int,
     authSignOut: () async -> Void
   ) async throws {
-    if token?.isEmpty == false {
-      let removed = try await delete()
-      if removed < 1, saveSucceeded { throw Failure.removedNoRows }
+    let savedToken = saved.flatMap { $0.isEmpty ? nil : $0 }
+    guard saveSucceeded, let savedToken else {
+      await authSignOut()
+      return
+    }
+    let removed = try await delete(savedToken)
+    guard removed > 0 else { throw Failure.removedNoRows }
+    if let current, current.isEmpty == false, current != savedToken {
+      _ = try await delete(current)
     }
     await authSignOut()
   }
@@ -127,6 +145,7 @@ enum DeviceTokenStore {
   static let tokenKey = "justus.push.token"
   static let pendingKey = "justus.push.tokenPending"
   static let savedUserKey = "justus.push.savedUser"
+  static let savedTokenKey = "justus.push.savedToken"
   /// Leftover from a cross-user delete. It is wiped and never retried.
   static let deleteUserKey = "justus.push.deleteUser"
   static let deleteTokenKey = "justus.push.deleteToken"
@@ -135,7 +154,8 @@ enum DeviceTokenStore {
     DeviceTokenRecord(
       token: UserDefaults.standard.string(forKey: tokenKey),
       awaitingSave: UserDefaults.standard.bool(forKey: pendingKey),
-      savedUserId: UserDefaults.standard.string(forKey: savedUserKey)
+      savedUserId: UserDefaults.standard.string(forKey: savedUserKey),
+      savedToken: UserDefaults.standard.string(forKey: savedTokenKey)
     )
   }
 
@@ -151,6 +171,11 @@ enum DeviceTokenStore {
     } else {
       UserDefaults.standard.removeObject(forKey: savedUserKey)
     }
+    if let savedToken = record.savedToken, savedToken.isEmpty == false {
+      UserDefaults.standard.set(savedToken, forKey: savedTokenKey)
+    } else {
+      UserDefaults.standard.removeObject(forKey: savedTokenKey)
+    }
   }
 
   static func clearDelete() {
@@ -162,6 +187,7 @@ enum DeviceTokenStore {
     UserDefaults.standard.removeObject(forKey: tokenKey)
     UserDefaults.standard.removeObject(forKey: pendingKey)
     UserDefaults.standard.removeObject(forKey: savedUserKey)
+    UserDefaults.standard.removeObject(forKey: savedTokenKey)
     clearDelete()
   }
 }

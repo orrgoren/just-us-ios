@@ -335,58 +335,75 @@ final class InviteAndPushTests: XCTestCase {
 
   func testTokenDeleteRunsBeforeSignOutAndZeroRowsDoNotSucceed() async throws {
     var events: [String] = []
-    try await DeviceTokenSignOut.perform(token: "tok", saveSucceeded: true, delete: {
-      events.append("delete")
+    try await DeviceTokenSignOut.perform(current: "tok", saved: "tok", saveSucceeded: true, delete: { token in
+      events.append(token)
       return 1
     }, authSignOut: {
       events.append("signOut")
     })
-    XCTAssertEqual(events, ["delete", "signOut"])
+    XCTAssertEqual(events, ["tok", "signOut"])
 
     events = []
     do {
-      try await DeviceTokenSignOut.perform(token: "tok", saveSucceeded: true, delete: {
-        events.append("delete")
+      try await DeviceTokenSignOut.perform(current: "tok", saved: "tok", saveSucceeded: true, delete: { token in
+        events.append(token)
         return 0
       }, authSignOut: {
         events.append("signOut")
       })
       XCTFail("a delete that removes no rows must fail after a save succeeded")
     } catch DeviceTokenSignOut.Failure.removedNoRows {
-      XCTAssertEqual(events, ["delete"])
+      XCTAssertEqual(events, ["tok"])
     } catch {
       XCTFail("unexpected \(error)")
     }
   }
 
-  func testSignOutDeletesWhileTheSaveIsPendingOrFailed() async throws {
+  func testSavedTokenRoundTripsThroughTheStore() {
     let user = UUID().uuidString
-    var pending = DeviceTokenRecord(token: "tok", awaitingSave: true)
-    pending.saved(for: user)
-    pending.awaitingSave = true
-    XCTAssertTrue(pending.awaitingSave)
-    XCTAssertTrue(pending.saveSucceeded(for: user))
+    let record = DeviceTokenRecord(token: "T2", awaitingSave: true, savedUserId: user, savedToken: "T1")
+    DeviceTokenStore.save(record)
+    XCTAssertEqual(DeviceTokenStore.load(), record)
+    var cleared = DeviceTokenStore.load()
+    cleared.savedUserId = nil
+    cleared.savedToken = nil
+    DeviceTokenStore.save(cleared)
+    XCTAssertEqual(DeviceTokenStore.load(), cleared)
+  }
 
+  func testSignOutDeletesTheSavedTokenWhenALaterSaveFailed() async throws {
+    let user = UUID().uuidString
+    var rotated = DeviceTokenRecord(token: "T1", awaitingSave: false)
+    rotated.saved(for: user, token: "T1")
+    rotated.received("T2")
+    XCTAssertEqual(rotated.token, "T2")
+    XCTAssertEqual(rotated.savedToken, "T1")
+    XCTAssertTrue(rotated.awaitingSave)
+    XCTAssertTrue(rotated.saveSucceeded(for: user))
+
+    var deleted: [String] = []
+    try await DeviceTokenSignOut.perform(
+      current: rotated.token,
+      saved: rotated.savedToken,
+      saveSucceeded: rotated.saveSucceeded(for: user),
+      delete: { token in
+        deleted.append(token)
+        return token == "T1" ? 1 : 0
+      },
+      authSignOut: { deleted.append("signOut") }
+    )
+    XCTAssertEqual(deleted, ["T1", "T2", "signOut"])
+  }
+
+  func testNeverSavedOfflineSignOutSkipsTheDelete() async throws {
     var events: [String] = []
-    try await DeviceTokenSignOut.perform(token: pending.token, saveSucceeded: pending.saveSucceeded(for: user), delete: {
+    try await DeviceTokenSignOut.perform(current: "T2", saved: nil, saveSucceeded: false, delete: { _ in
       events.append("delete")
-      return 1
+      throw DeviceTokenSignOut.Failure.removedNoRows
     }, authSignOut: {
       events.append("signOut")
     })
-    XCTAssertEqual(events, ["delete", "signOut"])
-
-    var failed = DeviceTokenRecord(token: "tok", awaitingSave: true)
-    XCTAssertFalse(failed.saveSucceeded(for: user))
-    events = []
-    try await DeviceTokenSignOut.perform(token: failed.token, saveSucceeded: failed.saveSucceeded(for: user), delete: {
-      events.append("delete")
-      return 0
-    }, authSignOut: {
-      events.append("signOut")
-    })
-    XCTAssertEqual(events, ["delete", "signOut"])
-
+    XCTAssertEqual(events, ["signOut"])
     XCTAssertFalse(L10n.message(for: .accountDeleteBlocked).contains("signed in"))
   }
 
