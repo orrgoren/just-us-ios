@@ -65,7 +65,6 @@ final class FlowUITests: XCTestCase {
     let own = jordan.textFields["inviteToken"]
     own.tap()
     own.typeText(String(repeating: "a", count: 43))
-    dismissKeyboard(jordan)
     jordan.buttons["redeemInvite"].tap()
     XCTAssertTrue(jordan.staticTexts["errorBanner"].waitForExistence(timeout: 5))
 
@@ -76,10 +75,8 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(token.waitForExistence(timeout: 4))
     token.tap()
     token.typeText(String(repeating: "a", count: 43))
-    dismissKeyboard(sam)
     sam.buttons["redeemInvite"].tap()
     XCTAssertTrue(sam.buttons["replaceEmpty"].waitForExistence(timeout: 5))
-    dismissKeyboard(sam)
     sam.buttons["replaceEmpty"].tap()
     XCTAssertTrue(sam.buttons["Us"].waitForExistence(timeout: 8))
   }
@@ -212,13 +209,11 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(field.waitForExistence(timeout: 12))
     field.tap()
     field.typeText(email)
-    dismissKeyboard(app)
     app.buttons["sendCode"].tap()
     let codeField = app.textFields["codeField"]
     XCTAssertTrue(codeField.waitForExistence(timeout: 8))
     codeField.tap()
     codeField.typeText(code)
-    dismissKeyboard(app)
     app.buttons["verifyCode"].tap()
     if expectHome {
       XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))

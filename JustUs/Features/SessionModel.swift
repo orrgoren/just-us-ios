@@ -280,10 +280,9 @@ final class SessionModel {
       return
     }
     rememberEmail()
-    let kept = email
     await backend.signOut()
     clearSession()
-    email = kept
+    email = ""
     offerNewLink = false
     screen = .login
     Telemetry.analytics.record(.signedOut)
@@ -336,14 +335,17 @@ final class SessionModel {
   /// Drops the live session and any pending magic-link verifier, then returns to a login that can send a new link.
   func recoverToLogin() async {
     rememberEmail()
-    let kept = email
+    let typed = email.trimmingCharacters(in: .whitespacesAndNewlines)
     await backend.signOut()
     clearSession()
-    email = kept
-    prefillEmail()
+    email = typed.isEmpty ? rememberedEmail() : typed
     offerNewLink = true
     signedIn = false
     screen = .login
+  }
+
+  private func rememberedEmail() -> String {
+    UserDefaults.standard.string(forKey: Self.lastEmailKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
   }
 
   func applyFailure(_ error: Error, retry: RetryKind?) async {

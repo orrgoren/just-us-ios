@@ -1,10 +1,12 @@
 import AuthenticationServices
 import SwiftUI
+import UIKit
 
 struct RootView: View {
   @Bindable var model: SessionModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var keyboardDismiss = 0
+  @State private var keyboardOverlap: CGFloat = 0
 
   var body: some View {
     JustScreen {
@@ -39,9 +41,16 @@ struct RootView: View {
           .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.screen)
         }
         .padding(Theme.Space.screen)
+        .padding(.bottom, keyboardOverlap > 0 ? 200 : 0)
       }
+      .padding(.bottom, keyboardOverlap)
       .scrollDismissesKeyboard(.immediately)
       .accessibilityIdentifier(A11y.content)
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if keyboardOverlap > 0, model.screen == .invite, model.pendingReplace {
+          PinnedReplaceActions(model: model)
+        }
+      }
       .toolbar {
         ToolbarItemGroup(placement: .keyboard) {
           Spacer()
@@ -50,10 +59,18 @@ struct RootView: View {
         }
       }
       .environment(\.scrollFieldIntoView) { id in
-        proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.2))
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+          proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.16))
+        }
       }
       .environment(\.keyboardDismiss, keyboardDismiss)
+      .environment(\.keyboardOverlap, keyboardOverlap)
       }
+    }
+    .background {
+      KeyboardOverlapReader(overlap: $keyboardOverlap)
     }
     .preferredColorScheme(Launch.preferredScheme)
     .onOpenURL { url in Task { await model.open(url) } }
@@ -176,6 +193,10 @@ private struct KeyboardDismissKey: EnvironmentKey {
   static let defaultValue = 0
 }
 
+private struct KeyboardOverlapKey: EnvironmentKey {
+  static let defaultValue: CGFloat = 0
+}
+
 extension EnvironmentValues {
   var scrollFieldIntoView: (String) -> Void {
     get { self[ScrollFieldKey.self] }
@@ -186,12 +207,55 @@ extension EnvironmentValues {
     get { self[KeyboardDismissKey.self] }
     set { self[KeyboardDismissKey.self] = newValue }
   }
+
+  var keyboardOverlap: CGFloat {
+    get { self[KeyboardOverlapKey.self] }
+    set { self[KeyboardOverlapKey.self] = newValue }
+  }
+}
+
+private struct PinnedReplaceActions: View {
+  @Bindable var model: SessionModel
+  @Environment(\.colorScheme) private var scheme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: Theme.Space.stack) {
+      WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty, busy: model.activity == .redeem, busyTitle: L10n.loading) {
+        Task { await model.redeem(replaceEmpty: true) }
+      }
+      Button(L10n.stay) { model.pendingReplace = false }
+        .accessibilityIdentifier(A11y.stay)
+        .frame(minHeight: 44)
+    }
+    .padding(.horizontal, Theme.Space.screen)
+    .padding(.vertical, 12)
+    .background(Theme.canvas(scheme))
+  }
+}
+
+private struct KeyboardOverlapReader: View {
+  @Binding var overlap: CGFloat
+
+  var body: some View {
+    GeometryReader { geo in
+      Color.clear
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+          let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
+          let covered = geo.frame(in: .global).intersection(frame)
+          let next = covered.isNull || covered.isInfinite ? 0 : max(0, covered.height)
+          guard abs(next - overlap) > 1 else { return }
+          overlap = next
+        }
+    }
+    .allowsHitTesting(false)
+  }
 }
 
 struct LabeledField: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.scrollFieldIntoView) private var scrollFieldIntoView
   @Environment(\.keyboardDismiss) private var keyboardDismiss
+  @Environment(\.keyboardOverlap) private var keyboardOverlap
   @FocusState private var focused: Bool
   var title: String
   @Binding var text: String
@@ -217,14 +281,22 @@ struct LabeledField: View {
     .id(identifier)
     .onChange(of: focused) { _, isOn in
       guard isOn else { return }
-      scrollFieldIntoView(identifier)
-      Task { @MainActor in
-        try? await Task.sleep(for: .milliseconds(350))
-        guard focused else { return }
-        scrollFieldIntoView(identifier)
-      }
+      reveal()
+    }
+    .onChange(of: keyboardOverlap) { _, overlap in
+      guard focused, overlap > 0 else { return }
+      reveal()
     }
     .onChange(of: keyboardDismiss) { _, _ in focused = false }
+  }
+
+  private func reveal() {
+    scrollFieldIntoView(identifier)
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(350))
+      guard focused else { return }
+      scrollFieldIntoView(identifier)
+    }
   }
 }
 
