@@ -1,18 +1,65 @@
 name: TestFlight
 
-# Retired. Xcode Cloud archives and uploads. See docs/xcode-cloud.md.
-# This file stays on workflow_dispatch so an old bookmark does not upload.
+# Manual only. Do not run until CI on the pull request is green and QA has signed off.
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type upload to archive Release and send it to internal TestFlight."
+        required: true
+        default: "no"
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  retired:
-    name: Retired
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  upload:
+    name: Internal TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 90
     steps:
-      - name: Point at Xcode Cloud
-        run: echo "TestFlight uploads moved to Xcode Cloud. See docs/xcode-cloud.md. This workflow does not archive."
+      - name: Refuse an unconfirmed dispatch
+        if: ${{ inputs.confirm != 'upload' }}
+        run: |
+          echo "Not uploading. Re-run this workflow with confirm set to upload after QA sign-off."
+          exit 0
+
+      - name: Checkout
+        if: ${{ inputs.confirm == 'upload' }}
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        if: ${{ inputs.confirm == 'upload' }}
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Write Secrets.xcconfig
+        if: ${{ inputs.confirm == 'upload' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python3 scripts/write-secrets.py
+
+      - name: Generate the Xcode project
+        if: ${{ inputs.confirm == 'upload' }}
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Install fastlane
+        if: ${{ inputs.confirm == 'upload' }}
+        run: |
+          gem install bundler
+          bundle config set --local path vendor/bundle
+          bundle install
+
+      - name: Verify App ID and upload to internal TestFlight
+        if: ${{ inputs.confirm == 'upload' }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bundle exec fastlane ios beta

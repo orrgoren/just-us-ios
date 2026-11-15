@@ -1,6 +1,8 @@
 # Xcode Cloud
 
-TestFlight uploads run in Xcode Cloud with automatic signing. The GitHub workflow `.github/workflows/testflight.yml` no longer archives. `project.yml` already sets `CODE_SIGN_STYLE` to Automatic. Do not attach a manual profile in the workflow.
+Xcode Cloud is one of two TestFlight upload paths. The other is GitHub Actions: `.github/workflows/testflight.yml` runs the fastlane `ios beta` lane on `workflow_dispatch` when `confirm` is `upload`. That lane checks the Sign in with Apple entitlement and sets the build number one above the latest TestFlight build. Use one path at a time.
+
+This path archives with automatic signing. `project.yml` already sets `CODE_SIGN_STYLE` to Automatic. Leave the provisioning profile unset in the Xcode Cloud workflow.
 
 The post-clone script is `ci_scripts/ci_post_clone.sh`. It installs xcodegen, generates `JustUs.xcodeproj`, writes `Config/Secrets.xcconfig`, and sets `CURRENT_PROJECT_VERSION` to `CI_BUILD_NUMBER + 2`. Xcode Cloud’s counter starts at 1, and TestFlight already has build 2, so the first archive is build 3.
 
@@ -27,5 +29,7 @@ Do not add `APNS_KEY_P8`, `APNS_KEY_ID`, `ASC_KEY_P8`, or `APPLE_TEAM_ID`. The a
 8. Save, then start the first build by hand. The build has to finish `ci_post_clone.sh` before it can see `JustUs.xcodeproj`, because that project is generated and is not committed.
 
 ## GitHub Actions
+
+`.github/workflows/testflight.yml` stays beside this workflow. Dispatch it with `confirm` set to `upload` when Xcode Cloud is idle for this app. The lane checks Sign in with Apple and numbers the build one above the latest TestFlight build.
 
 `ci.yml` stays. On a private repository the macOS minutes are the expensive ones. When that starts to matter, keep the Linux jobs (the account SQL check and the file filter) and move `JustUsTests` to a second Xcode Cloud workflow whose only action is Test, scheme `JustUs`, without a TestFlight post-action. Leave the UI tests on a manual dispatch.
