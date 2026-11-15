@@ -39,7 +39,8 @@ enum L10n {
   static var waitingOnThem: String { text("role.waiting", "Waiting on them") }
   static var loginNext: String { text("auth.next", "Next: sign in. Then make a space, or join theirs.") }
   static var codeNext: String { text("auth.codeNext", "The link is the way in. The code is there if you already have it.") }
-  static var inviteShareNext: String { text("invite.next", "Send this, then wait. They open it on their phone.") }
+  static var inviteShareNext: String { text("invite.next", "Send the app link. It opens Just Us on their phone.") }
+  static var appLinkLabel: String { text("invite.appLink", "Opens in the app") }
   static var joinNext: String { text("invite.joinNext", "Paste their code. You join their space, not a new one.") }
   static var spaceReady: String { text("celebrate.space", "Your space is ready.") }
   static var paired: String { text("celebrate.paired", "You're paired. The week is yours.") }
@@ -204,6 +205,27 @@ enum L10n {
 
   static func datesCount(_ count: Int) -> String {
     String(format: text("home.count", "%lld together"), locale: .current, count)
+  }
+
+  static func inviteShareText(app: String, web: String?, code: String) -> String {
+    if let web, !web.isEmpty {
+      return String(
+        format: text(
+          "invite.shareText",
+          "Join me on Just Us. Open the app link, or paste the code.\n%@\n%@\n%@"
+        ),
+        locale: .current,
+        app,
+        web,
+        code
+      )
+    }
+    return String(
+      format: text("invite.shareTextApp", "Join me on Just Us. Open the app link, or paste the code.\n%@\n%@"),
+      locale: .current,
+      app,
+      code
+    )
   }
 
   static func minutes(_ count: Int) -> String {

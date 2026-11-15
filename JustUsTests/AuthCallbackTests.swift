@@ -3,6 +3,18 @@ import XCTest
 
 @MainActor
 final class AuthCallbackTests: XCTestCase {
+  override nonisolated func setUp() {
+    super.setUp()
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
+  }
+
+  override nonisolated func tearDown() {
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
+    super.tearDown()
+  }
+
   func testRedirectIsTheAllowListedCallback() throws {
     XCTAssertEqual(AuthCallback.redirect?.absoluteString, "justus://auth-callback")
     let pkce = URL(string: "justus://auth-callback?code=pkce-code")

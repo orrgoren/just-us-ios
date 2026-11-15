@@ -7,6 +7,8 @@ enum Launch {
     let arguments = ProcessInfo.processInfo.arguments
     guard arguments.contains("-uitest") else { return }
     UserDefaults.standard.removeObject(forKey: uitestKey)
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
     if !arguments.contains("-uitestKeep") {
       resetFakeStoreIfNeeded(arguments)
     }

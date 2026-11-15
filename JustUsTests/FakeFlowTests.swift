@@ -3,6 +3,18 @@ import XCTest
 
 @MainActor
 final class FakeFlowTests: XCTestCase {
+  override nonisolated func setUp() {
+    super.setUp()
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
+  }
+
+  override nonisolated func tearDown() {
+    PendingInviteStore.clear()
+    DeviceTokenStore.reset()
+    super.tearDown()
+  }
+
   func testPartnerCannotSeePlan() async throws {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     _ = try await backend.sendCode(email: "blair@couple-a.test")

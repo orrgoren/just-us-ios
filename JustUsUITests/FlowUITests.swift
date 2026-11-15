@@ -50,6 +50,9 @@ final class FlowUITests: XCTestCase {
     typeFocused(app.textFields["partnerName"], "Rio", in: app)
     tapReady(app.buttons["createCouple"], in: app)
     XCTAssertTrue(app.buttons["shareInvite"].waitForExistence(timeout: 8))
+    let appLink = app.staticTexts["appInviteLink"]
+    XCTAssertTrue(appLink.waitForExistence(timeout: 4))
+    XCTAssertTrue(appLink.label.hasPrefix("justus://invite/"))
   }
 
   func testInviteFailuresAndReplace() {
@@ -57,6 +60,7 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(invalid.buttons["haveInvite"].waitForExistence(timeout: 12))
     invalid.buttons["haveInvite"].tap()
     XCTAssertTrue(invalid.buttons["inviteBack"].waitForExistence(timeout: 4))
+    XCTAssertTrue(invalid.textFields["inviteToken"].waitForExistence(timeout: 4))
     XCTAssertFalse(invalid.buttons["redeemInvite"].exists)
 
     let jordan = launch()

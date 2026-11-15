@@ -10,6 +10,7 @@ final class LiveBackend: DateBackend {
   private var deviceToken: String?
 
   init() {
+    deviceToken = DeviceTokenStore.load().token
     guard let url = URL(string: AppConfig.supabaseURL), AppConfig.supabaseURL.hasPrefix("https://"), !AppConfig.anonKey.isEmpty else {
       client = nil
       return
@@ -95,10 +96,14 @@ final class LiveBackend: DateBackend {
   func signOut() async {
     watchTask?.cancel()
     if let client, let cachedUser, let deviceToken {
-      _ = try? await client.from("device_tokens").delete()
-        .eq("user_id", value: cachedUser.uuidString)
-        .eq("token", value: deviceToken)
-        .execute()
+      do {
+        try await client.from("device_tokens").delete()
+          .eq("user_id", value: cachedUser.uuidString)
+          .eq("token", value: deviceToken)
+          .execute()
+      } catch {
+        PushLog.deleteFailed(error)
+      }
     }
     if let client {
       try? await client.auth.signOut()
@@ -108,7 +113,9 @@ final class LiveBackend: DateBackend {
     AuthStorageReset.clear()
     if let cachedUser { CacheStore.deleteAll() }
     cachedUser = nil
-    deviceToken = nil
+    var record = DeviceTokenStore.load()
+    record.removedFromAccount()
+    DeviceTokenStore.save(record)
   }
 
   func membership() async throws -> MembershipKind {
@@ -158,21 +165,36 @@ final class LiveBackend: DateBackend {
   }
 
   func registerDevice(token: String) async {
+    var record = DeviceTokenStore.load()
+    record.received(token)
+    DeviceTokenStore.save(record)
     deviceToken = token
     await uploadDeviceToken()
   }
 
   /// The APNs callback can arrive before the session exists. The token stays
-  /// in memory, and the next sign-in or restore uploads it.
+  /// on disk until the upsert succeeds, and the next launch or sign-in retries it.
   private func uploadDeviceToken() async {
-    guard AppConfig.pushEnabled, let user = cachedUser, let token = deviceToken, let client else { return }
+    let stored = DeviceTokenStore.load()
+    guard stored.awaitingSave, let token = stored.token else { return }
+    deviceToken = token
+    guard let user = cachedUser else { return }
+    guard AppConfig.pushEnabled else { return }
+    guard let client else {
+      PushLog.saveFailed(PushFailure(description: "Supabase client is not configured"))
+      return
+    }
     let environment = AppConfig.pushSandbox ? "sandbox" : "production"
-    let withEnvironment = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
+    let row = DeviceTokenEnvRow(userId: user, token: token, platform: "ios", environment: environment)
     do {
-      try await client.from("device_tokens").upsert(withEnvironment, onConflict: "user_id,token").execute()
+      try await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+      var current = DeviceTokenStore.load()
+      if current.token == token {
+        current.saved()
+        DeviceTokenStore.save(current)
+      }
     } catch {
-      let row = DeviceTokenRow(userId: user, token: token, platform: "ios")
-      _ = try? await client.from("device_tokens").upsert(row, onConflict: "user_id,token").execute()
+      PushLog.saveFailed(error)
     }
   }
 
@@ -378,17 +400,6 @@ struct NewInvite: Encodable {
     case createdBy = "created_by"
     case tokenHash = "token_hash"
     case expiresAt = "expires_at"
-  }
-}
-
-struct DeviceTokenRow: Encodable {
-  var userId: UUID
-  var token: String
-  var platform: String
-  enum CodingKeys: String, CodingKey {
-    case userId = "user_id"
-    case token
-    case platform
   }
 }
 

@@ -67,10 +67,17 @@ struct InviteShareScreen: View {
       Text(L10n.inviteTitle).font(Theme.display)
       Text(L10n.inviteBody)
       HelperText(text: L10n.inviteShareNext)
-      if let url = inviteURL {
-        ShareLink(item: url) { Text(L10n.shareInvite) }
+      if let token = model.inviteToken, let message = InviteLinks.shareText(token: token) {
+        ShareLink(item: message) { Text(L10n.shareInvite) }
           .accessibilityIdentifier(A11y.shareInvite)
           .frame(minHeight: 44)
+      }
+      if let token = model.inviteToken, let appLink = InviteLinks.appURL(token: token) {
+        Text(L10n.appLinkLabel).font(Theme.caption)
+        Text(appLink.absoluteString)
+          .font(.body.monospaced())
+          .textSelection(.enabled)
+          .accessibilityIdentifier(A11y.appInviteLink)
       }
       if let token = model.inviteToken {
         Text(token).font(.body.monospaced()).textSelection(.enabled)
@@ -80,11 +87,6 @@ struct InviteShareScreen: View {
         .accessibilityIdentifier(A11y.skipInvite)
         .frame(minHeight: 44)
     }
-  }
-
-  private var inviteURL: URL? {
-    guard let token = model.inviteToken else { return nil }
-    return URL(string: AppConfig.webURL + "/invite/" + token)
   }
 }
 
@@ -117,13 +119,13 @@ struct InviteRedeemScreen: View {
       Text(bodyCopy)
       if model.signedIn {
         HelperText(text: L10n.joinNext)
-        LabeledField(title: L10n.pasteCode, text: $model.inviteInput, identifier: A11y.inviteToken)
       }
+      LabeledField(title: L10n.pasteCode, text: $model.inviteInput, identifier: A11y.inviteToken)
       if model.signedIn && model.pendingReplace && keyboardOverlap == 0 {
         WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty, busy: model.activity == .redeem, busyTitle: L10n.loading) {
           Task { await model.redeem(replaceEmpty: true) }
         }
-        Button(L10n.stay) { model.pendingReplace = false }
+        Button(L10n.stay) { model.declineInvite() }
           .accessibilityIdentifier(A11y.stay)
           .frame(minHeight: 44)
       } else if model.signedIn && !model.blocked && !model.pendingReplace {
