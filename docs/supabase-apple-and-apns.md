@@ -61,6 +61,7 @@ Applied live on 2026-11-15. Do not re-apply. The push migrations went on in this
 
 Not applied, and must never be applied:
 
+- `supabase/proposed/013_mood_until_reveal.sql` — not applied. It lets a member change their own mood while the date is draft, or scheduled and not yet revealed. Do not apply it until it is approved.
 - `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush` and also undoes 003 and 004. Not applied. Do not apply it.
 - `supabase/proposed/008_push_rollback.sql` — the push-only rollback. It unschedules `justus-push-flush` and drops the push tables. It leaves 003, 004, `leave_couple`, `delete_my_account`, and the photo sweep alone.
 

@@ -59,8 +59,9 @@ struct RootView: View {
       .toolbar {
         ToolbarItemGroup(placement: .keyboard) {
           Spacer()
-          Button(L10n.dismissKeyboard) { keyboardDismiss += 1 }
-            .accessibilityIdentifier(A11y.dismissKeyboard)
+          ActionButton(title: L10n.dismissKeyboard, identifier: A11y.dismissKeyboard, kind: .link) {
+            keyboardDismiss += 1
+          }
         }
       }
       .environment(\.scrollFieldIntoView) { id in
@@ -159,9 +160,9 @@ struct LoginScreen: View {
       .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
       .frame(height: 48)
       .accessibilityIdentifier(A11y.apple)
-      Button(L10n.haveInvite) { model.screen = .invite }
-        .accessibilityIdentifier(A11y.haveInvite)
-        .frame(minHeight: 44)
+      ActionButton(title: L10n.haveInvite, identifier: A11y.haveInvite, kind: .link) {
+        model.screen = .invite
+      }
     }
   }
 }
@@ -179,11 +180,10 @@ struct CodeScreen: View {
       WineButton(title: L10n.verify, identifier: A11y.verify, busy: model.activity == .verify, busyTitle: L10n.loading) {
         Task { await model.verify() }
       }
-      Button(L10n.resend) { Task { await model.sendCode() } }
-        .accessibilityIdentifier(A11y.resend)
-        .frame(minHeight: 44)
-      Button(L10n.useAnotherEmail) { model.screen = .login }
-        .frame(minHeight: 44)
+      ActionButton(title: L10n.resend, identifier: A11y.resend, kind: .link) {
+        Task { await model.sendCode() }
+      }
+      ActionButton(title: L10n.useAnotherEmail, kind: .link) { model.screen = .login }
     }
   }
 }
@@ -230,9 +230,7 @@ private struct PinnedReplaceActions: View {
       WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty, busy: model.activity == .redeem, busyTitle: L10n.loading) {
         Task { await model.redeem(replaceEmpty: true) }
       }
-      Button(L10n.stay) { model.pendingReplace = false }
-        .accessibilityIdentifier(A11y.stay)
-        .frame(minHeight: 44)
+      ActionButton(title: L10n.stay, identifier: A11y.stay) { model.pendingReplace = false }
     }
     .padding(.horizontal, Theme.Space.screen)
     .padding(.vertical, 12)

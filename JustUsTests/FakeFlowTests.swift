@@ -290,6 +290,46 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertTrue(L10n.message(for: .notPlanner).localizedCaseInsensitiveContains("planner"))
   }
 
+  func testFailedMoodSaveRollsBack() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    let before = model.ritual?.moods
+    XCTAssertEqual(before?.first { $0.userId == SeedID.alex }?.mood, .romance)
+    backend.setOffline(true)
+    await model.choose(mood: .chill)
+    XCTAssertEqual(model.ritual?.moods, before)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .offline))
+    backend.setOffline(false)
+    await model.choose(mood: .chill)
+    XCTAssertNil(model.errorMessage)
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .chill)
+  }
+
+  func testScheduledMoodSavesAndRevealDoesNot() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.scheduleUnrevealed()
+    await model.refresh()
+    XCTAssertEqual(model.ritual?.date?.status, .scheduled)
+    XCTAssertEqual(model.ritual?.revealed, false)
+    await model.choose(mood: .fun)
+    XCTAssertNil(model.errorMessage)
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
+    backend.markRevealed()
+    await model.refresh()
+    await model.choose(mood: .adventure)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
+  }
+
   func testHintSaveRejectsAnUpdateThatTouchesNoRows() {
     XCTAssertNoThrow(try HintEdit.requireUpdated(dateRows: 1, planRows: 1))
     for (dates, plans) in [(0, 1), (1, 0), (0, 0)] {

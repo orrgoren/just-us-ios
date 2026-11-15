@@ -30,6 +30,45 @@ enum Palette {
   static let blush = RGB(0xF3D9D2)
   static let champagne = RGB(0xE8D6B8)
   static let ivory = RGB(0xF6F0E6)
+  static let accentOnDark = RGB(0xE7B7C2)
+  static let winePressed = RGB(0x541827)
+  static let blushPressed = RGB(0xE4C4BA)
+  static let secondaryDark = RGB(0x3A242C)
+  static let secondaryDarkPressed = RGB(0x4A3038)
+  static let disabledFillDark = RGB(0x3A322C)
+
+  static func moodSelected(_ mood: MoodKey) -> RGB {
+    switch mood {
+    case .fun: return RGB(0x8A520C)
+    case .romance: return wine
+    case .deep: return RGB(0x2C4A6E)
+    case .intimacy: return RGB(0x8E3A55)
+    case .adventure: return RGB(0x1F6A4A)
+    case .chill: return RGB(0x2F6158)
+    }
+  }
+
+  static func moodTint(_ mood: MoodKey) -> RGB {
+    switch mood {
+    case .fun: return RGB(0xF6E4C8)
+    case .romance: return blush
+    case .deep: return RGB(0xD7E2F2)
+    case .intimacy: return RGB(0xF6D4DE)
+    case .adventure: return RGB(0xD4E8DC)
+    case .chill: return RGB(0xD3E6E1)
+    }
+  }
+
+  static func moodTintDark(_ mood: MoodKey) -> RGB {
+    switch mood {
+    case .fun: return RGB(0x3A2A18)
+    case .romance: return secondaryDark
+    case .deep: return RGB(0x1C2838)
+    case .intimacy: return RGB(0x3A2430)
+    case .adventure: return RGB(0x1A3028)
+    case .chill: return RGB(0x1A302C)
+    }
+  }
 
   static func contrast(_ a: RGB, _ b: RGB) -> Double {
     let left = a.luminance()

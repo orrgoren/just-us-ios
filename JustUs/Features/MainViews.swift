@@ -14,9 +14,9 @@ struct MainScreen: View {
       }
       .pickerStyle(.segmented)
       if !coupleIsLinked {
-        Button(L10n.haveInvite) { model.screen = .invite }
-          .accessibilityIdentifier(A11y.haveInvite)
-          .frame(minHeight: 44)
+        ActionButton(title: L10n.haveInvite, identifier: A11y.haveInvite, kind: .link) {
+          model.screen = .invite
+        }
       }
       switch model.tab {
       case .week:
@@ -89,23 +89,12 @@ struct RitualScreen: View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.yourMood).font(Theme.title)
       HelperText(text: L10n.moodHelp)
+      let editable = MoodEdit.allowed(status: ritual.date?.status, revealed: ritual.revealed)
       ForEach(MoodKey.allCases) { mood in
         let selected = ritual.moods.first { $0.userId == ritual.selfMember.userId }?.mood == mood
-        Button {
+        MoodChip(mood: mood, selected: selected, enabled: editable) {
           Task { await model.choose(mood: mood) }
-        } label: {
-          HStack {
-            Text(L10n.moodName(mood))
-            if selected {
-              Image(systemName: "checkmark")
-                .accessibilityHidden(true)
-            }
-          }
         }
-        .fontWeight(selected ? .semibold : .regular)
-        .accessibilityIdentifier(A11y.mood(mood))
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .frame(minHeight: 44)
       }
       if let partner = ritual.partner {
         let mood = ritual.moods.first { $0.userId == partner.userId }?.mood
@@ -134,17 +123,12 @@ struct RitualScreen: View {
   private func planner(_ ritual: RitualSnapshot) -> some View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.whereTitle).font(Theme.title)
-      Button(L10n.byTradition) { Task { await model.choose(place: .auto) } }
-        .accessibilityIdentifier(A11y.place(.auto)).frame(minHeight: 44)
-      Button(L10n.atHome) { Task { await model.choose(place: .home) } }
-        .accessibilityIdentifier(A11y.place(.home)).frame(minHeight: 44)
-      Button(L10n.out) { Task { await model.choose(place: .out) } }
-        .accessibilityIdentifier(A11y.place(.out)).frame(minHeight: 44)
+      ActionButton(title: L10n.byTradition, identifier: A11y.place(.auto)) { Task { await model.choose(place: .auto) } }
+      ActionButton(title: L10n.atHome, identifier: A11y.place(.home)) { Task { await model.choose(place: .home) } }
+      ActionButton(title: L10n.out, identifier: A11y.place(.out)) { Task { await model.choose(place: .out) } }
       Text(ritual.date?.locationIsOverride == true ? L10n.overrideHint : L10n.traditionHint)
-      Button(L10n.swap) { Task { await model.swap() } }
-        .accessibilityIdentifier(A11y.swap).frame(minHeight: 44)
-      Button(L10n.surprise) { Task { await model.surprise() } }
-        .accessibilityIdentifier(A11y.surprise).frame(minHeight: 44)
+      ActionButton(title: L10n.swap, identifier: A11y.swap) { Task { await model.swap() } }
+      ActionButton(title: L10n.surprise, identifier: A11y.surprise) { Task { await model.surprise() } }
       if let plan = ritual.plan {
         Text(plan.title).font(Theme.title).accessibilityIdentifier(A11y.planTitle)
         Text(plan.summary)
@@ -157,8 +141,7 @@ struct RitualScreen: View {
       WineButton(title: L10n.saveDate, identifier: A11y.saveDate, busy: model.activity == .saveDate, busyTitle: L10n.loading) {
         Task { await model.saveDate() }
       }
-      Button(L10n.skipWeek) { Task { await model.skip() } }
-        .accessibilityIdentifier(A11y.skipWeek).frame(minHeight: 44)
+      ActionButton(title: L10n.skipWeek, identifier: A11y.skipWeek) { Task { await model.skip() } }
     }
   }
 
@@ -173,10 +156,9 @@ struct RitualScreen: View {
           }
         }
         if ritual.isPlanner && ritual.date?.status == .scheduled {
-          Button(L10n.skipWeek) { Task { await model.skip() } }
-            .accessibilityIdentifier(A11y.skipWeek).frame(minHeight: 44)
+          ActionButton(title: L10n.skipWeek, identifier: A11y.skipWeek) { Task { await model.skip() } }
         }
-        Button(L10n.addCalendar) { Task { await model.addCalendar() } }.frame(minHeight: 44)
+        ActionButton(title: L10n.addCalendar) { Task { await model.addCalendar() } }
         LabeledField(title: L10n.moment, text: $model.momentDraft, identifier: A11y.memoryNote, need: .optional)
         WineButton(title: L10n.finish, identifier: A11y.saveNote, busy: model.activity == .finish, busyTitle: L10n.loading) {
           Task { await model.finishNight() }
@@ -214,14 +196,14 @@ struct MemoriesScreen: View {
             ForEach(memory.notes) { note in
               Text(note.note)
               if note.mine {
-                Button(L10n.editMoment) {
+                ActionButton(title: L10n.editMoment) {
                   model.editingDate = memory.id
                   model.editingNote = note.id
                   model.noteDraft = note.note
-                }.frame(minHeight: 44)
+                }
               }
             }
-            Button(L10n.addMoment) { model.editingDate = memory.id }.frame(minHeight: 44)
+            ActionButton(title: L10n.addMoment) { model.editingDate = memory.id }
           }
         }
       }
@@ -230,12 +212,13 @@ struct MemoriesScreen: View {
         WineButton(title: L10n.saveMoment, identifier: A11y.memorySave, busy: model.activity == .moment, busyTitle: L10n.loading) {
           Task { await model.saveMoment() }
         }
-        Button(L10n.deleteMoment) { Task { await model.deleteMoment() } }.frame(minHeight: 44)
+        ActionButton(title: L10n.deleteMoment, kind: .destructive) { Task { await model.deleteMoment() } }
         PhotosPicker(selection: $photo, matching: .images) { Text(L10n.addPhoto) }
+          .buttonStyle(JustButtonStyle(kind: .secondary))
         if Launch.isUITest {
-          Button(L10n.samplePhoto) { Task { await model.useSamplePhoto() } }
-            .accessibilityIdentifier(A11y.samplePhoto)
-            .frame(minHeight: 44)
+          ActionButton(title: L10n.samplePhoto, identifier: A11y.samplePhoto) {
+            Task { await model.useSamplePhoto() }
+          }
         }
       }
     }
@@ -270,11 +253,11 @@ struct SettingsScreen: View {
           if model.confirmUnlink {
             Text(L10n.unlinkBody)
             WineButton(title: L10n.unlinkConfirm, identifier: A11y.unlinkConfirm) { Task { await model.unlinkPartner() } }
-            Button(L10n.stay) { model.confirmUnlink = false }
-              .frame(minHeight: 44)
+            ActionButton(title: L10n.stay) { model.confirmUnlink = false }
           } else {
-            Button(L10n.unlink) { model.confirmUnlink = true }
-              .accessibilityIdentifier(A11y.unlink).frame(minHeight: 44)
+            ActionButton(title: L10n.unlink, identifier: A11y.unlink, kind: .destructive) {
+              model.confirmUnlink = true
+            }
           }
         }
       }
@@ -284,15 +267,15 @@ struct SettingsScreen: View {
         Task { await model.saveSettings() }
       }
       if let privacy = URL(string: AppConfig.privacyURL) {
-        Link(L10n.privacy, destination: privacy)
+        AccentLink(title: L10n.privacy, destination: privacy)
       }
       if let support = URL(string: AppConfig.supportURL) {
-        Link(L10n.support, destination: support)
+        AccentLink(title: L10n.support, destination: support)
       }
-      Button(L10n.signOut) { Task { await model.signOut() } }
-        .accessibilityIdentifier(A11y.signOut).frame(minHeight: 44)
-      Button(L10n.deleteAccount) { model.showDelete = true }
-        .accessibilityIdentifier(A11y.deleteAccount).frame(minHeight: 44)
+      ActionButton(title: L10n.signOut, identifier: A11y.signOut) { Task { await model.signOut() } }
+      ActionButton(title: L10n.deleteAccount, identifier: A11y.deleteAccount, kind: .destructive) {
+        model.showDelete = true
+      }
       if model.showDelete {
         Text(L10n.deleteBody)
         LabeledField(title: L10n.confirmField, text: $model.deleteConfirm, identifier: A11y.deleteConfirm)

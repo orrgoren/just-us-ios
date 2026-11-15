@@ -43,19 +43,30 @@ extension SessionModel {
   }
 
   func choose(mood: MoodKey) async {
-    guard var current = ritual else { return }
-    if let index = current.moods.firstIndex(where: { $0.userId == current.selfMember.userId }) {
-      current.moods[index].mood = mood
-    } else {
-      current.moods.append(MoodVote(userId: current.selfMember.userId, mood: mood))
+    guard let current = ritual else { return }
+    guard MoodEdit.allowed(status: current.date?.status, revealed: current.revealed) else {
+      errorMessage = L10n.message(for: .notEditable)
+      return
     }
-    ritual = current
+    let previous = current.moods
+    var optimistic = current
+    if let index = optimistic.moods.firstIndex(where: { $0.userId == current.selfMember.userId }) {
+      optimistic.moods[index].mood = mood
+    } else {
+      optimistic.moods.append(MoodVote(userId: current.selfMember.userId, mood: mood))
+    }
+    ritual = optimistic
     Haptics.tap()
     do {
       try await backend.setMood(mood)
       outbox["mood"] = nil
       Telemetry.analytics.record(.moodSet)
+      errorMessage = nil
     } catch {
+      if var rolled = ritual {
+        rolled.moods = previous
+        ritual = rolled
+      }
       await remember(.mood(mood), key: "mood", error: error)
     }
   }

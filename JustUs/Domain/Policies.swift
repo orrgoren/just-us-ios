@@ -2,6 +2,15 @@ import CryptoKit
 import Foundation
 import Security
 
+enum MoodEdit {
+  /// A member can change a mood on a draft, and on a scheduled date until
+  /// the night is revealed.
+  static func allowed(status: DateStatus?, revealed: Bool) -> Bool {
+    guard revealed == false, let status else { return false }
+    return status == .draft || status == .scheduled
+  }
+}
+
 enum HintEdit {
   /// A draft can still change the idea. A scheduled date can change the hint
   /// until it is revealed.

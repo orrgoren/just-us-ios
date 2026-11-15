@@ -46,6 +46,29 @@ final class DomainTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.canvas, Palette.wine), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.mutedDark, Palette.canvasDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.accentOnDark, Palette.canvasDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.winePressed), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.blushPressed), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.secondaryDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.secondaryDarkPressed), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.accentOnDark, Palette.secondaryDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.muted, Palette.champagne), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.mutedDark, Palette.disabledFillDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.wine, Palette.blush), 4.5)
+    for mood in MoodKey.allCases {
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.moodSelected(mood)), 4.5, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.moodTint(mood)), 4.5, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.moodTintDark(mood)), 4.5, String(describing: mood))
+    }
+  }
+
+  func testMoodStaysEditableUntilReveal() {
+    XCTAssertTrue(MoodEdit.allowed(status: .draft, revealed: false))
+    XCTAssertTrue(MoodEdit.allowed(status: .scheduled, revealed: false))
+    XCTAssertFalse(MoodEdit.allowed(status: .scheduled, revealed: true))
+    XCTAssertFalse(MoodEdit.allowed(status: .completed, revealed: false))
+    XCTAssertFalse(MoodEdit.allowed(status: .skipped, revealed: false))
+    XCTAssertFalse(MoodEdit.allowed(status: nil, revealed: false))
   }
 
   func testRevealCopyHasNoSecrets() {

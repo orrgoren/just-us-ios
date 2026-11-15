@@ -22,6 +22,7 @@ The fake seeds two couples (Alex/Blair and Casey/Drew), Jordan’s open invite, 
 | Offline write is not reported as saved | `FakeFlowTests` |
 | Push, foreground | `PushUITests` via `simctl push` and `Fixtures/apns/plan-ready.apns` |
 | Dynamic Type, light/dark, RTL, accessibility audit | `ScreenshotUITests`, `FlowUITests` |
-| Daily cap, six-hour dedupe, invite windows, contrast | `DomainTests` |
+| Daily cap, six-hour dedupe, invite windows, contrast, mood chips | `DomainTests` |
+| Mood save rolls back, and stops at reveal | `FakeFlowTests` |
 
 Screenshots are test attachments named `se-` or `promax-` plus the screen, appearance, and text size. They are not committed.
