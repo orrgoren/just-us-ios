@@ -194,12 +194,14 @@ final class FakeFlowTests: XCTestCase {
     try await backend.saveDate(
       day: "2026-11-19", time: "20:30", teaser: "Come hungry", outfit: "Cozy", notes: "Only the planner knows"
     )
-    let scheduled = try XCTUnwrap(try await backend.ritual())
+    let scheduledLoaded = try await backend.ritual()
+    let scheduled = try XCTUnwrap(scheduledLoaded)
     XCTAssertEqual(scheduled.date?.status, .scheduled)
     XCTAssertFalse(scheduled.revealed)
 
     try await backend.saveHint(teaser: "Bring a sweater", outfit: "Pajamas", notes: "Candles")
-    let edited = try XCTUnwrap(try await backend.ritual())
+    let editedLoaded = try await backend.ritual()
+    let edited = try XCTUnwrap(editedLoaded)
     XCTAssertEqual(edited.date?.status, .scheduled)
     XCTAssertEqual(edited.date?.publicTeaser, "Bring a sweater")
     XCTAssertEqual(edited.date?.outfitHint, "Pajamas")
@@ -226,7 +228,8 @@ final class FakeFlowTests: XCTestCase {
     } catch let error as AppError {
       XCTAssertEqual(error, .notEditable)
     }
-    let revealed = try XCTUnwrap(try await backend.ritual())
+    let revealedLoaded = try await backend.ritual()
+    let revealed = try XCTUnwrap(revealedLoaded)
     XCTAssertEqual(revealed.date?.publicTeaser, "Bring a sweater")
     XCTAssertEqual(revealed.plan?.privateNotes, "Candles")
   }
@@ -247,7 +250,8 @@ final class FakeFlowTests: XCTestCase {
     } catch let error as AppError {
       XCTAssertEqual(error, .notPlanner)
     }
-    let ritual = try XCTUnwrap(try await backend.ritual())
+    let loaded = try await backend.ritual()
+    let ritual = try XCTUnwrap(loaded)
     XCTAssertEqual(ritual.date?.publicTeaser, "Come hungry")
     XCTAssertNil(ritual.plan)
   }
