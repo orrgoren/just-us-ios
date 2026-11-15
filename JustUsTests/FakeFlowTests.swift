@@ -289,4 +289,13 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertFalse(L10n.message(for: .notEditable).localizedCaseInsensitiveContains("planner"))
     XCTAssertTrue(L10n.message(for: .notPlanner).localizedCaseInsensitiveContains("planner"))
   }
+
+  func testHintSaveRejectsAnUpdateThatTouchesNoRows() {
+    XCTAssertNoThrow(try HintEdit.requireUpdated(dateRows: 1, planRows: 1))
+    for (dates, plans) in [(0, 1), (1, 0), (0, 0)] {
+      XCTAssertThrowsError(try HintEdit.requireUpdated(dateRows: dates, planRows: plans)) { error in
+        XCTAssertEqual(error as? AppError, .notEditable)
+      }
+    }
+  }
 }

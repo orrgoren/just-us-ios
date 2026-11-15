@@ -1,12 +1,12 @@
--- Proposed. Not applied. Do not run this on the live project until it is approved.
--- Numbered 012 because 009, 010, and 011 are open records of other live changes.
+-- Applied live as migration plans_update_until_reveal on 2026-11-15 at 20:52 Asia/Jerusalem.
+-- Do not re-apply. Numbered 012 because 009, 010, and 011 record other live changes.
 --
 -- public.dates already lets the planner change public_teaser and outfit_hint
 -- while the date stays scheduled. guard_date_update does not block those
 -- columns, and dates_update only requires couple membership.
 --
--- private_date_plans does not. plans_update requires status = 'draft', so a
--- scheduled date cannot change private_notes. This widens that policy to a
+-- private_date_plans did not. plans_update required status = 'draft', so a
+-- scheduled date could not change private_notes. This widens that policy to a
 -- scheduled date that has not been revealed. The trigger lets a draft replace
 -- idea_id and prepared_at, and freezes both once the date leaves draft.
 -- search_path is public. auth.uid() and public.dates are schema-qualified.

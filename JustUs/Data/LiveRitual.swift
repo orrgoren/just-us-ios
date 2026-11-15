@@ -69,11 +69,15 @@ extension LiveBackend {
     }
     guard let noteValue = Validation.note(notes) else { throw AppError.invalid(.note) }
     try await runWrite { client in
-      try await client.from("dates").update(HintPatch(
-        publicTeaser: teaserValue.nilIfEmpty, outfitHint: outfitValue.nilIfEmpty
-      )).eq("id", value: date.id.uuidString).eq("couple_id", value: context.couple.id.uuidString).execute()
-      try await client.from("private_date_plans").update(NotesPatch(privateNotes: noteValue.nilIfEmpty))
-        .eq("date_id", value: date.id.uuidString).execute()
+      let updatedDates: PostgrestResponse<[IdRow]> = try await client.from("dates").update(
+        HintPatch(publicTeaser: teaserValue.nilIfEmpty, outfitHint: outfitValue.nilIfEmpty),
+        returning: .representation
+      ).eq("id", value: date.id.uuidString).eq("couple_id", value: context.couple.id.uuidString).execute()
+      let updatedPlans: PostgrestResponse<[IdRow]> = try await client.from("private_date_plans").update(
+        NotesPatch(privateNotes: noteValue.nilIfEmpty),
+        returning: .representation
+      ).eq("date_id", value: date.id.uuidString).execute()
+      try HintEdit.requireUpdated(dateRows: updatedDates.value.count, planRows: updatedPlans.value.count)
     }
   }
 
