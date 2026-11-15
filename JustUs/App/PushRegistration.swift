@@ -57,25 +57,35 @@ struct DeviceTokenRecord: Equatable {
   }
 }
 
-struct PendingTokenDelete: Equatable {
-  var userId: UUID
-  var token: String
-}
-
 enum DeviceTokenSaveStep: Equatable {
   case upsertPlain
   case giveUp
 }
 
-enum PendingDelete {
-  /// A failed retry of an older row stays. A new failure is stored only after that retry succeeds.
-  static func replacement(
-    existing: PendingTokenDelete?,
-    retryCleared: Bool,
-    failed: PendingTokenDelete
-  ) -> PendingTokenDelete {
-    if let existing, !retryCleared, existing != failed { return existing }
-    return failed
+enum DeviceTokenSignOut {
+  enum Failure: Error, Equatable {
+    case removedNoRows
+  }
+
+  /// Deletes the row while the old session is still the caller, then signs out.
+  /// A PostgREST 204 with zero rows is not a successful delete: `device_tokens_own`
+  /// matches `auth.uid()`, so the next user or an anonymous caller deletes nothing.
+  static func perform(
+    hasToken: Bool,
+    delete: () async throws -> Int,
+    authSignOut: () async -> Void
+  ) async throws {
+    if hasToken {
+      let removed = try await delete()
+      guard removed > 0 else { throw Failure.removedNoRows }
+    }
+    await authSignOut()
+  }
+}
+
+enum JoinLanding {
+  static func screen(production: Bool = Launch.productionJoin, isUITest: Bool = Launch.isUITest) -> SessionModel.Screen {
+    production || !isUITest ? .softPrompt : .main
   }
 }
 
@@ -97,6 +107,7 @@ enum DeviceTokenSave {
 enum DeviceTokenStore {
   static let tokenKey = "justus.push.token"
   static let pendingKey = "justus.push.tokenPending"
+  /// Leftover from a cross-user delete. It is wiped and never retried.
   static let deleteUserKey = "justus.push.deleteUser"
   static let deleteTokenKey = "justus.push.deleteToken"
 
@@ -116,21 +127,6 @@ enum DeviceTokenStore {
     UserDefaults.standard.set(record.awaitingSave, forKey: pendingKey)
   }
 
-  static func loadDelete() -> PendingTokenDelete? {
-    guard
-      let user = UserDefaults.standard.string(forKey: deleteUserKey),
-      let userId = UUID(uuidString: user),
-      let token = UserDefaults.standard.string(forKey: deleteTokenKey),
-      !token.isEmpty
-    else { return nil }
-    return PendingTokenDelete(userId: userId, token: token)
-  }
-
-  static func saveDelete(_ pending: PendingTokenDelete) {
-    UserDefaults.standard.set(pending.userId.uuidString, forKey: deleteUserKey)
-    UserDefaults.standard.set(pending.token, forKey: deleteTokenKey)
-  }
-
   static func clearDelete() {
     UserDefaults.standard.removeObject(forKey: deleteUserKey)
     UserDefaults.standard.removeObject(forKey: deleteTokenKey)
@@ -147,7 +143,7 @@ enum PushLog {
   private static let logger = Logger(subsystem: "com.orrgoren.justus", category: "push")
 
   static func saveFailed(_ error: Error) {
-    logger.error("device token save failed: \(String(describing: error), privacy: .public)")
+    logger.error("device token save failed: \(String(describing: error), privacy: .private)")
   }
 
   static func saveFailed(_ message: String) {
@@ -155,7 +151,7 @@ enum PushLog {
   }
 
   static func deleteFailed(_ error: Error) {
-    logger.error("device token delete failed: \(String(describing: error), privacy: .public)")
+    logger.error("device token delete failed: \(String(describing: error), privacy: .private)")
   }
 
   static func deleteFailed(_ message: String) {

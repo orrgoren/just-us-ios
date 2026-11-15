@@ -13,6 +13,7 @@ final class InviteAndPushTests: XCTestCase {
   override nonisolated func tearDown() {
     PendingInviteStore.clear()
     DeviceTokenStore.reset()
+    Launch.productionJoin = false
     super.tearDown()
   }
 
@@ -36,7 +37,13 @@ final class InviteAndPushTests: XCTestCase {
     XCTAssertTrue(body.contains(app))
     XCTAssertTrue(body.contains(web))
     XCTAssertTrue(body.contains(token))
-    XCTAssertLessThan(body.range(of: app)?.lowerBound ?? body.endIndex, body.range(of: web)?.lowerBound ?? body.startIndex)
+    let webAt = try XCTUnwrap(body.range(of: web)).lowerBound
+    let codeAt = try XCTUnwrap(body.range(of: "\n\(token)\n")).lowerBound
+    let opensAt = try XCTUnwrap(body.range(of: "Opens in the app")).lowerBound
+    let appAt = try XCTUnwrap(body.range(of: app)).lowerBound
+    XCTAssertLessThan(webAt, codeAt)
+    XCTAssertLessThan(codeAt, opensAt)
+    XCTAssertLessThan(opensAt, appAt)
     XCTAssertNil(InviteLinks.shareText(token: "short", webBase: "https://example.com"))
     XCTAssertEqual(InviteLinks.appURL(token: token)?.absoluteString, app)
     let bare = try XCTUnwrap(InviteLinks.shareText(token: token, webBase: "just-us.example"))
@@ -46,6 +53,10 @@ final class InviteAndPushTests: XCTestCase {
   }
 
   func testDeepLinkBeforeSignInOpensJoinWithTheCode() async throws {
+    Launch.productionJoin = true
+    defer { Launch.productionJoin = false }
+    XCTAssertEqual(JoinLanding.screen(production: false, isUITest: false), .softPrompt)
+    XCTAssertEqual(JoinLanding.screen(production: false, isUITest: true), .main)
     let token = SeedID.validToken
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     let model = SessionModel(backend: backend)
@@ -67,7 +78,7 @@ final class InviteAndPushTests: XCTestCase {
 
     await model.redeem(replaceEmpty: false)
     XCTAssertNil(PendingInviteStore.current())
-    XCTAssertEqual(model.screen, Launch.isUITest ? .main : .softPrompt)
+    XCTAssertEqual(model.screen, .softPrompt)
     XCTAssertNil(model.errorMessage)
   }
 
@@ -317,16 +328,48 @@ final class InviteAndPushTests: XCTestCase {
     XCTAssertEqual(DeviceTokenSave.afterFailure(network, attemptedPlain: false), .giveUp)
   }
 
-  func testAFailedTokenDeleteStaysPendingUntilItSucceeds() {
-    let older = PendingTokenDelete(userId: UUID(), token: "abc123")
-    let newer = PendingTokenDelete(userId: UUID(), token: "def456")
-    DeviceTokenStore.saveDelete(older)
-    XCTAssertEqual(DeviceTokenStore.loadDelete(), older)
-    let kept = PendingDelete.replacement(existing: older, retryCleared: false, failed: newer)
-    XCTAssertEqual(kept, older)
-    let replaced = PendingDelete.replacement(existing: older, retryCleared: true, failed: newer)
-    XCTAssertEqual(replaced, newer)
-    DeviceTokenStore.clearDelete()
-    XCTAssertNil(DeviceTokenStore.loadDelete())
+  func testTokenDeleteRunsBeforeSignOutAndZeroRowsDoNotSucceed() async throws {
+    var events: [String] = []
+    try await DeviceTokenSignOut.perform(hasToken: true, delete: {
+      events.append("delete")
+      return 1
+    }, authSignOut: {
+      events.append("signOut")
+    })
+    XCTAssertEqual(events, ["delete", "signOut"])
+
+    events = []
+    do {
+      try await DeviceTokenSignOut.perform(hasToken: true, delete: {
+        events.append("delete")
+        return 0
+      }, authSignOut: {
+        events.append("signOut")
+      })
+      XCTFail("a delete that removes no rows must fail")
+    } catch DeviceTokenSignOut.Failure.removedNoRows {
+      XCTAssertEqual(events, ["delete"])
+    } catch {
+      XCTFail("unexpected \(error)")
+    }
+  }
+
+  func testSignOutStaysSignedInWhenTheTokenDeleteFails() async {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "sam@solo.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.blockSignOut = true
+    await model.signOut()
+    XCTAssertTrue(model.signedIn)
+    XCTAssertNotEqual(model.screen, .login)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .signOutBlocked))
+    XCTAssertEqual(model.retryKind, .signOut)
+    backend.blockSignOut = false
+    await model.signOut()
+    XCTAssertFalse(model.signedIn)
+    XCTAssertEqual(model.screen, .login)
   }
 }

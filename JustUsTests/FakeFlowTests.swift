@@ -50,7 +50,7 @@ final class FakeFlowTests: XCTestCase {
       XCTAssertEqual(error, .selfRedeem)
     }
 
-    await backend.signOut()
+    try await backend.signOut()
     _ = try await backend.sendCode(email: "new@example.com")
     _ = try await backend.verify(email: "new@example.com", code: "000000")
     do {
@@ -66,7 +66,7 @@ final class FakeFlowTests: XCTestCase {
       XCTAssertEqual(error, .coupleFull)
     }
 
-    await backend.signOut()
+    try await backend.signOut()
     _ = try await backend.sendCode(email: "sam@solo.test")
     _ = try await backend.verify(email: "sam@solo.test", code: "000000")
     try await backend.redeem(token: SeedID.validToken, replaceEmpty: true)

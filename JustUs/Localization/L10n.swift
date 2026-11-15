@@ -208,23 +208,26 @@ enum L10n {
   }
 
   static func inviteShareText(app: String, web: String?, code: String) -> String {
+    let opens = appLinkLabel
     if let web, !web.isEmpty {
       return String(
         format: text(
           "invite.shareText",
-          "Join me on Just Us. Open the app link, or paste the code.\n%@\n%@\n%@"
+          "Join me on Just Us. Open this link, or paste the code.\n%@\n%@\n%@\n%@"
         ),
         locale: .current,
-        app,
         web,
-        code
+        code,
+        opens,
+        app
       )
     }
     return String(
-      format: text("invite.shareTextApp", "Join me on Just Us. Open the app link, or paste the code.\n%@\n%@"),
+      format: text("invite.shareTextApp", "Join me on Just Us. Paste the code.\n%@\n%@\n%@"),
       locale: .current,
-      app,
-      code
+      code,
+      opens,
+      app
     )
   }
 
@@ -286,6 +289,7 @@ enum L10n {
     case .rateLimited: return text("err.rate", "Too many tries. Wait a few minutes.")
     case .confirmationRequired: return text("err.needConfirm", "Confirm before adding to memories you already have.")
     case .unsyncedChanges: return text("err.unsynced", "You still have changes that aren't saved. Try again when you're online, or discard them.")
+    case .signOutBlocked: return text("err.signOut", "This phone is still on the account, so you're still signed in. Try again.")
     case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
     }
   }

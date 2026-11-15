@@ -28,7 +28,7 @@ The app sends Sign in with Apple as an ID token, not as a web OAuth redirect:
 
 ## Edge Function secrets
 
-`send-push` is deployed with `verify_jwt` on. The replacement source is `supabase/proposed/functions/send-push/index.ts`. Do not redeploy it until `supabase/proposed/002_push_deliveries.sql` is applied. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the replacement accepts that flush by the JWT `role` claim. A queued push is removed on a final decision and kept only for a retryable APNs failure, up to the attempt cap. The APNs provider token is reused for 50 minutes. `verify_jwt` is pinned on in `supabase/config.toml`. Set the function secrets to:
+`send-push` is deployed with `verify_jwt` on. The replacement source is `supabase/proposed/functions/send-push/index.ts`. `002_push_deliveries.sql`, `006_push_claim_and_outbox.sql`, and `007_push_flush_schedule.sql` are already live, in that order. Do not re-apply them. The deployed sender is still v1, so do not redeploy the rewritten send-push from this repository until that deploy is reviewed on its own. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the replacement accepts that flush by the JWT `role` claim. A queued push is removed on a final decision and kept only for a retryable APNs failure, up to the attempt cap. The APNs provider token is reused for 50 minutes. `verify_jwt` is pinned on in `supabase/config.toml`. Set the function secrets to:
 
 | Secret | What to enter |
 | --- | --- |
@@ -46,17 +46,19 @@ Copy for a notification is chosen in `JustUs/Domain/PushPolicy.swift` and in the
 
 Already live: `device_tokens`, `notification_preferences`, `memory_notes.author_name`, `dates.memory_photo_path`, the private `date-photos` bucket, `mood_votes` in `supabase_realtime`, and `leave_couple()` for `authenticated` only. `supabase/proposed/001_push_devices_and_account.sql` records that proposal. Do not apply it again.
 
-Applied live on 2026-11-15. Do not re-apply:
+Applied live on 2026-11-15. Do not re-apply. The push migrations went on in this order: 002, then 006, then 007.
 
+- `supabase/proposed/002_push_deliveries.sql` — applied at `20261115092359`. The push send log is live.
+- `supabase/proposed/006_push_claim_and_outbox.sql` — applied at `20261115092405`. `device_tokens.environment` is live, with columns `user_id`, `token`, `platform`, `updated_at`, and `environment`.
+- `supabase/proposed/007_push_flush_schedule.sql` — applied after 006. The push flush schedule is live.
 - `supabase/proposed/003_memory_photo_and_close.sql` — photo path on a completed date. Unlink closes the whole couple for both people and returns that couple id. pg_cron, pg_net, and `justus-photo-sweep` are on.
 - `supabase/proposed/004_delete_my_account.sql` — account deletion. Either partner closes every couple they still touch. The other person stays unpaired.
-- `supabase/proposed/006_push_claim_and_outbox.sql` — applied. `device_tokens.environment` is live, with columns `user_id`, `token`, `platform`, `updated_at`, and `environment`. Do not re-apply.
 - `supabase/proposed/functions/delete-couple-photos/index.ts` — deployed. The app calls it after unlink. Account deletion leaves the rows for the sweep, because that login is already gone. The sweep bearer is the legacy service_role JWT in the vault. The function env may hold the newer `sb_secret` key, so the sweep is recognized by the JWT `role` claim after the gateway has checked the signature.
 
 Not applied, and waiting for review:
 
-- `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs.
 - `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. It does not redeploy send-push. Not applied.
+- The rewritten `send-push` source. The deployed sender is still v1.
 
 The TestFlight build calls `leave_couple` and then `delete-couple-photos`. It does not call the function after `delete_my_account`. The function deletes photos only for couple ids the leave closed, and only when `photo_delete_allowed` says that couple row is already gone. A failed call leaves the id in `closed_couples`. `justus-photo-sweep` posts `{"sweep":true}` with the `justus_service_role` vault secret. The sweep is what clears photos after account deletion. The next launch also retries for the person who left. `005_rollback.sql` restores the previous `leave_couple`, unschedules the sweep, and does not remove the edge function or the vault secret, so ship the previous build and delete the function before running it. Do not apply `003` or `004` again. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
 

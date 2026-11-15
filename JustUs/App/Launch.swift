@@ -15,6 +15,10 @@ enum Launch {
     UIView.setAnimationsEnabled(false)
   }
 
+  /// The test scheme passes `-uitest` to unit tests. A test of the real join landing sets this
+  /// so redeem opens the soft prompt, which is what a normal launch does.
+  static var productionJoin = false
+
   static var isUITest: Bool {
     ProcessInfo.processInfo.arguments.contains("-uitest")
   }

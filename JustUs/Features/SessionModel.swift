@@ -19,7 +19,7 @@ final class SessionModel {
   }
 
   enum RetryKind: Equatable {
-    case sendCode, verify, create, redeem(Bool), saveDate, reveal, finish, moment, settings, openWeek, surprise
+    case sendCode, verify, create, redeem(Bool), saveDate, reveal, finish, moment, settings, openWeek, surprise, signOut
   }
 
   var screen: Screen = .loading
@@ -220,7 +220,7 @@ final class SessionModel {
       self.clearRememberedClosure()
       self.signedIn = true
       await self.refresh()
-      self.screen = Launch.isUITest ? .main : .softPrompt
+      self.screen = JoinLanding.screen()
       self.celebrate(.paired)
     }
   }
@@ -239,6 +239,7 @@ final class SessionModel {
     case .settings: await saveSettings()
     case .openWeek: await openNextWeek()
     case .surprise: await surprise()
+    case .signOut: await signOut()
     }
   }
 
@@ -301,7 +302,12 @@ final class SessionModel {
       return
     }
     rememberEmail()
-    await backend.signOut()
+    do {
+      try await backend.signOut()
+    } catch {
+      await applyFailure(error, retry: .signOut)
+      return
+    }
     clearSession()
     email = ""
     offerNewLink = false
@@ -359,7 +365,7 @@ final class SessionModel {
   func recoverToLogin() async {
     rememberEmail()
     let typed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-    await backend.signOut()
+    await backend.dropExpiredSession()
     clearSession()
     email = typed.isEmpty ? rememberedEmail() : typed
     offerNewLink = true

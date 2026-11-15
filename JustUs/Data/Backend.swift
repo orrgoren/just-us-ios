@@ -10,7 +10,8 @@ protocol DateBackend: AnyObject {
   func session(from url: URL) async throws -> SessionUser
   func signInWithApple(idToken: String, nonce: String) async throws -> SessionUser
   func restore() async throws -> SessionUser?
-  func signOut() async
+  func signOut() async throws
+  func dropExpiredSession() async
   func membership() async throws -> MembershipKind
   func createCouple(_ draft: CoupleDraft) async throws
   func ritual() async throws -> RitualSnapshot?
