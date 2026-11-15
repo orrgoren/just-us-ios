@@ -7,8 +7,13 @@
 -- requests cannot both pass.
 --
 -- push_outbox holds a quiet-hours send until not_before. The edge function
--- accepts a service-role body { "kind": "flush" } and sends due rows. A row
--- stays queued when the send fails. Nothing here schedules that call.
+-- accepts a service-role body { "kind": "flush" } and sends due rows.
+-- claim_due_outbox locks the oldest due rows with FOR UPDATE SKIP LOCKED,
+-- counts the attempt, and leases them for 15 minutes so a second flush
+-- cannot take the same rows. A row is deleted on a final decision, sent
+-- or held. It stays only when the send throws or APNs asks for a retry,
+-- and only until attempts reaches the cap. A quiet-hours defer moves
+-- not_before on that same row. Nothing here schedules that call.
 -- pg_cron is not enabled by this file. A later apply can add, outside this
 -- proposal:
 --   select cron.schedule('justus-push-flush', '*/15 * * * *', $$select net.http_post(...)$$);
@@ -26,6 +31,7 @@ create table if not exists public.push_outbox (
     kind in ('partnerMood', 'planReady', 'inviteAccepted', 'weeklyReminder', 'inviteNudge')
   ),
   not_before timestamptz not null,
+  attempts integer not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -81,3 +87,46 @@ $$;
 
 revoke all on function public.claim_push_delivery(uuid, text, text) from public, anon, authenticated;
 grant execute on function public.claim_push_delivery(uuid, text, text) to service_role;
+
+-- One flush at a time per row. The lease moves not_before forward inside
+-- the same statement as the lock, so the lock does not have to outlive
+-- the request. The returned not_before is the time the row was due.
+create or replace function public.claim_due_outbox(p_limit integer)
+returns table (
+  id uuid,
+  caller_user_id uuid,
+  kind text,
+  attempts integer,
+  not_before timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(auth.role(), '') is distinct from 'service_role' then
+    raise exception 'forbidden';
+  end if;
+  if p_limit is null or p_limit < 1 or p_limit > 50 then
+    raise exception 'bad_limit';
+  end if;
+  return query
+  with due as (
+    select queued.id, queued.not_before
+    from public.push_outbox as queued
+    where queued.not_before <= now()
+    order by queued.not_before, queued.id
+    limit p_limit
+    for update skip locked
+  )
+  update public.push_outbox as outbox
+  set attempts = outbox.attempts + 1,
+      not_before = now() + interval '15 minutes'
+  from due
+  where outbox.id = due.id
+  returning outbox.id, outbox.caller_user_id, outbox.kind, outbox.attempts, due.not_before;
+end;
+$$;
+
+revoke all on function public.claim_due_outbox(integer) from public, anon, authenticated;
+grant execute on function public.claim_due_outbox(integer) to service_role;

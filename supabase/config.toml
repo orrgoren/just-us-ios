@@ -1,0 +1,10 @@
+# verify_jwt stays on for both functions. They read the JWT role only after
+# the gateway has checked the signature. jwt-role.mjs also rejects alg=none.
+
+[functions.delete-couple-photos]
+verify_jwt = true
+entrypoint = "./proposed/functions/delete-couple-photos/index.ts"
+
+[functions.send-push]
+verify_jwt = true
+entrypoint = "./proposed/functions/send-push/index.ts"
