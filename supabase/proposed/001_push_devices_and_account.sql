@@ -5,7 +5,8 @@
 -- leave_couple with the version that leaves an open date stuck on the leaver,
 -- and it would create the delete_my_account that fails on the live foreign
 -- keys. The replacements are 003_memory_photo_and_close.sql and
--- 004_delete_my_account.sql. Neither of those is applied.
+-- 004_delete_my_account.sql. Both were applied on 2026-11-15.
+-- Do not re-apply them.
 
 create table if not exists public.device_tokens (
   user_id uuid not null references auth.users (id) on delete cascade,

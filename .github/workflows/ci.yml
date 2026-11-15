@@ -295,5 +295,5 @@ jobs:
           sudo service postgresql start
       - name: Lifecycle
         run: bash scripts/sql-lifecycle.sh
-      - name: Photo delete function
-        run: node --test supabase/proposed/functions/delete-couple-photos/drain.test.mjs
+      - name: Function unit tests
+        run: node --test supabase/proposed/functions/delete-couple-photos/drain.test.mjs supabase/proposed/functions/send-push/push.test.mjs

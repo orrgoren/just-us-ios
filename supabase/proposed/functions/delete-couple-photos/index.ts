@@ -1,6 +1,9 @@
-// PROPOSED. Do not deploy until 003 is applied. Deploy this function
-// before the TestFlight build that calls it. The pg_cron sweep in 003
-// calls this same function with {"sweep":true} and the service role.
+// DEPLOYED on 2026-11-15. Do not redeploy an older copy. The pg_cron
+// sweep in 003 calls this function with {"sweep":true} and the legacy
+// service_role JWT from the justus_service_role vault secret.
+// SUPABASE_SERVICE_ROLE_KEY may be the newer sb_secret key, which is not
+// that JWT. verify_jwt is on, so the gateway checks the signature before
+// this code reads the payload role.
 //
 // A signed-in caller sends the couple ids leave_couple just returned. The
 // function also reads closed_couple_ids for that caller. Account deletion
@@ -17,10 +20,8 @@
 // next sweep and does not block the rest of the batch.
 // SQL must not delete storage.objects: protect_objects_delete raises
 // 42501 and does not remove the file bytes.
-//
-// This file is not deployed.
 
-import { ackAccepted, drainPrefix, eligibleIds, isUuid, maxCoupleIds, settleEach, tooMany } from "./drain.mjs";
+import { ackAccepted, drainPrefix, eligibleIds, isServiceCaller, isUuid, maxCoupleIds, settleEach, tooMany } from "./drain.mjs";
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "method" }, 405);
@@ -32,7 +33,9 @@ Deno.serve(async (request) => {
   const authorization = request.headers.get("authorization") ?? "";
   const token = bearer(authorization);
   if (!token) return json({ error: "not_authenticated" }, 401);
-  const sweep = token === serviceKey;
+  // The env key and the vault JWT differ. The role check covers the JWT
+  // the scheduled sweep sends. The gateway already verified its signature.
+  const sweep = isServiceCaller(token, serviceKey);
 
   let requested: string[] = [];
   let sweepBody = false;

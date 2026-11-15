@@ -1,8 +1,10 @@
--- PROPOSED ONLY. Do not apply until Tom verifies.
--- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
+-- APPLIED LIVE on 2026-11-15. Do not re-apply.
+-- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI
+-- against a throwaway database only.
 --
--- Apply 002 and 003 first. 006 may be applied before or after this file.
--- The push deletes below run only when those tables exist.
+-- Live already has delete_my_account. Running this file again would
+-- replace that function. 002 and 006 are still not applied. The push
+-- deletes below run only when those tables exist.
 --
 -- If either partner deletes their account, every couple they still touch is
 -- closed for both people: the couple row, dates, plans, notes, mood votes,

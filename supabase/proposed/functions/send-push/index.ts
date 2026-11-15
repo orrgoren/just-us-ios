@@ -11,10 +11,23 @@
 // a user. Quiet hours, the daily cap, the six-hour dedupe, and the invite
 // nudge windows match JustUs/Domain/PushPolicy.swift.
 //
+// A flush is { "kind": "flush" } from the justus-push-flush cron. The bearer
+// is the legacy service_role JWT in the justus_service_role vault secret.
+// SUPABASE_SERVICE_ROLE_KEY may be the newer sb_secret key, so a string
+// compare is not enough. verify_jwt is pinned on in supabase/config.toml,
+// and the payload role is what identifies the cron. A queued row is deleted
+// on any final decision, sent or held. It stays only when the send throws
+// or APNs asks for a retry, and only until the attempt cap. Quiet hours
+// move that row's not_before instead of inserting another. The APNs
+// provider token is reused for 50 minutes and dropped on 403.
+//
 // Secrets stay on the function and are never committed:
 //   APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, APNS_KEY_P8
 //   APNS_USE_SANDBOX=true only for a development-entitlement build
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
+
+import { isServiceCaller } from "../_shared/jwt-role.mjs";
+import { dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns } from "./push.mjs";
 
 const QUIET_START = 22;
 const QUIET_END = 8;
@@ -46,7 +59,7 @@ Deno.serve(async (request) => {
 
   const header = request.headers.get("authorization") ?? "";
   const bearer = header.replace(/^Bearer\s+/i, "").trim();
-  if (bearer && bearer === serviceKey && kind === "flush") {
+  if (isServiceCaller(bearer, serviceKey) && kind === "flush") {
     try {
       const flushed = await flushOutbox(supabaseUrl, serviceKey);
       return json(flushed, 200);
@@ -63,7 +76,7 @@ Deno.serve(async (request) => {
   if (!callerId) return json({ error: "not_authenticated" }, 401);
 
   try {
-    const decision = await deliver(kind as Kind, callerId, supabaseUrl, serviceKey);
+    const decision = await deliver(kind as Kind, callerId, supabaseUrl, serviceKey, {});
     return json(decision.body, decision.status);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -77,6 +90,7 @@ async function deliver(
   callerId: string,
   supabaseUrl: string,
   serviceKey: string,
+  options: { outboxId?: string },
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const db = new Db(supabaseUrl, serviceKey);
   const callerRows = await db.select<{ couple_id: string; display_name: string }[]>(
@@ -153,12 +167,16 @@ async function deliver(
   if (zoned.hour >= QUIET_START || zoned.hour < QUIET_END) {
     const hours = zoned.hour >= QUIET_START ? 24 - zoned.hour + QUIET_END : QUIET_END - zoned.hour;
     const notBefore = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-    await db.insert("push_outbox", {
-      caller_user_id: callerId,
-      recipient_user_id: recipientId,
-      kind,
-      not_before: notBefore,
-    });
+    // A row that is already queued is moved. Inserting here would leave
+    // the original due row beside the new one.
+    if (!options.outboxId) {
+      await db.insert("push_outbox", {
+        caller_user_id: callerId,
+        recipient_user_id: recipientId,
+        kind,
+        not_before: notBefore,
+      });
+    }
     return { status: 202, body: { decision: "defer", reason: "quiet_hours", not_before: notBefore } };
   }
 
@@ -193,25 +211,41 @@ async function deliver(
 
   const jwt = await apnsJwt();
   let sent = 0;
+  let retry = false;
   try {
-    for (const row of tokens) {
-      const sandbox = row.environment
-        ? row.environment === "sandbox"
+    for (const device of tokens) {
+      const sandbox = device.environment
+        ? device.environment === "sandbox"
         : Deno.env.get("APNS_USE_SANDBOX") === "true";
-      const status = await send(row.token, text, kind, jwt, sandbox);
-      if (status === 410 || status === 400) {
-        await db.remove("device_tokens", `user_id=eq.${recipientId}&token=eq.${encodeURIComponent(row.token)}`);
+      const result = await send(device.token, text, kind, jwt, sandbox);
+      if (providerTokenRejected(result.status, result.reason)) {
+        apnsCached = null;
+        retry = true;
+        break;
+      }
+      if (retryableApns(result.status, result.reason)) {
+        retry = true;
+        break;
+      }
+      if (dropDeviceToken(result.status, result.reason)) {
+        await db.remove("device_tokens", `user_id=eq.${recipientId}&token=eq.${encodeURIComponent(device.token)}`);
         continue;
       }
-      if (status >= 200 && status < 300) sent += 1;
+      if (result.status >= 200 && result.status < 300) sent += 1;
+      else retry = true;
     }
   } catch (error) {
-    if (sent === 0) await db.remove("push_deliveries", `id=eq.${claimed.id}`);
-    throw error;
+    if (sent === 0) {
+      await db.remove("push_deliveries", `id=eq.${claimed.id}`);
+      throw error;
+    }
+    // A later device threw after one send. Deleting the row is final, so
+    // the next flush cannot deliver the same alert again.
+    return { status: 200, body: { decision: "send", devices: sent } };
   }
   if (sent === 0) {
     await db.remove("push_deliveries", `id=eq.${claimed.id}`);
-    return { status: 502, body: { error: "apns" } };
+    return { status: retry ? 503 : 502, body: { error: retry ? "retry" : "apns" } };
   }
   return { status: 200, body: { decision: "send", devices: sent } };
 }
@@ -321,6 +355,21 @@ class Db {
     if (!response.ok) throw new Error("db");
   }
 
+  async update(table: string, filter: string, row: Record<string, unknown>): Promise<void> {
+    const response = await this.request(`${table}?${filter}`, { method: "PATCH", body: JSON.stringify(row) });
+    if (!response.ok) throw new Error("db");
+  }
+
+  async claimDue(limit: number): Promise<{ id: string; caller_user_id: string; kind: Kind; attempts: number; not_before: string }[]> {
+    const response = await this.request("rpc/claim_due_outbox", {
+      method: "POST",
+      body: JSON.stringify({ p_limit: limit }),
+    });
+    if (response.status === 404) throw new Error("push_log_missing");
+    if (!response.ok) throw new Error("db");
+    return await response.json() as { id: string; caller_user_id: string; kind: Kind; attempts: number; not_before: string }[];
+  }
+
   async claim(recipient: string, kind: Kind, timezone: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
     const response = await this.request("rpc/claim_push_delivery", {
       method: "POST",
@@ -380,19 +429,25 @@ async function loadTokens(db: Db, recipientId: string): Promise<{ token: string;
 
 async function flushOutbox(supabaseUrl: string, serviceKey: string): Promise<Record<string, unknown>> {
   const db = new Db(supabaseUrl, serviceKey);
-  const due = await db.select<{ id: string; caller_user_id: string; kind: Kind }[]>(
-    `push_outbox?not_before=lte.${encodeURIComponent(new Date().toISOString())}&select=id,caller_user_id,kind&limit=50`,
-  );
-  let sent = 0;
-  for (const row of due) {
-    await db.remove("push_outbox", `id=eq.${row.id}`);
-    const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey);
-    if (decision.body.decision === "send") sent += 1;
-  }
-  return { decision: "flush", sent };
+  const due = orderedDue(await db.claimDue(50));
+  const outcome = await flushDue(due, {
+    deliver: async (row) => {
+      const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey, { outboxId: row.id });
+      return decision.body;
+    },
+    remove: (row) => db.remove("push_outbox", `id=eq.${row.id}`),
+    reschedule: (row, notBefore) => db.update("push_outbox", `id=eq.${row.id}`, { not_before: notBefore }),
+  });
+  return { decision: "flush", sent: outcome.sent, kept: outcome.kept.length };
 }
 
-async function send(token: string, text: string, kind: Kind, jwt: string, sandbox: boolean): Promise<number> {
+async function send(
+  token: string,
+  text: string,
+  kind: Kind,
+  jwt: string,
+  sandbox: boolean,
+): Promise<{ status: number; reason: string }> {
   const host = sandbox ? "api.sandbox.push.apple.com" : "api.push.apple.com";
   const topic = Deno.env.get("APNS_BUNDLE_ID") ?? "com.orrgoren.justus";
   const response = await fetch(`https://${host}/3/device/${encodeURIComponent(token)}`, {
@@ -407,10 +462,28 @@ async function send(token: string, text: string, kind: Kind, jwt: string, sandbo
       type: kind,
     }),
   });
-  return response.status;
+  let reason = "";
+  try {
+    const body = await response.json() as { reason?: unknown };
+    if (typeof body?.reason === "string") reason = body.reason;
+  } catch {
+    reason = "";
+  }
+  return { status: response.status, reason };
 }
 
+let apnsCached: { token: string; mintedAt: number } | null = null;
+
 async function apnsJwt(): Promise<string> {
+  const now = Date.now();
+  const cached = freshApnsToken(apnsCached, now);
+  if (cached) return cached;
+  const token = await mintApnsJwt();
+  apnsCached = { token, mintedAt: now };
+  return token;
+}
+
+async function mintApnsJwt(): Promise<string> {
   const keyId = Deno.env.get("APNS_KEY_ID") ?? "";
   const teamId = Deno.env.get("APNS_TEAM_ID") ?? "";
   const pem = Deno.env.get("APNS_KEY_P8") ?? "";

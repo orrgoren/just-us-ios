@@ -22,9 +22,10 @@
 -- The SQL editor has no ON_ERROR_STOP. The transaction is the stop: any
 -- error rolls the whole file back.
 --
--- Unschedules justus-push-flush when pg_cron has that job. pg_cron is not
--- installed on the live project today, so the block does nothing there
--- until 007 has been applied.
+-- Unschedules justus-push-flush and justus-photo-sweep when those jobs
+-- exist. pg_cron and pg_net are installed live as of 2026-11-15. This file
+-- undoes 003 and 004 as well as push. Push alone is 008_push_rollback.sql,
+-- which leaves the photo sweep scheduled.
 --
 -- send-push v1 is what is deployed (verify_jwt on, body token / kind /
 -- partnerName / localHour). This file does not deploy or replace it.
@@ -334,6 +335,7 @@ drop function if exists app_private.couples_touched_by(uuid);
 drop function if exists app_private.photo_delete_allowed(uuid);
 drop table if exists app_private.closed_couples;
 drop function if exists public.set_memory_photo_path(uuid, text);
+drop function if exists public.claim_due_outbox(integer);
 drop function if exists public.claim_push_delivery(uuid, text, text);
 drop function if exists app_private.delete_couple_photos(uuid);
 drop function if exists app_private.begin_handoff();

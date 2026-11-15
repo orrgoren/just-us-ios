@@ -45,6 +45,8 @@ export function ackAccepted(status) {
   return status >= 200 && status < 300;
 }
 
+export { isServiceCaller, jwtRole } from "../_shared/jwt-role.mjs";
+
 // One couple at a time. A drain or confirm failure is recorded and the
 // next id still runs, so one stuck folder cannot pin the whole sweep.
 export async function settleEach(ids, work) {

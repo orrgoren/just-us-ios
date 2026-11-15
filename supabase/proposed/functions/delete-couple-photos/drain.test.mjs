@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ackAccepted, drainPrefix, eligibleIds, settleEach, tooMany } from "./drain.mjs";
+import { ackAccepted, drainPrefix, eligibleIds, jwtRole, settleEach, tooMany } from "./drain.mjs";
 
 const closed = "11111111-1111-4111-8111-111111111111";
 const living = "22222222-2222-4222-8222-222222222222";
@@ -10,6 +10,30 @@ test("more than 50 couple ids is rejected", () => {
   assert.equal(tooMany(ids), true);
   assert.equal(tooMany(ids.slice(0, 50)), false);
   assert.equal(tooMany([]), false);
+});
+
+function jwt(claims) {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
+  return { token: `${header}.${payload}.sig`, payload };
+}
+
+test("jwtRole reads the role from a base64url service_role JWT", () => {
+  const dash = jwt({ role: "service_role", ref: "+2y?L>F=/<i\"" });
+  const under = jwt({ role: "service_role", ref: "x=b+K?+(0Y/F" });
+  assert.match(dash.payload, /-/);
+  assert.match(under.payload, /_/);
+  assert.equal(jwtRole(dash.token), "service_role");
+  assert.equal(jwtRole(under.token), "service_role");
+  assert.equal(jwtRole(jwt({}).token), "");
+});
+
+test("jwtRole does not treat a user JWT or a secret key as the sweep", () => {
+  assert.equal(jwtRole(jwt({ role: "authenticated" }).token), "authenticated");
+  assert.equal(jwtRole(jwt({ role: 1 }).token), "");
+  assert.equal(jwtRole("sb_secret_example"), "");
+  assert.equal(jwtRole("not.a.jwt"), "");
+  assert.equal(jwtRole(""), "");
 });
 
 test("a confirm call counts only when the response succeeded", () => {
