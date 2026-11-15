@@ -1,12 +1,11 @@
--- PROPOSED ONLY. Do not apply until Tom verifies.
+-- Applied live at 20261115092359. Do not re-apply.
 -- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
--- send-push v1 is already deployed. The replacement in
+-- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
 -- supabase/proposed/functions/send-push/index.ts reads this table to enforce
 -- the quiet-hours, daily-cap, six-hour dedupe, and invite-nudge rules from
--- JustUs/Domain/PushPolicy.swift. Do not redeploy the function until this
--- table exists. There is no client policy: the service role is the only
--- writer, and the iOS app cannot insert or read these rows.
+-- JustUs/Domain/PushPolicy.swift. There is no client policy: the service role
+-- is the only writer, and the iOS app cannot insert or read these rows.
 
 create table if not exists public.push_deliveries (
   id uuid primary key default gen_random_uuid(),

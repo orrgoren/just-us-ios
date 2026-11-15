@@ -290,6 +290,7 @@ enum L10n {
     case .confirmationRequired: return text("err.needConfirm", "Confirm before adding to memories you already have.")
     case .unsyncedChanges: return text("err.unsynced", "You still have changes that aren't saved. Try again when you're online, or discard them.")
     case .signOutBlocked: return text("err.signOut", "This phone is still on the account, so you're still signed in. Try again.")
+    case .accountDeleteBlocked: return text("err.deleteAccount", "This phone is still on the account, so the account was not deleted. Try again.")
     case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
     }
   }

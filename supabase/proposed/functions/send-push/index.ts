@@ -1,9 +1,5 @@
-// PROPOSED REPLACEMENT. Do not deploy until Tom applies
-// supabase/proposed/002_push_deliveries.sql and verifies this function.
-//
-// send-push v1 is already deployed with verify_jwt on. verify_jwt accepts the
-// anon key, and v1 also reads `kind` inside send() where it is not in scope,
-// so it throws before APNs. This file is the fix. It is not deployed.
+// Live send-push v3. Deployed from main at a12f1d1 with verify_jwt on.
+// 002, 006, and 007 are already applied. Do not redeploy from this branch.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,
 // and the nudge index are never taken from the client. The recipient's tokens

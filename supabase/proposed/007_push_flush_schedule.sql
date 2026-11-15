@@ -1,15 +1,12 @@
--- PROPOSED ONLY. Do not apply until 002 and 006 are applied and the
--- replacement send-push is deployed. This file is not a migration.
+-- Applied live after 006. Do not re-apply. This file is not a migration.
 -- scripts/sql-lifecycle.sh applies it. Without pg_cron, pg_net, and both
 -- vault secrets, the schedule block skips itself.
 --
--- 008_push_rollback.sql unschedules justus-push-flush and drops the push
--- tables. It leaves the photo sweep alone. 005_rollback.sql unschedules
--- both jobs because it also undoes 003 and 004. The deployed send-push is
--- still v1. Do not redeploy v1. The replacement is
--- supabase/proposed/functions/send-push/index.ts and is a separate reviewed
--- deploy, only after 002 and 006:
---   supabase functions deploy send-push --project-ref vowmukhhnfhtnjlswkun
+-- 008_push_rollback.sql is the push-only rollback. It unschedules
+-- justus-push-flush and drops the push tables. It leaves the photo sweep
+-- alone. 005_rollback.sql also undoes 003 and 004 and must never be applied.
+-- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
+-- The source is supabase/proposed/functions/send-push/index.ts.
 -- Rolling the SQL back does not deploy or replace the function.
 --
 -- pg_cron and pg_net are installed on the live project as of 2026-11-15.

@@ -57,7 +57,8 @@ Applied live on 2026-11-15. Do not re-apply. The push migrations went on in this
 
 Not applied, and must never be applied:
 
-- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. Not applied. Do not apply it.
+- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush` and also undoes 003 and 004. Not applied. Do not apply it.
+- `supabase/proposed/008_push_rollback.sql` — the push-only rollback. It unschedules `justus-push-flush` and drops the push tables. It leaves 003, 004, `leave_couple`, `delete_my_account`, and the photo sweep alone.
 
 The TestFlight build calls `leave_couple` and then `delete-couple-photos`. It does not call the function after `delete_my_account`. The function deletes photos only for couple ids the leave closed, and only when `photo_delete_allowed` says that couple row is already gone. A failed call leaves the id in `closed_couples`. `justus-photo-sweep` posts `{"sweep":true}` with the `justus_service_role` vault secret. The sweep is what clears photos after account deletion. The next launch also retries for the person who left. `005_rollback.sql` would restore the previous `leave_couple` and unschedule the sweep. It is not applied and must never be applied. Do not apply `003` or `004` again. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
 

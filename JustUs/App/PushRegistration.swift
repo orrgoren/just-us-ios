@@ -39,6 +39,9 @@ enum PushRegistration {
 struct DeviceTokenRecord: Equatable {
   var token: String?
   var awaitingSave: Bool
+  /// The user whose upsert succeeded. A later launch sets `awaitingSave` again, so that flag
+  /// cannot mean the server row is absent.
+  var savedUserId: String? = nil
 
   mutating func received(_ token: String) {
     self.token = token
@@ -47,6 +50,15 @@ struct DeviceTokenRecord: Equatable {
 
   mutating func saved() {
     awaitingSave = false
+  }
+
+  mutating func saved(for userId: String) {
+    saved()
+    savedUserId = userId
+  }
+
+  func saveSucceeded(for userId: String) -> Bool {
+    savedUserId == userId
   }
 
   /// Sign-out deletes the server row. The same device token has to be saved for the next account.
@@ -68,24 +80,31 @@ enum DeviceTokenSignOut {
   }
 
   /// Deletes the row while the old session is still the caller, then signs out.
-  /// A PostgREST 204 with zero rows is not a successful delete: `device_tokens_own`
-  /// matches `auth.uid()`, so the next user or an anonymous caller deletes nothing.
+  /// A known token is always deleted. Zero returned rows block sign-out only when this
+  /// user has already had a successful save, because that row can still be on the server
+  /// while a later save is pending or failed. A token that was never saved has no row.
   static func perform(
-    hasToken: Bool,
+    token: String?,
+    saveSucceeded: Bool,
     delete: () async throws -> Int,
     authSignOut: () async -> Void
   ) async throws {
-    if hasToken {
+    if token?.isEmpty == false {
       let removed = try await delete()
-      guard removed > 0 else { throw Failure.removedNoRows }
+      if removed < 1, saveSucceeded { throw Failure.removedNoRows }
     }
     await authSignOut()
   }
 }
 
 enum JoinLanding {
-  static func screen(production: Bool = Launch.productionJoin, isUITest: Bool = Launch.isUITest) -> SessionModel.Screen {
-    production || !isUITest ? .softPrompt : .main
+  static func screen(production: Bool = false, isUITest: Bool = Launch.isUITest) -> SessionModel.Screen {
+    #if DEBUG
+    if production || Launch.productionJoin { return .softPrompt }
+    return isUITest ? .main : .softPrompt
+    #else
+    return .softPrompt
+    #endif
   }
 }
 
@@ -107,6 +126,7 @@ enum DeviceTokenSave {
 enum DeviceTokenStore {
   static let tokenKey = "justus.push.token"
   static let pendingKey = "justus.push.tokenPending"
+  static let savedUserKey = "justus.push.savedUser"
   /// Leftover from a cross-user delete. It is wiped and never retried.
   static let deleteUserKey = "justus.push.deleteUser"
   static let deleteTokenKey = "justus.push.deleteToken"
@@ -114,7 +134,8 @@ enum DeviceTokenStore {
   static func load() -> DeviceTokenRecord {
     DeviceTokenRecord(
       token: UserDefaults.standard.string(forKey: tokenKey),
-      awaitingSave: UserDefaults.standard.bool(forKey: pendingKey)
+      awaitingSave: UserDefaults.standard.bool(forKey: pendingKey),
+      savedUserId: UserDefaults.standard.string(forKey: savedUserKey)
     )
   }
 
@@ -125,6 +146,11 @@ enum DeviceTokenStore {
       UserDefaults.standard.removeObject(forKey: tokenKey)
     }
     UserDefaults.standard.set(record.awaitingSave, forKey: pendingKey)
+    if let savedUserId = record.savedUserId, savedUserId.isEmpty == false {
+      UserDefaults.standard.set(savedUserId, forKey: savedUserKey)
+    } else {
+      UserDefaults.standard.removeObject(forKey: savedUserKey)
+    }
   }
 
   static func clearDelete() {
@@ -135,6 +161,7 @@ enum DeviceTokenStore {
   static func reset() {
     UserDefaults.standard.removeObject(forKey: tokenKey)
     UserDefaults.standard.removeObject(forKey: pendingKey)
+    UserDefaults.standard.removeObject(forKey: savedUserKey)
     clearDelete()
   }
 }

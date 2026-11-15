@@ -1,4 +1,4 @@
--- PROPOSED ONLY. Do not apply until Tom verifies.
+-- Applied live at 20261115092405. Do not re-apply.
 -- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
 -- claim_push_delivery is the atomic cap and dedupe. send-push calls it with
@@ -14,10 +14,8 @@
 -- or held. It stays only when the send throws or APNs asks for a retry,
 -- and only until attempts reaches the cap. A quiet-hours defer moves
 -- not_before on that same row. Nothing here schedules that call.
--- pg_cron is not enabled by this file. A later apply can add, outside this
--- proposal:
---   select cron.schedule('justus-push-flush', '*/15 * * * *', $$select net.http_post(...)$$);
--- Do not install that until the function is redeployed.
+-- pg_cron is not enabled by this file. 007 schedules justus-push-flush.
+-- 008_push_rollback.sql is the push-only rollback.
 
 alter table public.device_tokens
   add column if not exists environment text not null default 'production'
