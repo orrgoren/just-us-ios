@@ -172,8 +172,10 @@ extension SessionModel {
   func unlinkPartner() async {
     await act {
       try await self.backend.unlink()
+      self.rememberSpaceClosed()
       await self.refresh()
-      self.screen = self.ritual == nil ? .setup : .main
+      self.rememberSpaceClosed()
+      self.screen = .setup
     }
   }
 

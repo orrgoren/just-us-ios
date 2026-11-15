@@ -373,6 +373,60 @@ begin
   end if;
 end $$;
 
+do $$
+begin
+  if public.photo_delete_allowed('04040404-0404-4040-8040-040404040404') then
+    raise exception 'public_photo_delete_allowed_a_living_couple';
+  end if;
+  if not public.photo_delete_allowed('05050505-0505-4050-8050-050505050505') then
+    raise exception 'public_photo_delete_allowed_missed_a_closed_couple';
+  end if;
+  if has_function_privilege('authenticated', 'public.photo_delete_allowed(uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.closed_couples_pending(integer)', 'execute')
+     or has_function_privilege('authenticated', 'public.ack_swept_couples(uuid[])', 'execute')
+  then
+    raise exception 'sweep_functions_granted_to_authenticated';
+  end if;
+  if not exists (
+       select 1 from public.closed_couples_pending(50) as pending(couple_id)
+       where couple_id = '05050505-0505-4050-8050-050505050505'
+     )
+     or exists (
+       select 1 from public.closed_couples_pending(50) as pending(couple_id)
+       where couple_id = '04040404-0404-4040-8040-040404040404'
+     )
+  then
+    raise exception 'pending_sweep_missed_the_closed_couple';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.role', 'authenticated', false);
+do $$
+begin
+  begin
+    perform public.ack_swept_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
+    raise exception 'user_swept_a_couple';
+  exception
+    when others then
+      if sqlerrm <> 'forbidden' then
+        raise;
+      end if;
+  end;
+end $$;
+
+select set_config('request.jwt.claim.role', 'service_role', false);
+select public.ack_swept_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
+
+do $$
+begin
+  if exists (select 1 from app_private.closed_couples where couple_id = '05050505-0505-4050-8050-050505050505') then
+    raise exception 'sweep_left_the_closed_couple';
+  end if;
+end $$;
+
+insert into app_private.closed_couples (couple_id, closed_by)
+values ('05050505-0505-4050-8050-050505050505', '40404040-4040-4040-8040-404040404040');
+select set_config('request.jwt.claim.role', '', false);
 select public.ack_closed_couples(array['05050505-0505-4050-8050-050505050505']::uuid[]);
 
 do $$

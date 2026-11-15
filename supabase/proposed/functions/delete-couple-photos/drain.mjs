@@ -3,6 +3,12 @@
 // list loop. The loop always reads offset 0 so a delete cannot skip the
 // files that shift into the first page.
 
+export const maxCoupleIds = 50;
+
+export function tooMany(ids) {
+  return Array.isArray(ids) && ids.length > maxCoupleIds;
+}
+
 export function isUuid(value) {
   return typeof value === "string"
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -35,6 +41,10 @@ export function objectPaths(prefix, files) {
 // list(prefix) must return the first page only (offset 0). remove(paths)
 // deletes those objects. Two empty reads in a row cover a file that is
 // uploaded after the couple row is gone and lands between passes.
+export function ackAccepted(status) {
+  return status >= 200 && status < 300;
+}
+
 export async function drainPrefix(prefix, list, remove) {
   let removed = 0;
   let emptyReads = 0;

@@ -117,6 +117,8 @@ extension FakeBackend {
     store.save()
   }
 
+  func retryClosedPhotos() async {}
+
   func unlink() async throws {
     try requireOnline()
     guard let mine = memberOfSession() else { throw AppError.notAuthenticated }

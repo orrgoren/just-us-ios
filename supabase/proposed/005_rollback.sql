@@ -8,8 +8,9 @@
 --   2. Delete the delete-couple-photos edge function in the dashboard if
 --      it was deployed. This file does not remove it.
 --   3. Then run this file. It unschedules justus-push-flush only when 007
---      created that job, and it drops push_outbox and push_deliveries only
---      because 002 and 006 created them.
+--      created that job, and justus-photo-sweep only when 003 created that
+--      job. It drops push_outbox and push_deliveries only because 002 and
+--      006 created them. It does not delete the vault secrets.
 -- The deployed send-push is still v1. This file does not redeploy it.
 --
 -- One transaction. Paste this whole file into the Supabase SQL editor.
@@ -44,10 +45,13 @@ begin;
 
 do $$
 begin
-  if to_regnamespace('cron') is not null
-     and to_regclass('cron.job') is not null
-     and exists (select 1 from cron.job where jobname = 'justus-push-flush') then
-    perform cron.unschedule('justus-push-flush');
+  if to_regnamespace('cron') is not null and to_regclass('cron.job') is not null then
+    if exists (select 1 from cron.job where jobname = 'justus-push-flush') then
+      perform cron.unschedule('justus-push-flush');
+    end if;
+    if exists (select 1 from cron.job where jobname = 'justus-photo-sweep') then
+      perform cron.unschedule('justus-photo-sweep');
+    end if;
   end if;
 end $$;
 
@@ -322,6 +326,9 @@ drop function if exists public.delete_my_account();
 drop function if exists public.couples_touching_me();
 drop function if exists public.closed_couple_ids();
 drop function if exists public.ack_closed_couples(uuid[]);
+drop function if exists public.ack_swept_couples(uuid[]);
+drop function if exists public.closed_couples_pending(integer);
+drop function if exists public.photo_delete_allowed(uuid);
 drop function if exists app_private.close_couple(uuid, uuid);
 drop function if exists app_private.couples_touched_by(uuid);
 drop function if exists app_private.photo_delete_allowed(uuid);

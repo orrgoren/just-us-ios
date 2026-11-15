@@ -6,6 +6,16 @@
 -- delete_my_account and only then the function. Shipping the build first
 -- calls an RPC shape that is not live yet.
 --
+-- A failed function call leaves the couple id in app_private.closed_couples.
+-- The schedule at the bottom of this file uses pg_cron and pg_net, both
+-- free platform extensions, to post {"sweep":true} to the function every
+-- 15 minutes. The bearer is the justus_service_role vault secret. The
+-- function drains those rows and deletes a row only after its photos are
+-- gone. Enable pg_cron and pg_net, and create the vault secrets
+-- justus_project_url and justus_service_role, before relying on the
+-- schedule. The block skips itself when those are missing, so re-run this
+-- file after they exist. Do not paste the service role into git.
+--
 -- Depends on nothing new. Replaces app_private.guard_date_update and
 -- public.leave_couple. The live copies stay in place until this is applied.
 --
@@ -224,6 +234,63 @@ revoke all on function public.closed_couple_ids() from public, anon, authenticat
 revoke all on function public.ack_closed_couples(uuid[]) from public, anon, authenticated;
 grant execute on function public.closed_couple_ids() to authenticated;
 grant execute on function public.ack_closed_couples(uuid[]) to authenticated;
+
+-- PostgREST exposes public. The edge function calls this with the service
+-- role. It is the same check as app_private.photo_delete_allowed.
+create or replace function public.photo_delete_allowed(p_couple uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select app_private.photo_delete_allowed(p_couple)
+$$;
+
+-- At most 50 closed couples whose row is already gone. The sweep uses this.
+-- authenticated cannot list another person's closures.
+create or replace function public.closed_couples_pending(p_limit integer)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select recorded.couple_id
+  from app_private.closed_couples as recorded
+  where app_private.photo_delete_allowed(recorded.couple_id)
+  order by recorded.closed_at
+  limit least(greatest(coalesce(p_limit, 50), 0), 50)
+$$;
+
+-- Removes swept rows. A user JWT cannot call this: closed_by is often a
+-- login that delete_my_account already removed, so auth.uid() would match
+-- nothing. The service role is the sweep's caller.
+create or replace function public.ack_swept_couples(p_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(current_setting('request.jwt.claim.role', true), '') is distinct from 'service_role' then
+    raise exception 'forbidden';
+  end if;
+  if p_ids is null or cardinality(p_ids) > 50 then
+    raise exception 'too_many';
+  end if;
+  delete from app_private.closed_couples as recorded
+  where recorded.couple_id = any (p_ids)
+    and app_private.photo_delete_allowed(recorded.couple_id);
+end;
+$$;
+
+revoke all on function public.photo_delete_allowed(uuid) from public, anon, authenticated;
+revoke all on function public.closed_couples_pending(integer) from public, anon, authenticated;
+revoke all on function public.ack_swept_couples(uuid[]) from public, anon, authenticated;
+grant execute on function public.photo_delete_allowed(uuid) to service_role;
+grant execute on function public.closed_couples_pending(integer) to service_role;
+grant execute on function public.ack_swept_couples(uuid[]) to service_role;
 
 create or replace function app_private.guard_date_update()
 returns trigger
@@ -479,3 +546,41 @@ revoke all on function public.set_memory_photo_path(uuid, text) from public, ano
 revoke all on function public.leave_couple() from public, anon, authenticated;
 grant execute on function public.set_memory_photo_path(uuid, text) to authenticated;
 grant execute on function public.leave_couple() to authenticated;
+
+-- Photo sweep. Free extensions only. Skipped until pg_cron, pg_net, and the
+-- two vault secrets exist. Re-running this block replaces the job.
+do $$
+begin
+  if to_regnamespace('cron') is null
+     or to_regnamespace('net') is null
+     or to_regclass('vault.decrypted_secrets') is null
+  then
+    raise notice 'photo sweep not scheduled; enable pg_cron and pg_net and create vault secrets justus_project_url and justus_service_role, then re-run this block';
+    return;
+  end if;
+  if (select count(*) from vault.decrypted_secrets where name in ('justus_project_url', 'justus_service_role')) < 2 then
+    raise notice 'photo sweep not scheduled; vault is missing justus_project_url or justus_service_role';
+    return;
+  end if;
+  if exists (select 1 from cron.job where jobname = 'justus-photo-sweep') then
+    perform cron.unschedule('justus-photo-sweep');
+  end if;
+  perform cron.schedule(
+    'justus-photo-sweep',
+    '*/15 * * * *',
+    $cron$
+    select net.http_post(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'justus_project_url')
+        || '/functions/v1/delete-couple-photos',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || (
+          select decrypted_secret from vault.decrypted_secrets where name = 'justus_service_role'
+        )
+      ),
+      body := '{"sweep":true}'::jsonb,
+      timeout_milliseconds := 10000
+    );
+    $cron$
+  );
+end $$;

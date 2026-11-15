@@ -212,7 +212,7 @@ final class LiveBackend: DateBackend {
       let response: PostgrestResponse<[UUID]> = try await client.rpc("leave_couple").execute()
       return response.value
     }
-    try await deleteCouplePhotos(closed)
+    await forgetPhotos(closed)
   }
 
   func takeSpaceClosed() async -> Bool {
@@ -240,13 +240,25 @@ final class LiveBackend: DateBackend {
       let response: PostgrestResponse<[UUID]> = try await client.rpc("delete_my_account").execute()
       return response.value
     }
-    do {
-      try await deleteCouplePhotos(closed)
-    } catch {
-      await signOut()
-      throw error
-    }
+    await forgetPhotos(closed)
     await signOut()
+  }
+
+  func retryClosedPhotos() async {
+    guard client != nil else { return }
+    let closed = try? await run { client in
+      let response: PostgrestResponse<[UUID]> = try await client.rpc("closed_couple_ids").execute()
+      return response.value
+    }
+    await forgetPhotos(closed ?? [])
+  }
+
+  private func forgetPhotos(_ coupleIds: [UUID]) async {
+    do {
+      try await deleteCouplePhotos(coupleIds)
+    } catch {
+      return
+    }
   }
 
   private func deleteCouplePhotos(_ coupleIds: [UUID]) async throws {

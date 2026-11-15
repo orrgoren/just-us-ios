@@ -91,7 +91,7 @@ end \$\$;
 run -v ON_ERROR_STOP=1 -c "
 create schema if not exists cron;
 create table if not exists cron.job (jobname text primary key);
-insert into cron.job (jobname) values ('justus-push-flush') on conflict do nothing;
+insert into cron.job (jobname) values ('justus-push-flush'), ('justus-photo-sweep') on conflict do nothing;
 create or replace function cron.unschedule(job_name text)
 returns void
 language plpgsql
@@ -116,6 +116,9 @@ begin
   end if;
   if exists (select 1 from cron.job where jobname = 'justus-push-flush') then
     raise exception 'push_flush_was_not_unscheduled';
+  end if;
+  if exists (select 1 from cron.job where jobname = 'justus-photo-sweep') then
+    raise exception 'photo_sweep_was_not_unscheduled';
   end if;
   if position('close_couple' in pg_get_functiondef('public.leave_couple()'::regprocedure)) > 0 then
     raise exception 'leave_was_not_restored';

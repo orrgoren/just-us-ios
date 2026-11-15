@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { drainPrefix, eligibleIds } from "./drain.mjs";
+import { ackAccepted, drainPrefix, eligibleIds, tooMany } from "./drain.mjs";
 
 const closed = "11111111-1111-4111-8111-111111111111";
 const living = "22222222-2222-4222-8222-222222222222";
+
+test("more than 50 couple ids is rejected", () => {
+  const ids = Array.from({ length: 51 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`);
+  assert.equal(tooMany(ids), true);
+  assert.equal(tooMany(ids.slice(0, 50)), false);
+  assert.equal(tooMany([]), false);
+});
+
+test("a confirm call counts only when the response succeeded", () => {
+  assert.equal(ackAccepted(204), true);
+  assert.equal(ackAccepted(200), true);
+  assert.equal(ackAccepted(401), false);
+  assert.equal(ackAccepted(500), false);
+});
 
 test("a living couple is not eligible, even if the caller sends its id", () => {
   const chosen = eligibleIds(

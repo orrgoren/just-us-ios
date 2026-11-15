@@ -87,6 +87,9 @@ final class SessionModel {
       Task { await self?.follow(route) }
     }
     await restoreOrLogin()
+    if signedIn {
+      await backend.retryClosedPhotos()
+    }
     await refreshPushRegistration()
     if let raw = Launch.argument(after: "-JustUsURL"), let url = URL(string: raw) {
       await open(url)
