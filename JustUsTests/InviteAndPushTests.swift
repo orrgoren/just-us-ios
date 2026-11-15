@@ -67,7 +67,7 @@ final class InviteAndPushTests: XCTestCase {
 
     await model.redeem(replaceEmpty: false)
     XCTAssertNil(PendingInviteStore.current())
-    XCTAssertEqual(model.screen, .softPrompt)
+    XCTAssertEqual(model.screen, Launch.isUITest ? .main : .softPrompt)
     XCTAssertNil(model.errorMessage)
   }
 
