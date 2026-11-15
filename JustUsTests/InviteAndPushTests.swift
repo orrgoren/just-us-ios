@@ -55,12 +55,13 @@ final class InviteAndPushTests: XCTestCase {
   }
 
   func testDeepLinkBeforeSignInOpensJoinWithTheCode() async throws {
+    XCTAssertEqual(JoinLanding.screen(production: false, isUITest: false), .softPrompt)
+    XCTAssertEqual(JoinLanding.screen(production: false, isUITest: true), .main)
+    XCTAssertEqual(JoinLanding.screen(production: true, isUITest: true), .softPrompt)
     #if DEBUG
     Launch.productionJoin = true
     defer { Launch.productionJoin = false }
     #endif
-    XCTAssertEqual(JoinLanding.screen(production: false, isUITest: false), .softPrompt)
-    XCTAssertEqual(JoinLanding.screen(production: false, isUITest: true), .main)
     let token = SeedID.validToken
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     let model = SessionModel(backend: backend)
