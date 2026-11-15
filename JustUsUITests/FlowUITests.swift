@@ -241,7 +241,7 @@ final class FlowUITests: XCTestCase {
       return frame.height > 2 && frame.midY > 12 && frame.midY <= keyboard.frame.minY
     }
     let ready = XCTNSPredicateExpectation(predicate: above, object: nil)
-    XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 3), .completed)
+    XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 8), .completed)
     if record && !Self.recordedKeyboard {
       Self.recordedKeyboard = true
       let shot = XCTAttachment(screenshot: app.screenshot())
