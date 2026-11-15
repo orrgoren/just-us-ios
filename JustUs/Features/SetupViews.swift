@@ -5,6 +5,9 @@ struct SetupScreen: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
+      if model.spaceClosed {
+        StatusBanner(message: L10n.spaceClosed, identifier: A11y.spaceClosed)
+      }
       VStack(alignment: .leading, spacing: Theme.Space.stack) {
         RoleLine(waiting: false, text: L10n.yourTurn)
         Text(L10n.setupTitle).font(Theme.display)
@@ -104,6 +107,7 @@ struct SoftPromptScreen: View {
 
 struct InviteRedeemScreen: View {
   @Bindable var model: SessionModel
+  @Environment(\.keyboardOverlap) private var keyboardOverlap
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
@@ -115,14 +119,14 @@ struct InviteRedeemScreen: View {
         HelperText(text: L10n.joinNext)
         LabeledField(title: L10n.pasteCode, text: $model.inviteInput, identifier: A11y.inviteToken)
       }
-      if model.signedIn && model.pendingReplace {
+      if model.signedIn && model.pendingReplace && keyboardOverlap == 0 {
         WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty, busy: model.activity == .redeem, busyTitle: L10n.loading) {
           Task { await model.redeem(replaceEmpty: true) }
         }
         Button(L10n.stay) { model.pendingReplace = false }
           .accessibilityIdentifier(A11y.stay)
           .frame(minHeight: 44)
-      } else if model.signedIn && !model.blocked {
+      } else if model.signedIn && !model.blocked && !model.pendingReplace {
         WineButton(title: L10n.join, identifier: A11y.redeem, busy: model.activity == .redeem, busyTitle: L10n.loading) {
           Task { await model.redeem(replaceEmpty: false) }
         }

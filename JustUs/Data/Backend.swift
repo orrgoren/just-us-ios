@@ -36,6 +36,8 @@ protocol DateBackend: AnyObject {
   func redeem(token: String, replaceEmpty: Bool) async throws
   func unlink() async throws
   func deleteAccount() async throws
+  func retryClosedPhotos() async
+  func takeSpaceClosed() async -> Bool
   func registerDevice(token: String) async
   func setOffline(_ offline: Bool)
   func injectPartnerMood() async

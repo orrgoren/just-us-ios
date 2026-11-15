@@ -77,7 +77,7 @@ final class AuthCallbackTests: XCTestCase {
     XCTAssertNil(backend.codeVerifier)
     XCTAssertTrue(backend.store.world.otpSentAt.isEmpty)
     XCTAssertEqual(model.screen, .login)
-    XCTAssertEqual(model.email, "alex@couple-a.test")
+    XCTAssertEqual(model.email, "")
     XCTAssertFalse(model.offerNewLink)
 
     await model.open(link)

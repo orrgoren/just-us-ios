@@ -63,14 +63,75 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(ritual.coupleId, SeedID.coupleJordan)
   }
 
-  func testDeletionKeepsPartnerHistory() async throws {
+  func testDeletionClosesTheSharedSpace() async throws {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     _ = try await backend.sendCode(email: "alex@couple-a.test")
     _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
     try await backend.deleteAccount()
     XCTAssertFalse(backend.store.world.users.contains { $0.id == SeedID.alex })
-    XCTAssertTrue(backend.store.world.members.contains { $0.userId == SeedID.blair })
-    XCTAssertTrue(backend.store.world.dates.contains { $0.id == SeedID.dateA })
+    XCTAssertTrue(backend.store.world.users.contains { $0.id == SeedID.blair })
+    XCTAssertFalse(backend.store.world.members.contains { $0.coupleId == SeedID.coupleA })
+    XCTAssertFalse(backend.store.world.couples.contains { $0.id == SeedID.coupleA })
+    XCTAssertFalse(backend.store.world.dates.contains { $0.coupleId == SeedID.coupleA })
+    XCTAssertFalse(backend.store.world.moods.contains { $0.dateId == SeedID.dateA })
+    XCTAssertFalse(backend.store.world.invites.contains { $0.coupleId == SeedID.coupleA })
+    XCTAssertTrue(backend.store.world.couples.contains { $0.id == SeedID.coupleB })
+
+    let partner = SessionModel(backend: backend)
+    partner.email = "blair@couple-a.test"
+    await partner.sendCode()
+    partner.code = "000000"
+    await partner.verify()
+    XCTAssertEqual(partner.screen, .setup)
+    XCTAssertTrue(partner.spaceClosed)
+    XCTAssertEqual(partner.errorMessage, nil)
+    await partner.refresh()
+    XCTAssertEqual(partner.screen, .setup)
+    XCTAssertTrue(partner.spaceClosed)
+    await partner.signOut()
+    partner.email = "blair@couple-a.test"
+    await partner.sendCode()
+    partner.code = "000000"
+    await partner.verify()
+    XCTAssertEqual(partner.screen, .setup)
+    XCTAssertTrue(partner.spaceClosed)
+    UserDefaults.standard.removeObject(forKey: SessionModel.closedSpaceKey("blair@couple-a.test"))
+  }
+
+  func testRefreshLeavesMainForTheClosedNotice() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    XCTAssertEqual(model.screen, .main)
+    backend.store.markSpaceClosed(SeedID.alex)
+    backend.removeCouple(SeedID.coupleA)
+    await model.refresh()
+    XCTAssertEqual(model.screen, .setup)
+    XCTAssertTrue(model.spaceClosed)
+    await model.refresh()
+    XCTAssertEqual(model.screen, .setup)
+    XCTAssertTrue(model.spaceClosed)
+    UserDefaults.standard.removeObject(forKey: SessionModel.closedSpaceKey("alex@couple-a.test"))
+  }
+
+  func testUnlinkClosesTheSharedSpace() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    try await backend.unlink()
+    XCTAssertFalse(backend.store.world.couples.contains { $0.id == SeedID.coupleA })
+    XCTAssertTrue(backend.store.world.users.contains { $0.id == SeedID.alex })
+    let partner = SessionModel(backend: backend)
+    partner.email = "blair@couple-a.test"
+    await partner.sendCode()
+    partner.code = "000000"
+    await partner.verify()
+    XCTAssertEqual(partner.screen, .setup)
+    XCTAssertTrue(partner.spaceClosed)
+    UserDefaults.standard.removeObject(forKey: SessionModel.closedSpaceKey("blair@couple-a.test"))
   }
 
   func testOfflineMoodIsRejectedUntilOnline() async throws {

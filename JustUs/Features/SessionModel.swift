@@ -40,6 +40,8 @@ final class SessionModel {
   var retryKind: RetryKind?
   /// Set when a magic link is expired or already used, so login offers a new link instead of a dead end.
   var offerNewLink = false
+  /// The partner's next launch, after the other person closed the shared space.
+  var spaceClosed = false
   var pushDenied = false
   var showDelete = false
   var deleteConfirm = ""
@@ -85,6 +87,9 @@ final class SessionModel {
       Task { await self?.follow(route) }
     }
     await restoreOrLogin()
+    if signedIn {
+      await backend.retryClosedPhotos()
+    }
     await refreshPushRegistration()
     if let raw = Launch.argument(after: "-JustUsURL"), let url = URL(string: raw) {
       await open(url)
@@ -160,6 +165,7 @@ final class SessionModel {
   func createCouple() async {
     await work(activity: .create, retry: .create) {
       try await self.backend.createCouple(self.draft)
+      self.clearRememberedClosure()
       self.inviteToken = try await self.backend.createInvite()
       Telemetry.analytics.record(.inviteSent)
       await self.refresh()
@@ -200,6 +206,7 @@ final class SessionModel {
       Telemetry.analytics.record(.inviteRedeemed)
       self.pendingReplace = false
       self.blocked = false
+      self.clearRememberedClosure()
       self.signedIn = true
       await self.refresh()
       self.screen = Launch.isUITest ? .main : .softPrompt
@@ -273,10 +280,9 @@ final class SessionModel {
       return
     }
     rememberEmail()
-    let kept = email
     await backend.signOut()
     clearSession()
-    email = kept
+    email = ""
     offerNewLink = false
     screen = .login
     Telemetry.analytics.record(.signedOut)
@@ -309,6 +315,7 @@ final class SessionModel {
     focusReveal = false
     signedIn = false
     offerNewLink = false
+    spaceClosed = false
     tab = .week
   }
 
@@ -328,14 +335,17 @@ final class SessionModel {
   /// Drops the live session and any pending magic-link verifier, then returns to a login that can send a new link.
   func recoverToLogin() async {
     rememberEmail()
-    let kept = email
+    let typed = email.trimmingCharacters(in: .whitespacesAndNewlines)
     await backend.signOut()
     clearSession()
-    email = kept
-    prefillEmail()
+    email = typed.isEmpty ? rememberedEmail() : typed
     offerNewLink = true
     signedIn = false
     screen = .login
+  }
+
+  private func rememberedEmail() -> String {
+    UserDefaults.standard.string(forKey: Self.lastEmailKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
   }
 
   func applyFailure(_ error: Error, retry: RetryKind?) async {
@@ -353,6 +363,25 @@ final class SessionModel {
   }
 
   private static let lastEmailKey = "justus.lastEmail"
+
+  static func closedSpaceKey(_ email: String) -> String {
+    "justus.spaceClosed.\(email.lowercased())"
+  }
+
+  func rememberSpaceClosed() {
+    spaceClosed = true
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    UserDefaults.standard.set(true, forKey: Self.closedSpaceKey(trimmed))
+  }
+
+  func clearRememberedClosure() {
+    let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty {
+      UserDefaults.standard.removeObject(forKey: Self.closedSpaceKey(trimmed))
+    }
+    spaceClosed = false
+  }
 
   private func restoreOrLogin() async {
     if let user = try? await backend.restore() {

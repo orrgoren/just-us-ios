@@ -182,6 +182,15 @@ async function deliver(
   const claimed = await db.claim(recipientId, kind, couple.timezone);
   if (!claimed.ok) return { status: 200, body: { decision: "suppress", reason: claimed.reason } };
 
+  // Membership can end after the claim and before APNs. Check again here.
+  const still = await db.select<{ user_id: string }[]>(
+    `couple_members?user_id=eq.${callerId}&couple_id=eq.${caller.couple_id}&select=user_id&limit=1`,
+  );
+  if (!still[0]) {
+    await db.remove("push_deliveries", `id=eq.${claimed.id}`);
+    return { status: 200, body: { decision: "suppress", reason: "no_couple" } };
+  }
+
   const jwt = await apnsJwt();
   let sent = 0;
   try {

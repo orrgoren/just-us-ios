@@ -126,6 +126,7 @@ struct RoleLine: View {
   var body: some View {
     Text(text)
       .font(Theme.caption.weight(.semibold))
+      .foregroundStyle(Theme.ink)
       .padding(.horizontal, 12)
       .padding(.vertical, 8)
       .background(waiting ? Theme.champagne : Theme.blush, in: Capsule())

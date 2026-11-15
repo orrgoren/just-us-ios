@@ -208,16 +208,69 @@ final class LiveBackend: DateBackend {
   }
 
   func unlink() async throws {
-    try await run { client in
-      try await client.rpc("leave_couple").execute()
+    let closed = try await run { client in
+      let response: PostgrestResponse<[UUID]> = try await client.rpc("leave_couple").execute()
+      return response.value
+    }
+    await forgetPhotos(closed)
+  }
+
+  func takeSpaceClosed() async -> Bool {
+    guard let client, let user = cachedUser else { return false }
+    struct ClosureRow: Decodable {
+      var userId: UUID
+      enum CodingKeys: String, CodingKey { case userId = "user_id" }
+    }
+    do {
+      let response: PostgrestResponse<[ClosureRow]> = try await client
+        .from("space_closures")
+        .select("user_id")
+        .eq("user_id", value: user.uuidString)
+        .execute()
+      guard response.value.isEmpty == false else { return false }
+      _ = try? await client.from("space_closures").delete().eq("user_id", value: user.uuidString).execute()
+      return true
+    } catch {
+      return false
     }
   }
 
   func deleteAccount() async throws {
-    try await run { client in
-      try await client.rpc("delete_my_account").execute()
+    _ = try await run { client in
+      let response: PostgrestResponse<[UUID]> = try await client.rpc("delete_my_account").execute()
+      return response.value
     }
+    // The login is already gone, so /auth/v1/user rejects this JWT. The
+    // sweep deletes the photos and clears closed_couples. Leave still
+    // calls the function, because that login remains.
     await signOut()
+  }
+
+  func retryClosedPhotos() async {
+    guard client != nil else { return }
+    let closed = try? await run { client in
+      let response: PostgrestResponse<[UUID]> = try await client.rpc("closed_couple_ids").execute()
+      return response.value
+    }
+    await forgetPhotos(closed ?? [])
+  }
+
+  private func forgetPhotos(_ coupleIds: [UUID]) async {
+    do {
+      try await deleteCouplePhotos(coupleIds)
+    } catch {
+      return
+    }
+  }
+
+  private func deleteCouplePhotos(_ coupleIds: [UUID]) async throws {
+    guard coupleIds.isEmpty == false else { return }
+    try await run { client in
+      let _: PhotoDeleteAck = try await client.functions.invoke(
+        "delete-couple-photos",
+        options: FunctionInvokeOptions(body: PhotoDeleteRequest(coupleIds: coupleIds))
+      )
+    }
   }
 
   private func run<T>(_ body: (SupabaseClient) async throws -> T) async throws -> T {
@@ -354,6 +407,14 @@ struct DeviceTokenEnvRow: Encodable {
 
 struct PushKindBody: Encodable {
   var kind: String
+}
+
+private struct PhotoDeleteRequest: Encodable {
+  var coupleIds: [UUID]
+}
+
+private struct PhotoDeleteAck: Decodable {
+  var deleted: Int
 }
 
 struct PushAck: Decodable {

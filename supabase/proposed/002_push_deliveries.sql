@@ -1,5 +1,5 @@
 -- PROPOSED ONLY. Do not apply until Tom verifies.
--- This file is not a migration and CI never runs it.
+-- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
 -- send-push v1 is already deployed. The replacement in
 -- supabase/proposed/functions/send-push/index.ts reads this table to enforce

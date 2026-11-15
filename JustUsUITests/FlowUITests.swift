@@ -157,17 +157,26 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(element.waitForExistence(timeout: 8))
     dismissKeyboard(app)
     let scroll = app.scrollViews["mainContent"]
-    let hittable = NSPredicate(format: "isHittable == true")
     for _ in 0..<8 {
-      let ready = XCTNSPredicateExpectation(predicate: hittable, object: element)
-      if XCTWaiter().wait(for: [ready], timeout: 1) == .completed {
+      if shows(element, in: app) {
         element.tap()
         return
       }
       drag(scroll)
     }
-    XCTAssertTrue(element.isHittable)
+    XCTAssertTrue(shows(element, in: app))
     element.tap()
+  }
+
+  /// `isHittable` fails the test when a scrolled-away frame has no activation point.
+  private func shows(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+    guard element.exists else { return false }
+    let frame = element.frame
+    guard frame.isNull == false, frame.isInfinite == false, frame.width > 2, frame.height > 2 else {
+      return false
+    }
+    let screen = app.windows.firstMatch.frame.insetBy(dx: 1, dy: 24)
+    return screen.contains(CGPoint(x: frame.midX, y: frame.midY))
   }
 
   /// The keyboard pins the focused field, so Create stays below it until the keyboard closes.
@@ -186,8 +195,8 @@ final class FlowUITests: XCTestCase {
   }
 
   private func drag(_ scroll: XCUIElement) {
-    let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.22))
-    let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
+    let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+    let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
     start.press(forDuration: 0.05, thenDragTo: end)
   }
 
@@ -200,14 +209,42 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(field.waitForExistence(timeout: 12))
     field.tap()
     field.typeText(email)
-    app.buttons["sendCode"].tap()
+    tapAboveKeyboard("sendCode", in: app, record: true)
     let codeField = app.textFields["codeField"]
     XCTAssertTrue(codeField.waitForExistence(timeout: 8))
     codeField.tap()
     codeField.typeText(code)
-    app.buttons["verifyCode"].tap()
+    tapAboveKeyboard("verifyCode", in: app, record: false)
     if expectHome {
       XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))
     }
+  }
+
+  private static var recordedKeyboard = false
+
+  /// The send and verify buttons have to sit above the keyboard. The first
+  /// one keeps a screenshot so the SE job shows the keyboard-up layout.
+  private func tapAboveKeyboard(_ identifier: String, in app: XCUIApplication, record: Bool) {
+    let button = app.buttons[identifier]
+    XCTAssertTrue(button.waitForExistence(timeout: 4))
+    let keyboard = app.keyboards.firstMatch
+    guard keyboard.waitForExistence(timeout: 2), keyboard.frame.height > 20 else {
+      button.tap()
+      return
+    }
+    let above = NSPredicate { _, _ in
+      let frame = button.frame
+      return frame.height > 2 && frame.midY > 12 && frame.midY <= keyboard.frame.minY
+    }
+    let ready = XCTNSPredicateExpectation(predicate: above, object: nil)
+    XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 3), .completed)
+    if record && !Self.recordedKeyboard {
+      Self.recordedKeyboard = true
+      let shot = XCTAttachment(screenshot: app.screenshot())
+      shot.name = "se-keyboard-login"
+      shot.lifetime = .keepAlways
+      add(shot)
+    }
+    button.tap()
   }
 }

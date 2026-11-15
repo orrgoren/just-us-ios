@@ -21,12 +21,20 @@ extension SessionModel {
         privateNotes = ritual.plan?.privateNotes ?? ""
         planDay = ritual.date?.scheduledDate ?? ""
         planTime = ritual.date?.scheduledTime ?? ""
-      } else {
+      } else if signedIn {
         teaser = ""
         outfit = ""
         privateNotes = ""
         planDay = ""
         planTime = ""
+        if await backend.takeSpaceClosed() {
+          rememberSpaceClosed()
+        } else if UserDefaults.standard.bool(forKey: Self.closedSpaceKey(email)) {
+          spaceClosed = true
+        }
+        if spaceClosed {
+          screen = .setup
+        }
       }
       offline = false
     } catch {
@@ -165,7 +173,8 @@ extension SessionModel {
     await act {
       try await self.backend.unlink()
       await self.refresh()
-      self.screen = self.ritual == nil ? .setup : .main
+      self.clearRememberedClosure()
+      self.screen = .setup
     }
   }
 
@@ -178,6 +187,7 @@ extension SessionModel {
       try await self.backend.deleteAccount()
       Telemetry.analytics.record(.accountDeleted)
       self.clearSession()
+      self.email = ""
       self.screen = .login
     }
   }
@@ -292,6 +302,11 @@ extension SessionModel {
       await signedIn("demo@justus.app")
       deleteConfirm = L10n.deleteWord
       await deleteAccount()
+    case "spaceClosed":
+      await signedIn("alex@couple-a.test")
+      deleteConfirm = L10n.deleteWord
+      await deleteAccount()
+      await signedIn("blair@couple-a.test")
     case "notificationTap":
       await signedIn("alex@couple-a.test")
       focusReveal = true
@@ -302,6 +317,7 @@ extension SessionModel {
   }
 
   private func signedIn(_ email: String) async {
+    self.email = email
     _ = try? await backend.sendCode(email: email)
     _ = try? await backend.verify(email: email, code: "000000")
     signedIn = true

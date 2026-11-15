@@ -7,7 +7,7 @@ final class ScreenshotUITests: XCTestCase {
       "inviteReplace", "inviteBlocked", "homeSolo", "homePlanner", "homePartner",
       "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount", "offline",
       "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan",
-      "errorBanner", "unlinkConfirm", "postDeletion", "notificationTap", "signOut"
+      "errorBanner", "unlinkConfirm", "postDeletion", "spaceClosed", "notificationTap", "signOut"
     ]
     let scrolled: Set<String> = [
       "homePlanner", "reveal", "memories", "settings", "deleteAccount",
@@ -43,6 +43,8 @@ final class ScreenshotUITests: XCTestCase {
     app.launch()
     if screen == "login" || screen == "postDeletion" {
       _ = app.textFields["emailField"].waitForExistence(timeout: 10)
+    } else if screen == "spaceClosed" {
+      XCTAssertTrue(app.staticTexts["spaceClosed"].waitForExistence(timeout: 10))
     } else {
       _ = app.staticTexts["Just Us"].waitForExistence(timeout: 10)
     }

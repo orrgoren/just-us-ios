@@ -135,6 +135,6 @@ enum PhotoSavePolicy {
 }
 
 enum AccountDeletionPolicy {
-  /// The departing person is removed. Dates, notes, and photos stay for the partner.
-  static let partnerKeepsSharedHistory = true
+  /// Either partner closing their account removes the shared space. The other person is left unpaired.
+  static let closesTheSharedSpace = true
 }

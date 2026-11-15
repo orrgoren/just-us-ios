@@ -49,12 +49,13 @@ Already live: `device_tokens`, `notification_preferences`, `memory_notes.author_
 Not applied, and waiting for review:
 
 - `supabase/proposed/002_push_deliveries.sql` — the send log the replacement sender needs.
-- `supabase/proposed/003_memory_photo_and_leave_handoff.sql` — photo path on a completed date, and the unlink handoff.
-- `supabase/proposed/004_delete_my_account.sql` — account deletion. A remaining partner keeps history.
-- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — the live function bodies and the rollback. Not applied.
+- `supabase/proposed/003_memory_photo_and_close.sql` — photo path on a completed date. Unlink closes the whole couple for both people and returns that couple id. Not applied.
+- `supabase/proposed/004_delete_my_account.sql` — account deletion. Either partner closes every couple they still touch. The other person stays unpaired. Not applied.
+- `supabase/proposed/functions/delete-couple-photos/index.ts` — Storage API delete of photos for couples the RPC just closed. Not deployed. The app calls it after unlink. Account deletion leaves the rows for the sweep, because that login is already gone.
+- `supabase/proposed/005_rollback.sql` and `supabase/proposed/live/` — one transaction, with the live function bodies inlined. It unschedules `justus-push-flush`. It does not redeploy send-push. Not applied.
 - `supabase/proposed/006_push_claim_and_outbox.sql` — the push claim, the outbox, and a sandbox or production token column. Not applied.
 
-The iOS client calls `delete_my_account`, `leave_couple`, and `set_memory_photo_path`. Until a function exists, that action says nothing changed.
+Deploy order for closing a space: apply `003_memory_photo_and_close.sql` (and `004` for account deletion), then deploy `delete-couple-photos`, then ship the TestFlight build. The build calls `leave_couple` and then the function. It does not call the function after `delete_my_account`. The function deletes photos only for couple ids the leave closed, and only when `photo_delete_allowed` says that couple row is already gone. A failed call leaves the id in `closed_couples`. The same file schedules `justus-photo-sweep` with pg_cron and pg_net, posting to the function as the `justus_service_role` vault secret, after pg_cron, pg_net, and that secret exist. The sweep is what clears photos after account deletion. The next launch also retries for the person who left. `005_rollback.sql` restores the live `leave_couple`, unschedules the sweep, and does not remove the edge function or the vault secret, so ship the previous build and delete the function before running it. `scripts/sql/live-fk-dump.sql` is read-only and lists live foreign keys and delete triggers.
 
 ## What GitHub Actions already has
 

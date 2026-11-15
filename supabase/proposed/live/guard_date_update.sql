@@ -1,6 +1,6 @@
 -- LIVE SNAPSHOT of app_private.guard_date_update on vowmukhhnfhtnjlswkun.
 -- Read on 2026-11-14 with pg_get_functiondef. Do not apply except as rollback.
--- This is the body before the photo-path and handoff exceptions in 003.
+-- This is the body before the photo-path exception in 003.
 
 CREATE OR REPLACE FUNCTION app_private.guard_date_update()
  RETURNS trigger

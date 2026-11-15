@@ -1,10 +1,16 @@
 import AuthenticationServices
 import SwiftUI
+import UIKit
 
 struct RootView: View {
   @Bindable var model: SessionModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var keyboardDismiss = 0
+  @State private var keyboardOverlap: CGFloat = 0
+
+  private var pinReplace: Bool {
+    keyboardOverlap > 0 && model.screen == .invite && model.pendingReplace
+  }
 
   var body: some View {
     JustScreen {
@@ -39,9 +45,17 @@ struct RootView: View {
           .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.screen)
         }
         .padding(Theme.Space.screen)
+        .padding(.bottom, pinReplace ? 0 : keyboardOverlap)
       }
+      .ignoresSafeArea(.keyboard, edges: .bottom)
       .scrollDismissesKeyboard(.immediately)
       .accessibilityIdentifier(A11y.content)
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if pinReplace {
+          PinnedReplaceActions(model: model)
+            .padding(.bottom, keyboardOverlap)
+        }
+      }
       .toolbar {
         ToolbarItemGroup(placement: .keyboard) {
           Spacer()
@@ -50,9 +64,19 @@ struct RootView: View {
         }
       }
       .environment(\.scrollFieldIntoView) { id in
-        proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.2))
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+          proxy.scrollTo(id, anchor: UnitPoint(x: 0.5, y: 0.16))
+        }
       }
       .environment(\.keyboardDismiss, keyboardDismiss)
+      .environment(\.keyboardOverlap, keyboardOverlap)
+      .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+        let next = KeyboardOverlap.height(from: note)
+        guard abs(next - keyboardOverlap) > 1 else { return }
+        keyboardOverlap = next
+      }
       }
     }
     .preferredColorScheme(Launch.preferredScheme)
@@ -176,6 +200,10 @@ private struct KeyboardDismissKey: EnvironmentKey {
   static let defaultValue = 0
 }
 
+private struct KeyboardOverlapKey: EnvironmentKey {
+  static let defaultValue: CGFloat = 0
+}
+
 extension EnvironmentValues {
   var scrollFieldIntoView: (String) -> Void {
     get { self[ScrollFieldKey.self] }
@@ -186,12 +214,54 @@ extension EnvironmentValues {
     get { self[KeyboardDismissKey.self] }
     set { self[KeyboardDismissKey.self] = newValue }
   }
+
+  var keyboardOverlap: CGFloat {
+    get { self[KeyboardOverlapKey.self] }
+    set { self[KeyboardOverlapKey.self] = newValue }
+  }
+}
+
+private struct PinnedReplaceActions: View {
+  @Bindable var model: SessionModel
+  @Environment(\.colorScheme) private var scheme
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: Theme.Space.stack) {
+      WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty, busy: model.activity == .redeem, busyTitle: L10n.loading) {
+        Task { await model.redeem(replaceEmpty: true) }
+      }
+      Button(L10n.stay) { model.pendingReplace = false }
+        .accessibilityIdentifier(A11y.stay)
+        .frame(minHeight: 44)
+    }
+    .padding(.horizontal, Theme.Space.screen)
+    .padding(.vertical, 12)
+    .background(Theme.canvas(scheme))
+  }
+}
+
+private enum KeyboardOverlap {
+  /// Height of the keyboard over the screen. The frame comes from the
+  /// notification, not from a background view that SwiftUI may have
+  /// already lifted clear of the keyboard.
+  static func height(from note: Notification) -> CGFloat {
+    guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return 0 }
+    let screen = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .first { $0.activationState == .foregroundActive }?
+      .screen.bounds
+      ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.screen.bounds
+      ?? .zero
+    guard screen.height > 1, frame.minY < screen.maxY else { return 0 }
+    return min(max(0, screen.maxY - frame.minY), screen.height)
+  }
 }
 
 struct LabeledField: View {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.scrollFieldIntoView) private var scrollFieldIntoView
   @Environment(\.keyboardDismiss) private var keyboardDismiss
+  @Environment(\.keyboardOverlap) private var keyboardOverlap
   @FocusState private var focused: Bool
   var title: String
   @Binding var text: String
@@ -206,7 +276,7 @@ struct LabeledField: View {
           .font(Theme.caption)
           .foregroundStyle(Theme.muted(scheme))
       }
-      TextField(title, text: $text)
+      TextField(title, text: $text, prompt: Text(title).foregroundStyle(Theme.muted))
         .focused($focused)
         .textFieldStyle(.plain)
         .foregroundStyle(Theme.ink)
@@ -217,14 +287,22 @@ struct LabeledField: View {
     .id(identifier)
     .onChange(of: focused) { _, isOn in
       guard isOn else { return }
-      scrollFieldIntoView(identifier)
-      Task { @MainActor in
-        try? await Task.sleep(for: .milliseconds(350))
-        guard focused else { return }
-        scrollFieldIntoView(identifier)
-      }
+      reveal()
+    }
+    .onChange(of: keyboardOverlap) { _, overlap in
+      guard focused, overlap > 0 else { return }
+      reveal()
     }
     .onChange(of: keyboardDismiss) { _, _ in focused = false }
+  }
+
+  private func reveal() {
+    scrollFieldIntoView(identifier)
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(350))
+      guard focused else { return }
+      scrollFieldIntoView(identifier)
+    }
   }
 }
 
