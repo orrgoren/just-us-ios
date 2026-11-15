@@ -395,11 +395,29 @@ final class InviteAndPushTests: XCTestCase {
     XCTAssertEqual(deleted, ["T1", "T2", "signOut"])
   }
 
-  func testNeverSavedOfflineSignOutSkipsTheDelete() async throws {
+  func testUnrecordedSaveIsDeletedBeforeSignOutAndDoesNotBlock() async throws {
     var events: [String] = []
-    try await DeviceTokenSignOut.perform(current: "T2", saved: nil, saveSucceeded: false, delete: { _ in
-      events.append("delete")
+    try await DeviceTokenSignOut.perform(current: "T1", saved: nil, saveSucceeded: false, delete: { token in
+      events.append(token)
       throw DeviceTokenSignOut.Failure.removedNoRows
+    }, authSignOut: {
+      events.append("signOut")
+    })
+    XCTAssertEqual(events, ["T1", "signOut"])
+
+    events = []
+    try await DeviceTokenSignOut.perform(current: "T1", saved: nil, saveSucceeded: false, delete: { token in
+      events.append(token)
+      return 0
+    }, authSignOut: {
+      events.append("signOut")
+    })
+    XCTAssertEqual(events, ["T1", "signOut"])
+
+    events = []
+    try await DeviceTokenSignOut.perform(current: nil, saved: nil, saveSucceeded: false, delete: { _ in
+      events.append("delete")
+      return 1
     }, authSignOut: {
       events.append("signOut")
     })

@@ -93,7 +93,8 @@ enum DeviceTokenSignOut {
 
   /// Deletes while the old session is still the caller, then signs out.
   /// The saved token is the one that must come back. A newer token whose save failed may
-  /// delete zero rows. When no save has succeeded, there is no row, so the delete is skipped.
+  /// delete zero rows. A token with no recorded save may still have committed, so that
+  /// delete is best-effort and never blocks sign-out.
   static func perform(
     current: String?,
     saved: String?,
@@ -102,14 +103,15 @@ enum DeviceTokenSignOut {
     authSignOut: () async -> Void
   ) async throws {
     let savedToken = saved.flatMap { $0.isEmpty ? nil : $0 }
-    guard saveSucceeded, let savedToken else {
-      await authSignOut()
-      return
-    }
-    let removed = try await delete(savedToken)
-    guard removed > 0 else { throw Failure.removedNoRows }
-    if let current, current.isEmpty == false, current != savedToken {
-      _ = try await delete(current)
+    let currentToken = current.flatMap { $0.isEmpty ? nil : $0 }
+    if saveSucceeded, let savedToken {
+      let removed = try await delete(savedToken)
+      guard removed > 0 else { throw Failure.removedNoRows }
+      if let currentToken, currentToken != savedToken {
+        _ = try await delete(currentToken)
+      }
+    } else if let currentToken {
+      _ = try? await delete(currentToken)
     }
     await authSignOut()
   }
