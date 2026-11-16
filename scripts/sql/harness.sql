@@ -160,6 +160,7 @@ create table if not exists public.mood_votes (
   date_id uuid not null references public.dates (id) on delete cascade,
   user_id uuid not null references auth.users (id),
   mood text not null,
+  updated_at timestamptz not null default now(),
   primary key (date_id, user_id)
 );
 

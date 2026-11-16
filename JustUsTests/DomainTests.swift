@@ -46,6 +46,50 @@ final class DomainTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.canvas, Palette.wine), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.mutedDark, Palette.canvasDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.accentOnDark, Palette.canvasDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.winePressed), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.blushPressed), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.secondaryDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.secondaryDarkPressed), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.accentOnDark, Palette.secondaryDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.muted, Palette.champagne), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.mutedDark, Palette.disabledFillDark), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.wine, Palette.blush), 4.5)
+    XCTAssertEqual(Palette.moodSelected(.romance), Palette.wine)
+    for mood in MoodKey.allCases {
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.moodSelected(mood)), 4.5, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ivory, Palette.moodSelectedDark(mood)), 4.5, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.moodSelectedDark(mood), Palette.canvasDark), 3, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.moodBorderDark(mood), Palette.canvasDark), 3, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.moodBorderDark(mood), Palette.moodTintDark(mood)), 3, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.moodTint(mood)), 4.5, String(describing: mood))
+      XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.moodTintDark(mood)), 4.5, String(describing: mood))
+    }
+  }
+
+  func testMoodReplayMapsAPermissionDenial() {
+    XCTAssertEqual(ErrorMap.moodReplay(AppError.server(code: "42501")), .notEditable)
+    XCTAssertEqual(ErrorMap.moodReplay(AppError.notEditable), .notEditable)
+    XCTAssertEqual(ErrorMap.moodReplay(AppError.saveFailed), .saveFailed)
+    XCTAssertEqual(ErrorMap.moodReplay(AppError.server(code: "23505")), .server(code: "23505"))
+    XCTAssertEqual(ErrorMap.moodReplay(AppError.offline), .offline)
+  }
+
+  func testMoodChipsDisableOnceRevealed() {
+    XCTAssertTrue(MoodChips.isEnabled(status: .draft, revealed: false))
+    XCTAssertTrue(MoodChips.isEnabled(status: .scheduled, revealed: false))
+    XCTAssertFalse(MoodChips.isEnabled(status: .scheduled, revealed: true))
+    XCTAssertFalse(MoodChips.isEnabled(status: .completed, revealed: true))
+    XCTAssertFalse(MoodChips.isEnabled(status: nil, revealed: false))
+  }
+
+  func testMoodStaysEditableUntilReveal() {
+    XCTAssertTrue(MoodEdit.allowed(status: .draft, revealed: false))
+    XCTAssertTrue(MoodEdit.allowed(status: .scheduled, revealed: false))
+    XCTAssertFalse(MoodEdit.allowed(status: .scheduled, revealed: true))
+    XCTAssertFalse(MoodEdit.allowed(status: .completed, revealed: false))
+    XCTAssertFalse(MoodEdit.allowed(status: .skipped, revealed: false))
+    XCTAssertFalse(MoodEdit.allowed(status: nil, revealed: false))
   }
 
   func testRevealCopyHasNoSecrets() {

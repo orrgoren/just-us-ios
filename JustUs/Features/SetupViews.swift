@@ -48,10 +48,10 @@ struct SetupScreen: View {
           busy: model.activity == .create,
           busyTitle: L10n.settingUp
         ) { Task { await model.createCouple() } }
-        Button(L10n.joinInstead) { model.screen = .invite }
-          .accessibilityIdentifier(A11y.joinInstead)
-          .frame(minHeight: 44)
-          .disabled(model.busy)
+        ActionButton(title: L10n.joinInstead, identifier: A11y.joinInstead, kind: .link) {
+          model.screen = .invite
+        }
+        .disabled(model.busy)
       }
     }
   }
@@ -69,8 +69,8 @@ struct InviteShareScreen: View {
       HelperText(text: L10n.inviteShareNext)
       if let token = model.inviteToken, let message = InviteLinks.shareText(token: token) {
         ShareLink(item: message) { Text(L10n.shareInvite) }
+          .buttonStyle(JustButtonStyle(kind: .secondary))
           .accessibilityIdentifier(A11y.shareInvite)
-          .frame(minHeight: 44)
       }
       if let token = model.inviteToken, let appLink = InviteLinks.appURL(token: token) {
         Text(L10n.appLinkLabel).font(Theme.caption)
@@ -83,9 +83,7 @@ struct InviteShareScreen: View {
         Text(token).font(.body.monospaced()).textSelection(.enabled)
       }
       WineButton(title: L10n.continueOn, identifier: A11y.continueInvite) { model.finishInvite(askPush: true) }
-      Button(L10n.skipInvite) { model.finishInvite(askPush: true) }
-        .accessibilityIdentifier(A11y.skipInvite)
-        .frame(minHeight: 44)
+      ActionButton(title: L10n.skipInvite, identifier: A11y.skipInvite) { model.finishInvite(askPush: true) }
     }
   }
 }
@@ -100,9 +98,9 @@ struct SoftPromptScreen: View {
       Text(L10n.softPromptBody)
       HelperText(text: L10n.softNext)
       WineButton(title: L10n.softYes, identifier: A11y.softYes) { Task { await model.answerSoftPrompt(yes: true) } }
-      Button(L10n.softNo) { Task { await model.answerSoftPrompt(yes: false) } }
-        .accessibilityIdentifier(A11y.softNo)
-        .frame(minHeight: 44)
+      ActionButton(title: L10n.softNo, identifier: A11y.softNo) {
+        Task { await model.answerSoftPrompt(yes: false) }
+      }
     }
   }
 }
@@ -125,9 +123,7 @@ struct InviteRedeemScreen: View {
         WineButton(title: L10n.replaceJoin, identifier: A11y.replaceEmpty, busy: model.activity == .redeem, busyTitle: L10n.loading) {
           Task { await model.redeem(replaceEmpty: true) }
         }
-        Button(L10n.stay) { model.declineInvite() }
-          .accessibilityIdentifier(A11y.stay)
-          .frame(minHeight: 44)
+        ActionButton(title: L10n.stay, identifier: A11y.stay) { model.declineInvite() }
       } else if model.signedIn && !model.blocked && !model.pendingReplace {
         WineButton(title: L10n.join, identifier: A11y.redeem, busy: model.activity == .redeem, busyTitle: L10n.loading) {
           Task { await model.redeem(replaceEmpty: false) }
@@ -145,7 +141,6 @@ struct InviteRedeemScreen: View {
 }
 
 struct InviteBackButton: View {
-  @Environment(\.colorScheme) private var scheme
   var action: () -> Void
 
   var body: some View {
@@ -155,10 +150,8 @@ struct InviteBackButton: View {
           .accessibilityHidden(true)
         Text(L10n.back)
       }
-      .font(Theme.body.weight(.semibold))
-      .foregroundStyle(Theme.ink(scheme))
-      .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
+    .buttonStyle(JustButtonStyle(kind: .link))
     .accessibilityIdentifier(A11y.inviteBack)
   }
 }

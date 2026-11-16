@@ -97,10 +97,9 @@ final class FlowUITests: XCTestCase {
   func testSignOutReturnsToLogin() {
     let app = launch()
     signIn(app, email: "alex@couple-a.test", code: "000000", expectHome: true)
-    app.buttons["Us"].tap()
+    openUs(app)
     let signOut = app.buttons["signOut"]
-    if !signOut.waitForExistence(timeout: 2) { app.swipeUp() }
-    XCTAssertTrue(signOut.waitForExistence(timeout: 4))
+    reveal(signOut, in: app)
     signOut.tap()
     XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 8))
   }
@@ -108,10 +107,9 @@ final class FlowUITests: XCTestCase {
   func testDeleteRequiresWord() {
     let app = launch()
     signIn(app, email: "demo@justus.app", code: "424242", expectHome: true)
-    app.buttons["Us"].tap()
+    openUs(app)
     let delete = app.buttons["deleteAccount"]
-    if !delete.waitForExistence(timeout: 2) { app.swipeUp() }
-    XCTAssertTrue(delete.waitForExistence(timeout: 4))
+    reveal(delete, in: app)
     delete.tap()
     app.buttons["deleteSubmit"].tap()
     XCTAssertTrue(app.staticTexts["errorBanner"].waitForExistence(timeout: 5))
@@ -202,6 +200,21 @@ final class FlowUITests: XCTestCase {
     let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
     let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
     start.press(forDuration: 0.05, thenDragTo: end)
+  }
+
+  private func openUs(_ app: XCUIApplication) {
+    let scroll = app.scrollViews["mainContent"]
+    if scroll.exists { scroll.swipeDown() }
+    let us = app.buttons["Us"]
+    XCTAssertTrue(us.waitForExistence(timeout: 4))
+    us.tap()
+  }
+
+  private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+    for _ in 0..<4 where !element.exists || !element.isHittable {
+      app.swipeUp()
+    }
+    XCTAssertTrue(element.waitForExistence(timeout: 4))
   }
 
   func launch(_ extra: [String] = []) -> XCUIApplication {

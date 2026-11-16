@@ -134,6 +134,15 @@ enum ErrorMap {
     }
     return .server(code: error.code ?? "postgrest")
   }
+
+  /// A mood replay that the database rejects is not editable. 42501 is the
+  /// privilege error PostgREST returns when the row no longer matches the
+  /// policy, which happens after reveal. Other calls keep that code.
+  static func moodReplay(_ error: Error) -> AppError {
+    let mapped = app(error)
+    if case .server(let code) = mapped, code == "42501" { return .notEditable }
+    return mapped
+  }
 }
 
 enum Telemetry {

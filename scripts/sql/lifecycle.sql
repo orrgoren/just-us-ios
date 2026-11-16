@@ -683,3 +683,164 @@ begin
 
   execute 'reset role';
 end $$;
+
+-- 013. A member can set, change, and remove their own mood while the date is
+-- scheduled and still unrevealed. Reveal, a completed date, and someone
+-- else's row do not.
+do $$
+declare
+  n int;
+  target_date uuid := '56565656-5656-4656-8656-565656565656';
+  planner uuid := '10101010-1010-4010-8010-101010101010';
+  partner uuid := '30303030-3030-4030-8030-303030303030';
+  outsider uuid := '50505050-5050-4050-8050-505050505050';
+  couple uuid := '12121212-1212-4212-8212-121212121212';
+begin
+  insert into auth.users (id) values (outsider) on conflict do nothing;
+  -- Live Supabase lets authenticated call auth.uid(). The throwaway role
+  -- does not, and is_couple_member is not security definer.
+  grant usage on schema auth to authenticated;
+  grant execute on function auth.uid() to authenticated;
+  insert into public.dates (
+    id, couple_id, planner_user_id, status, scheduled_at, location
+  ) values (
+    target_date, couple, planner, 'scheduled', timestamptz '2026-11-19 18:30:00+00', 'home'
+  );
+
+  alter table public.mood_votes enable row level security;
+  grant select, insert, update, delete on public.mood_votes to authenticated;
+  create policy mood_votes_select_test on public.mood_votes
+    for select to authenticated
+    using (true);
+
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  execute 'set local role authenticated';
+
+  insert into public.mood_votes (date_id, user_id, mood)
+  values (target_date, planner, 'fun');
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'scheduled_mood_not_inserted';
+  end if;
+
+  update public.mood_votes
+    set mood = 'chill'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'scheduled_mood_not_updated';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', partner::text, true);
+  execute 'set local role authenticated';
+
+  update public.mood_votes
+    set mood = 'deep'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'partner_changed_the_other_mood';
+  end if;
+
+  insert into public.mood_votes (date_id, user_id, mood)
+  values (target_date, partner, 'romance');
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'partner_mood_not_inserted';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  begin
+    insert into public.mood_votes (date_id, user_id, mood)
+    values (target_date, outsider, 'fun');
+    raise exception 'outsider_mood_was_allowed';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  update public.dates
+    set status = 'draft', revealed_at = null
+    where id = target_date;
+  execute 'set local role authenticated';
+  update public.mood_votes
+    set mood = 'deep'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'draft_mood_not_updated';
+  end if;
+
+  begin
+    update public.mood_votes
+      set date_id = '99999999-9999-4999-8999-999999999999'
+      where date_id = target_date and user_id = planner;
+    raise exception 'mood_date_change_was_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'forbidden' then
+        raise;
+      end if;
+  end;
+
+  delete from public.mood_votes
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'draft_mood_not_deleted';
+  end if;
+
+  execute 'reset role';
+  insert into public.private_date_plans (date_id, idea_id, private_notes)
+  values (target_date, 'h1', 'mood test')
+  on conflict (date_id) do nothing;
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  update public.dates
+    set status = 'scheduled', revealed_at = null
+    where id = target_date;
+  execute 'set local role authenticated';
+  insert into public.mood_votes (date_id, user_id, mood)
+  values (target_date, planner, 'fun');
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  update public.dates
+    set revealed_at = timestamptz '2026-11-15 20:00:00+00'
+    where id = target_date;
+  execute 'set local role authenticated';
+  update public.mood_votes
+    set mood = 'adventure'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'revealed_mood_was_allowed';
+  end if;
+
+  delete from public.mood_votes
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'revealed_mood_was_deleted';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', planner::text, true);
+  update public.dates
+    set status = 'completed'
+    where id = target_date;
+  execute 'set local role authenticated';
+  update public.mood_votes
+    set mood = 'fun'
+    where date_id = target_date and user_id = planner;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'completed_mood_was_allowed';
+  end if;
+
+  execute 'reset role';
+end $$;

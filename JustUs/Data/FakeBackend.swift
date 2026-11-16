@@ -3,6 +3,9 @@ import Foundation
 @MainActor
 final class FakeBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
+  /// Forces the next mood save to fail the way a live write can, including a
+  /// PostgREST 42501 after reveal.
+  var moodFailure: AppError?
   let store: FakeStore
   private let cooldown: TimeInterval
   /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
@@ -196,6 +199,12 @@ final class FakeBackend: DateBackend {
     guard let index = store.world.dates.firstIndex(where: { $0.id == SeedID.dateA }) else { return }
     store.world.dates[index].status = .scheduled
     store.world.dates[index].revealedAt = Date()
+    store.save()
+  }
+
+  func finishDate() {
+    guard let index = store.world.dates.firstIndex(where: { $0.id == SeedID.dateA }) else { return }
+    store.world.dates[index].status = .completed
     store.save()
   }
 

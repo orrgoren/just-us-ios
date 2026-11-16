@@ -23,6 +23,10 @@ enum Theme {
     scheme == .dark ? mutedDark : muted
   }
 
+  static func color(_ rgb: Palette.RGB) -> Color {
+    Color(red: rgb.r, green: rgb.g, blue: rgb.b)
+  }
+
   static let display = Font.system(.largeTitle, design: .serif)
   static let title = Font.system(.title2, design: .serif)
   static let body = Font.body
@@ -133,6 +137,87 @@ struct RoleLine: View {
   }
 }
 
+enum JustButtonKind {
+  case primary
+  case secondary
+  case link
+  case destructive
+}
+
+struct JustButtonStyle: ButtonStyle {
+  var kind: JustButtonKind
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.isEnabled) private var enabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    let pressed = configuration.isPressed && enabled
+    configuration.label
+      .font(.body.weight(.semibold))
+      .multilineTextAlignment(kind == .link ? .leading : .center)
+      .foregroundStyle(foreground)
+      .padding(.horizontal, kind == .link ? 2 : 16)
+      .padding(.vertical, 12)
+      .frame(maxWidth: kind == .link ? nil : .infinity, minHeight: 48, alignment: kind == .link ? .leading : .center)
+      .background(background(pressed: pressed), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .overlay {
+        if showsBorder {
+          RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(border(pressed: pressed), lineWidth: pressed ? 2 : 1.5)
+        }
+      }
+      .underline(kind == .link && enabled)
+      .contentShape(Rectangle())
+      .scaleEffect(pressed && kind != .link ? 0.98 : 1)
+      .animation(.easeOut(duration: 0.12), value: pressed)
+  }
+
+  private var showsBorder: Bool {
+    kind == .destructive || (kind == .secondary && !enabled)
+  }
+
+  private var foreground: Color {
+    if !enabled { return Theme.muted(scheme) }
+    switch kind {
+    case .primary:
+      return Theme.canvas
+    case .secondary:
+      return scheme == .dark ? Theme.inkDark : Theme.ink
+    case .link, .destructive:
+      return scheme == .dark ? Theme.color(Palette.accentOnDark) : Theme.wine
+    }
+  }
+
+  private func background(pressed: Bool) -> Color {
+    if kind == .link {
+      if !pressed || !enabled { return .clear }
+      return scheme == .dark ? Theme.color(Palette.secondaryDark) : Theme.blush
+    }
+    if !enabled {
+      return scheme == .dark ? Theme.color(Palette.disabledFillDark) : Theme.champagne
+    }
+    switch kind {
+    case .primary:
+      return pressed ? Theme.color(Palette.winePressed) : Theme.wine
+    case .secondary:
+      if scheme == .dark {
+        return Theme.color(pressed ? Palette.secondaryDarkPressed : Palette.secondaryDark)
+      }
+      return pressed ? Theme.color(Palette.blushPressed) : Theme.blush
+    case .destructive:
+      guard pressed else { return .clear }
+      return scheme == .dark ? Theme.color(Palette.secondaryDark) : Theme.blush
+    case .link:
+      return .clear
+    }
+  }
+
+  private func border(pressed: Bool) -> Color {
+    if !enabled { return Theme.muted(scheme) }
+    if scheme == .dark { return Theme.color(Palette.accentOnDark) }
+    return pressed ? Theme.color(Palette.winePressed) : Theme.wine
+  }
+}
+
 struct WineButton: View {
   var title: String
   var identifier: String
@@ -153,19 +238,134 @@ struct WineButton: View {
             .tint(Theme.canvas)
         }
         Text(label)
-          .font(.body.weight(.semibold))
-          .foregroundStyle(Theme.canvas)
       }
-      .frame(maxWidth: .infinity, minHeight: 48)
-      .background(Theme.wine, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
-    .buttonStyle(.plain)
-    .disabled(busy)
+    .buttonStyle(JustButtonStyle(kind: .primary))
+    .allowsHitTesting(!busy)
     .accessibilityIdentifier(identifier)
     .accessibilityLabel(label)
   }
 
   private var label: String { busy ? (busyTitle ?? L10n.loading) : title }
+}
+
+struct ActionButton: View {
+  var title: String
+  var identifier: String?
+  var kind: JustButtonKind = .secondary
+  var action: () -> Void
+
+  var body: some View {
+    Button(action: {
+      Haptics.tap()
+      action()
+    }) {
+      Text(title)
+    }
+    .buttonStyle(JustButtonStyle(kind: kind))
+    .modifier(AccessIdentifier(identifier: identifier))
+  }
+}
+
+private struct AccessIdentifier: ViewModifier {
+  var identifier: String?
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if let identifier {
+      content.accessibilityIdentifier(identifier)
+    } else {
+      content
+    }
+  }
+}
+
+struct AccentLink: View {
+  var title: String
+  var destination: URL
+
+  var body: some View {
+    Link(destination: destination) {
+      Text(title)
+    }
+    .buttonStyle(JustButtonStyle(kind: .link))
+  }
+}
+
+struct MoodChip: View {
+  var mood: MoodKey
+  var selected: Bool
+  var enabled: Bool
+  var action: () -> Void
+
+  var body: some View {
+    Button(action: {
+      guard enabled else { return }
+      Haptics.tap()
+      action()
+    }) {
+      HStack(spacing: 8) {
+        Text(L10n.moodName(mood))
+        Spacer(minLength: 8)
+        if selected {
+          Image(systemName: "checkmark")
+            .accessibilityHidden(true)
+        }
+      }
+    }
+    .buttonStyle(MoodChipStyle(mood: mood, selected: selected))
+    .disabled(!enabled)
+    .accessibilityIdentifier(A11y.mood(mood))
+    .accessibilityAddTraits(selected ? .isSelected : [])
+  }
+}
+
+struct MoodChipStyle: ButtonStyle {
+  var mood: MoodKey
+  var selected: Bool
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.isEnabled) private var enabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    let pressed = configuration.isPressed && enabled
+    configuration.label
+      .font(.body.weight(selected ? .semibold : .regular))
+      .foregroundStyle(foreground)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+      .background(fill(pressed: pressed), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .strokeBorder(border, lineWidth: selected ? 2 : 1.5)
+      }
+      .scaleEffect(pressed ? 0.98 : 1)
+      .animation(.easeOut(duration: 0.12), value: pressed)
+  }
+
+  private var foreground: Color {
+    if !enabled { return Theme.muted(scheme) }
+    if selected { return Theme.canvas }
+    return scheme == .dark ? Theme.inkDark : Theme.ink
+  }
+
+  private func fill(pressed: Bool) -> Color {
+    if !enabled { return scheme == .dark ? Theme.color(Palette.disabledFillDark) : Theme.champagne }
+    if selected {
+      let fill = scheme == .dark ? Palette.moodSelectedDark(mood) : Palette.moodSelected(mood)
+      return Theme.color(fill)
+    }
+    if scheme == .dark {
+      return Theme.color(pressed ? Palette.secondaryDarkPressed : Palette.moodTintDark(mood))
+    }
+    return Theme.color(pressed ? Palette.blushPressed : Palette.moodTint(mood))
+  }
+
+  private var border: Color {
+    if !enabled { return Theme.muted(scheme) }
+    if scheme == .dark { return Theme.color(Palette.moodBorderDark(mood)) }
+    return Theme.color(Palette.moodSelected(mood))
+  }
 }
 
 struct StatusBanner: View {

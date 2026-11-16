@@ -290,6 +290,115 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertTrue(L10n.message(for: .notPlanner).localizedCaseInsensitiveContains("planner"))
   }
 
+  func testFailedMoodSaveRollsBack() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    let before = model.ritual?.moods
+    XCTAssertEqual(before?.first { $0.userId == SeedID.alex }?.mood, .romance)
+    backend.setOffline(true)
+    await model.choose(mood: .chill)
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .chill)
+    XCTAssertEqual(model.outbox["mood"], .mood(.chill))
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .offline))
+    backend.setOffline(false)
+    await model.flush()
+    XCTAssertNil(model.outbox["mood"])
+    await model.refresh()
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .chill)
+    backend.markRevealed()
+    let shown = model.ritual?.moods
+    await model.choose(mood: .adventure)
+    XCTAssertEqual(model.ritual?.moods, shown)
+    XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+  }
+
+  func testRejectedMoodReplayDoesNotBlockSignOut() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.setOffline(true)
+    await model.choose(mood: .chill)
+    XCTAssertEqual(model.outbox["mood"], .mood(.chill))
+    backend.markRevealed()
+    backend.setOffline(false)
+    await model.flush()
+    XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .romance)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+    await model.signOut()
+    XCTAssertEqual(model.screen, .login)
+    XCTAssertFalse(model.signedIn)
+  }
+
+  func testFinishedDateAndPermissionDenialDropTheQueuedMood() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.setOffline(true)
+    await model.choose(mood: .chill)
+    backend.finishDate()
+    backend.setOffline(false)
+    await model.flush()
+    XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .saveFailed))
+    XCTAssertEqual(model.ritual?.date, nil)
+    await model.signOut()
+    XCTAssertEqual(model.screen, .login)
+  }
+
+  func testPermissionDeniedReplayDropsTheQueuedMood() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.setOffline(true)
+    await model.choose(mood: .adventure)
+    backend.moodFailure = .server(code: "42501")
+    backend.setOffline(false)
+    await model.flush()
+    XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .romance)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+    await model.signOut()
+    XCTAssertEqual(model.screen, .login)
+  }
+
+  func testScheduledMoodSavesAndRevealDoesNot() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.scheduleUnrevealed()
+    await model.refresh()
+    XCTAssertEqual(model.ritual?.date?.status, .scheduled)
+    XCTAssertEqual(model.ritual?.revealed, false)
+    XCTAssertTrue(MoodChips.isEnabled(status: model.ritual?.date?.status, revealed: model.ritual?.revealed == true))
+    await model.choose(mood: .fun)
+    XCTAssertNil(model.errorMessage)
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
+    backend.markRevealed()
+    await model.refresh()
+    XCTAssertFalse(MoodChips.isEnabled(status: model.ritual?.date?.status, revealed: model.ritual?.revealed == true))
+    await model.choose(mood: .adventure)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
+  }
+
   func testHintSaveRejectsAnUpdateThatTouchesNoRows() {
     XCTAssertNoThrow(try HintEdit.requireUpdated(dateRows: 1, planRows: 1))
     for (dates, plans) in [(0, 1), (1, 0), (0, 0)] {
