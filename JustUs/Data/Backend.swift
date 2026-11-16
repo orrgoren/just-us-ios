@@ -46,6 +46,7 @@ protocol DateBackend: AnyObject {
   func savePreferences(_ preferences: PushPreferences) async
   func messages() async throws -> [ChatLine]
   func sendMessage(_ text: String) async throws
+  func partnerKeyNotice() -> String?
 }
 
 enum ErrorMap {
@@ -129,7 +130,8 @@ enum ErrorMap {
       ("missing_plan", .missingPlan),
       ("not_authenticated", .notAuthenticated),
       ("confirmation_required", .confirmationRequired),
-      ("over_email_send_rate_limit", .rateLimited)
+      ("over_email_send_rate_limit", .rateLimited),
+      ("chat_rate", .rateLimited)
     ]
     for item in codes where blob.contains(item.0) {
       return item.1

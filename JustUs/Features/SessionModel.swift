@@ -63,6 +63,7 @@ final class SessionModel {
   var momentDraft = ""
   var chatDraft = ""
   var messages: [ChatLine] = []
+  var chatKeyNotice: String?
   var focusReveal = false
   let backend: any DateBackend
   let pendingAppleNonce = AppleNonceBox()
@@ -337,6 +338,7 @@ final class SessionModel {
     momentDraft = ""
     chatDraft = ""
     messages = []
+    chatKeyNotice = nil
     deleteConfirm = ""
     editingNote = nil
     editingDate = nil

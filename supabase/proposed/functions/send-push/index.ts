@@ -8,6 +8,9 @@
 // are loaded with the service role after the caller's JWT is confirmed to be
 // a user. The daily cap, the six-hour dedupe, and the invite nudge windows
 // match JustUs/Domain/PushPolicy.swift. A push is not held for 22:00–08:00.
+// chatMessage still skips the daily cap and the six-hour dedupe. It is sent
+// only when the caller inserted a chat_messages row in the last 60 seconds,
+// and at most once per recipient in that same window.
 //
 // A flush is { "kind": "flush" } from the justus-push-flush cron. The bearer
 // is the legacy service_role JWT in the justus_service_role vault secret.
@@ -26,7 +29,7 @@
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
-import { apnsAttemptLog, dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage } from "./push.mjs";
+import { apnsAttemptLog, chatPushDecision, CHAT_PUSH_WINDOW_MS, dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, skipsDailyCap } from "./push.mjs";
 
 const DEDUPE_MS = 6 * 60 * 60 * 1000;
 const INVITE_TTL_HOURS = 7 * 24;
@@ -125,12 +128,6 @@ async function deliver(
     );
     if (!votes[0]) return { status: 200, body: { decision: "suppress", reason: "no_mood" } };
   }
-  if (kind === "chatMessage") {
-    const notes = await db.select<{ id: string }[]>(
-      `chat_messages?couple_id=eq.${caller.couple_id}&sender_user_id=eq.${callerId}&select=id&order=created_at.desc&limit=1`,
-    );
-    if (!notes[0]) return { status: 200, body: { decision: "suppress", reason: "no_message" } };
-  }
   if (kind === "inviteAccepted" && !partner) {
     return { status: 200, body: { decision: "suppress", reason: "no_partner" } };
   }
@@ -161,6 +158,20 @@ async function deliver(
     weekly_reminder: true,
   };
   if (!allows(kind, preferences)) return { status: 200, body: { decision: "suppress", reason: "preference" } };
+
+  if (kind === "chatMessage") {
+    const since = new Date(Date.now() - CHAT_PUSH_WINDOW_MS).toISOString();
+    const notes = await db.select<{ id: string }[]>(
+      `chat_messages?couple_id=eq.${caller.couple_id}&sender_user_id=eq.${callerId}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`,
+    );
+    const pushes = await db.select<{ sent_at: string }[]>(
+      `push_deliveries?recipient_user_id=eq.${recipientId}&kind=eq.chatMessage&sent_at=gte.${encodeURIComponent(since)}&select=sent_at&order=sent_at.desc&limit=1`,
+    );
+    const parsed = pushes[0] ? Date.parse(pushes[0].sent_at) : null;
+    const lastPushAt = pushes[0] ? (Number.isFinite(parsed) ? parsed : Date.now()) : null;
+    const gate = chatPushDecision({ recentMessage: Boolean(notes[0]), lastPushAt, now: Date.now() });
+    if (gate !== "send") return { status: 200, body: { decision: "suppress", reason: gate } };
+  }
 
   try {
     localParts(new Date(), couple.timezone);
@@ -252,7 +263,7 @@ function decide(
   inviteAge: number | null,
   timeZone: string,
 ): "send" | string {
-  if (kind === "chatMessage") return "send";
+  if (skipsDailyCap(kind)) return "send";
   const now = Date.now();
   if (kind === "partnerMood" || kind === "inviteAccepted" || kind === "planReady") {
     const recent = history.some((row) => row.kind === kind && now - Date.parse(row.sent_at) < DEDUPE_MS);

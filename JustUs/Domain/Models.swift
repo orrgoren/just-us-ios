@@ -184,6 +184,7 @@ enum AppError: Error, Equatable, Sendable {
   case signOutBlocked
   case accountDeleteBlocked
   case partnerNotReady
+  case chatTooLong
   case server(code: String)
 }
 

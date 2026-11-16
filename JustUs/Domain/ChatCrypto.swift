@@ -21,44 +21,179 @@ struct ChatEnvelope: Equatable, Sendable {
   var box: Data
 }
 
+struct ChatTarget: Equatable, Sendable {
+  var keyId: UUID
+  var userId: UUID
+  var publicKey: Data
+}
+
 enum ChatCryptoError: Error {
   case unreadable
 }
 
 enum ChatText {
-  static func normalized(_ raw: String) -> String? {
+  /// UTF-8 bytes, not Swift characters. An emoji counts as more than one.
+  static let maxBytes = 2000
+
+  static func normalized(_ raw: String) throws -> String {
     let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard (1...2000).contains(text.count) else { return nil }
+    if text.isEmpty { throw AppError.invalid(.note) }
+    if text.utf8.count > maxBytes { throw AppError.chatTooLong }
     return text
   }
 }
 
-enum ChatCrypto {
-  private static let info = Data("justus-chat-v1".utf8)
+enum SenderKey {
+  /// The row's sender key is trusted only when that exact key is published for the sender.
+  static func trusted(sender: Data, senderUserId: UUID, keys: [(userId: UUID, publicKey: Data)]) -> Bool {
+    sender.count == 32 && keys.contains { $0.userId == senderUserId && $0.publicKey == sender }
+  }
+}
 
-  static func seal(text: String, from sender: ChatIdentity, to recipients: [(id: UUID, publicKey: Data)]) throws -> [ChatEnvelope] {
-    try recipients.map { recipient in
-      let publicKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: recipient.publicKey)
+enum ChatRecipients {
+  /// One person's phones. The envelope list allows two extra on top of both people.
+  static let perUser = 3
+
+  static func choose(
+    senderUserId: UUID,
+    senderKeyId: UUID,
+    keys: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)]
+  ) -> [ChatTarget] {
+    let own = keys.filter { $0.userId == senderUserId }
+    var kept: [ChatTarget] = []
+    if let current = own.first(where: { $0.id == senderKeyId }) {
+      kept.append(ChatTarget(keyId: current.id, userId: current.userId, publicKey: current.publicKey))
+    }
+    for key in newest(own) where key.id != senderKeyId && kept.count < perUser {
+      kept.append(ChatTarget(keyId: key.id, userId: key.userId, publicKey: key.publicKey))
+    }
+    let partners = Set(keys.map(\.userId)).subtracting([senderUserId])
+    let theirs = partners.flatMap { partner in
+      newest(keys.filter { $0.userId == partner }).prefix(perUser).map {
+        ChatTarget(keyId: $0.id, userId: $0.userId, publicKey: $0.publicKey)
+      }
+    }
+    return kept + theirs
+  }
+
+  private static func newest(
+    _ keys: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)]
+  ) -> [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)] {
+    keys.sorted { lhs, rhs in
+      if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+      return lhs.id.uuidString > rhs.id.uuidString
+    }
+  }
+}
+
+enum ChatWindow {
+  static let limit = 100
+
+  /// Newest `limit` rows, oldest of that window first, so the screen reads downward to the latest.
+  static func chronological(_ lines: [ChatLine]) -> [ChatLine] {
+    Array(lines.sorted { lhs, rhs in
+      if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+      return lhs.id.uuidString > rhs.id.uuidString
+    }.prefix(limit).reversed())
+  }
+}
+
+enum PartnerKeyMemory {
+  static func changed<T: Hashable>(previous: some Sequence<T>, current: some Sequence<T>) -> Bool {
+    let prior = Set(previous)
+    guard prior.isEmpty == false else { return false }
+    return Set(current).subtracting(prior).isEmpty == false
+  }
+
+  static func remember(userId: UUID, current: [String]) -> Bool {
+    let key = storageKey(userId)
+    let previous = UserDefaults.standard.stringArray(forKey: key) ?? []
+    let didChange = changed(previous: previous, current: current)
+    UserDefaults.standard.set(current, forKey: key)
+    return didChange
+  }
+
+  static func clear(userId: UUID) {
+    UserDefaults.standard.removeObject(forKey: storageKey(userId))
+  }
+
+  private static func storageKey(_ userId: UUID) -> String {
+    "partner-keys-\(userId.uuidString)"
+  }
+}
+
+enum ChatCrypto {
+  /// The shared secret stays stable. Context is authenticated, so a v1 box fails closed.
+  private static let info = Data("justus-chat-v1".utf8)
+  static let version = "justus-chat-v2"
+
+  static func seal(
+    text: String,
+    messageId: UUID,
+    senderUserId: UUID,
+    from sender: ChatIdentity,
+    to targets: [ChatTarget]
+  ) throws -> [ChatEnvelope] {
+    try targets.map { target in
+      let publicKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: target.publicKey)
       let secret = try sender.privateKey.sharedSecretFromKeyAgreement(with: publicKey)
       let key = secret.hkdfDerivedSymmetricKey(
         using: SHA256.self, salt: Data(), sharedInfo: info, outputByteCount: 32
       )
-      let sealed = try ChaChaPoly.seal(Data(text.utf8), using: key)
-      return ChatEnvelope(keyId: recipient.id, box: sealed.combined)
+      let aad = associatedData(
+        messageId: messageId, senderUserId: senderUserId, recipientUserId: target.userId,
+        senderKey: sender.publicKey, recipientKey: target.publicKey
+      )
+      let sealed = try ChaChaPoly.seal(Data(text.utf8), using: key, authenticating: aad)
+      return ChatEnvelope(keyId: target.keyId, box: sealed.combined)
     }
   }
 
-  static func open(envelopes: [ChatEnvelope], identity: ChatIdentity, senderPublic: Data) throws -> String {
+  /// `messageId` is the row id. A copied box under any other id fails the authenticated context.
+  static func open(
+    envelopes: [ChatEnvelope],
+    identity: ChatIdentity,
+    messageId: UUID,
+    senderUserId: UUID,
+    recipientUserId: UUID,
+    senderPublic: Data
+  ) throws -> String {
     guard let mine = envelopes.first(where: { $0.keyId == identity.id }) else { throw ChatCryptoError.unreadable }
     let sender = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: senderPublic)
     let secret = try identity.privateKey.sharedSecretFromKeyAgreement(with: sender)
     let key = secret.hkdfDerivedSymmetricKey(
       using: SHA256.self, salt: Data(), sharedInfo: info, outputByteCount: 32
     )
+    let aad = associatedData(
+      messageId: messageId, senderUserId: senderUserId, recipientUserId: recipientUserId,
+      senderKey: senderPublic, recipientKey: identity.publicKey
+    )
     let box = try ChaChaPoly.SealedBox(combined: mine.box)
-    let clear = try ChaChaPoly.open(box, using: key)
+    let clear = try ChaChaPoly.open(box, using: key, authenticating: aad)
     guard let text = String(data: clear, encoding: .utf8) else { throw ChatCryptoError.unreadable }
     return text
+  }
+
+  static func associatedData(
+    messageId: UUID,
+    senderUserId: UUID,
+    recipientUserId: UUID,
+    senderKey: Data,
+    recipientKey: Data
+  ) -> Data {
+    var data = Data()
+    func append(_ bytes: Data) {
+      var count = UInt32(bytes.count).bigEndian
+      withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
+      data.append(bytes)
+    }
+    append(Data(version.utf8))
+    append(Data(messageId.uuidString.lowercased().utf8))
+    append(Data(senderUserId.uuidString.lowercased().utf8))
+    append(Data(recipientUserId.uuidString.lowercased().utf8))
+    append(senderKey)
+    append(recipientKey)
+    return data
   }
 }
 

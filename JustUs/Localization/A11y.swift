@@ -34,6 +34,7 @@ enum A11y {
   static let chatField = "chatField"
   static let chatSend = "chatSend"
   static let chatLine = "chat.line"
+  static let chatKeyNotice = "chat.keyNotice"
   static let tabMemories = "tab.memories"
   static let tabSettings = "tab.settings"
   static let partnerMood = "partnerMood"

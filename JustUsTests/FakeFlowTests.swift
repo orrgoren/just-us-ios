@@ -469,6 +469,35 @@ final class FakeFlowTests: XCTestCase {
     await blair.verify()
     XCTAssertEqual(blair.messages.last?.text, secret)
     XCTAssertEqual(blair.messages.last?.mine, false)
+    XCTAssertNil(blair.chatKeyNotice)
+    let replacement = ChatIdentity.generate()
+    store.world.deviceKeys.append(FakeDeviceKey(
+      id: replacement.id, userId: SeedID.alex, publicKey: replacement.publicKey,
+      privateKey: replacement.privateKey.rawRepresentation, createdAt: Date().addingTimeInterval(10)
+    ))
+    await blair.refresh()
+    XCTAssertEqual(blair.chatKeyNotice, L10n.chatKeyChanged)
+  }
+
+  func testChatLoadErrorsStayVisible() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    alex.chatDraft = "hello"
+    await alex.sendChat()
+    XCTAssertEqual(alex.messages.count, 1)
+    backend.chatFailure = .server(code: "chat")
+    await alex.refresh()
+    XCTAssertEqual(alex.errorMessage, L10n.message(for: .server(code: "chat")))
+    XCTAssertEqual(alex.messages.count, 1)
+    alex.chatDraft = String(repeating: "a", count: 2001)
+    backend.chatFailure = nil
+    await alex.sendChat()
+    XCTAssertEqual(alex.errorMessage, L10n.message(for: .chatTooLong))
   }
 
   func testHintSaveRejectsAnUpdateThatTouchesNoRows() {

@@ -7,9 +7,6 @@ extension SessionModel {
       ritual = try await backendRitual()
       memories = try await backend.memories()
       settings = try await backend.settings()
-      if let lines = try? await backend.messages() {
-        messages = lines
-      }
       if let settings, draft.selfName.isEmpty {
         draft.selfName = settings.selfName
         draft.partnerName = settings.partnerName
@@ -42,6 +39,18 @@ extension SessionModel {
       offline = false
     } catch {
       await applyFailure(error, retry: nil)
+    }
+    await loadMessages()
+  }
+
+  func loadMessages() async {
+    do {
+      messages = try await backend.messages()
+      if let notice = backend.partnerKeyNotice() {
+        chatKeyNotice = notice
+      }
+    } catch {
+      errorMessage = L10n.message(for: ErrorMap.app(error))
     }
   }
 
@@ -189,10 +198,9 @@ extension SessionModel {
     do {
       try await backend.sendMessage(chatDraft)
       chatDraft = ""
+      chatKeyNotice = nil
       errorMessage = nil
-      if let lines = try? await backend.messages() {
-        messages = lines
-      }
+      await loadMessages()
     } catch {
       errorMessage = L10n.message(for: ErrorMap.app(error))
     }
@@ -322,9 +330,7 @@ extension SessionModel {
     case "chat":
       await signedIn("alex@couple-a.test")
       (backend as? FakeBackend)?.seedChatPreview()
-      if let lines = try? await backend.messages() {
-        messages = lines
-      }
+      await loadMessages()
       tab = .chat
       screen = .main
     case "deleteAccount":

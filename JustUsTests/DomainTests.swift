@@ -161,18 +161,134 @@ final class DomainTests: XCTestCase {
   }
 
   func testChatRoundTripHidesTheText() throws {
+    let aliceUser = UUID()
+    let blairUser = UUID()
     let alice = ChatIdentity.generate()
     let blair = ChatIdentity.generate()
+    let messageId = UUID()
     let secret = "xylophone-harbor"
-    let envelopes = try ChatCrypto.seal(
-      text: secret, from: alice, to: [(id: blair.id, publicKey: blair.publicKey), (id: alice.id, publicKey: alice.publicKey)]
-    )
+    let envelopes = try sealed(secret, messageId: messageId, alice: alice, aliceUser: aliceUser, blair: blair, blairUser: blairUser)
     let stored = envelopes.map(\.box).reduce(into: Data()) { $0.append($1) }
     XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(secret))
-    XCTAssertEqual(try ChatCrypto.open(envelopes: envelopes, identity: blair, senderPublic: alice.publicKey), secret)
-    XCTAssertEqual(try ChatCrypto.open(envelopes: envelopes, identity: alice, senderPublic: alice.publicKey), secret)
+    XCTAssertEqual(try open(envelopes, messageId: messageId, identity: blair, sender: alice, senderUser: aliceUser, recipientUser: blairUser), secret)
+    XCTAssertEqual(try open(envelopes, messageId: messageId, identity: alice, sender: alice, senderUser: aliceUser, recipientUser: aliceUser), secret)
     let stranger = ChatIdentity.generate()
-    XCTAssertThrowsError(try ChatCrypto.open(envelopes: envelopes, identity: stranger, senderPublic: alice.publicKey))
+    XCTAssertThrowsError(try open(envelopes, messageId: messageId, identity: stranger, sender: alice, senderUser: aliceUser, recipientUser: blairUser))
+  }
+
+  func testChatRejectsTamperForgeryReflectionAndReplay() throws {
+    let aliceUser = UUID()
+    let blairUser = UUID()
+    let alice = ChatIdentity.generate()
+    let blair = ChatIdentity.generate()
+    let messageId = UUID()
+    let envelopes = try sealed("tea", messageId: messageId, alice: alice, aliceUser: aliceUser, blair: blair, blairUser: blairUser)
+    var tampered = envelopes
+    tampered[0].box[tampered[0].box.count - 1] ^= 0xff
+    XCTAssertThrowsError(try open(tampered, messageId: messageId, identity: blair, sender: alice, senderUser: aliceUser, recipientUser: blairUser))
+
+    let forged = ChatIdentity.generate()
+    XCTAssertThrowsError(try open(envelopes, messageId: messageId, identity: blair, sender: forged, senderUser: aliceUser, recipientUser: blairUser))
+    XCTAssertFalse(SenderKey.trusted(
+      sender: forged.publicKey, senderUserId: aliceUser,
+      keys: [(userId: aliceUser, publicKey: alice.publicKey)]
+    ))
+    XCTAssertTrue(SenderKey.trusted(
+      sender: alice.publicKey, senderUserId: aliceUser,
+      keys: [(userId: aliceUser, publicKey: alice.publicKey)]
+    ))
+
+    XCTAssertThrowsError(try open(envelopes, messageId: messageId, identity: blair, sender: alice, senderUser: blairUser, recipientUser: aliceUser))
+    let reflected = [ChatEnvelope(keyId: alice.id, box: envelopes.first { $0.keyId == blair.id }?.box ?? Data())]
+    XCTAssertThrowsError(try open(reflected, messageId: messageId, identity: alice, sender: blair, senderUser: blairUser, recipientUser: aliceUser))
+
+    XCTAssertThrowsError(try open(envelopes, messageId: UUID(), identity: blair, sender: alice, senderUser: aliceUser, recipientUser: blairUser))
+  }
+
+  func testChatLengthIsByteAccurate() throws {
+    XCTAssertThrowsError(try ChatText.normalized("   ")) { error in
+      XCTAssertEqual(error as? AppError, .invalid(.note))
+    }
+    XCTAssertEqual(try ChatText.normalized(String(repeating: "a", count: 2000)).utf8.count, 2000)
+    XCTAssertThrowsError(try ChatText.normalized(String(repeating: "a", count: 2001))) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
+    XCTAssertThrowsError(try ChatText.normalized(String(repeating: "🙂", count: 501))) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
+    XCTAssertEqual(L10n.message(for: .chatTooLong), L10n.chatTooLong)
+  }
+
+  func testChatKeepsTheCurrentKeyAndTheNewestPartnerKeys() {
+    let sender = UUID()
+    let partner = UUID()
+    let current = UUID()
+    let older = Date(timeIntervalSince1970: 1)
+    let keys = (0..<5).map { index in
+      (id: UUID(), userId: sender, publicKey: Data([UInt8(index)]), createdAt: older.addingTimeInterval(TimeInterval(index)))
+    }
+    let currentKey = (id: current, userId: sender, publicKey: Data([9]), createdAt: older)
+    let partnerKeys = (0..<4).map { index in
+      (id: UUID(), userId: partner, publicKey: Data([UInt8(20 + index)]), createdAt: older.addingTimeInterval(TimeInterval(index)))
+    }
+    let chosen = ChatRecipients.choose(senderUserId: sender, senderKeyId: current, keys: [currentKey] + keys + partnerKeys)
+    let own = chosen.filter { $0.userId == sender }
+    XCTAssertEqual(own.count, 3)
+    XCTAssertEqual(own.first?.keyId, current)
+    XCTAssertEqual(chosen.filter { $0.userId == partner }.count, 3)
+  }
+
+  func testChatWindowShowsTheNewestHundred() {
+    let lines = (0..<105).map { index in
+      ChatLine(
+        id: UUID(), senderUserId: UUID(), text: "\(index)",
+        createdAt: Date(timeIntervalSince1970: TimeInterval(index)), mine: false, unreadable: false
+      )
+    }
+    let shown = ChatWindow.chronological(lines)
+    XCTAssertEqual(shown.count, 100)
+    XCTAssertEqual(shown.first?.text, "5")
+    XCTAssertEqual(shown.last?.text, "104")
+  }
+
+  func testAPartnerKeyChangeIsNotTheFirstSighting() {
+    let first = ["a"]
+    XCTAssertFalse(PartnerKeyMemory.changed(previous: [String](), current: first))
+    XCTAssertFalse(PartnerKeyMemory.changed(previous: first, current: first))
+    XCTAssertTrue(PartnerKeyMemory.changed(previous: first, current: ["a", "b"]))
+  }
+
+  func testNotifyFailureIsVisibleToTests() {
+    final class Notes: @unchecked Sendable {
+      var values: [String] = []
+    }
+    let notes = Notes()
+    PushFailureLog.handler = { notes.values.append($0) }
+    defer { PushFailureLog.handler = nil }
+    PushFailureLog.record(AppError.saveFailed)
+    XCTAssertEqual(notes.values, ["send-push failed"])
+  }
+
+  private func sealed(
+    _ text: String, messageId: UUID, alice: ChatIdentity, aliceUser: UUID, blair: ChatIdentity, blairUser: UUID
+  ) throws -> [ChatEnvelope] {
+    try ChatCrypto.seal(
+      text: text, messageId: messageId, senderUserId: aliceUser, from: alice,
+      to: [
+        ChatTarget(keyId: blair.id, userId: blairUser, publicKey: blair.publicKey),
+        ChatTarget(keyId: alice.id, userId: aliceUser, publicKey: alice.publicKey)
+      ]
+    )
+  }
+
+  private func open(
+    _ envelopes: [ChatEnvelope], messageId: UUID, identity: ChatIdentity, sender: ChatIdentity,
+    senderUser: UUID, recipientUser: UUID
+  ) throws -> String {
+    try ChatCrypto.open(
+      envelopes: envelopes, identity: identity, messageId: messageId,
+      senderUserId: senderUser, recipientUserId: recipientUser, senderPublic: sender.publicKey
+    )
   }
 
   func testPlaceRhythmAndPhotoPolicy() throws {

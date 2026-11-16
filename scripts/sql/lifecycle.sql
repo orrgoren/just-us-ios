@@ -1156,3 +1156,176 @@ begin
       end if;
   end;
 end $$;
+
+-- 016. The sender key has to be one of theirs, the clock is the server's,
+-- a fourth device key drops the oldest, and leaving drops the keys.
+do $$
+declare
+  n int;
+  alex uuid := '15151515-1515-4151-8151-151515151515';
+  blair uuid := '16161616-1616-4161-8161-161616161616';
+  outsider uuid := '17171717-1717-4171-8171-171717171717';
+  couple uuid := '18181818-1818-4181-8181-181818181818';
+  message uuid := '19191919-1919-4191-8191-191919191919';
+  key_id uuid := '1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a';
+  alex_key text := 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+  stamped timestamptz;
+  recent int;
+  i int;
+begin
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+
+  insert into public.chat_messages (
+    id, couple_id, sender_user_id, sender_public_key, created_at, envelopes
+  ) values (
+    '1b1b1b1b-1b1b-41b1-81b1-1b1b1b1b1b1b', couple, alex, alex_key, '2000-01-01+00',
+    '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+  );
+  select created_at into stamped
+  from public.chat_messages
+  where id = '1b1b1b1b-1b1b-41b1-81b1-1b1b1b1b1b1b';
+  if stamped < now() - interval '1 minute' then
+    raise exception 'created_at_was_client';
+  end if;
+
+  insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+  values (
+    '1c1c1c1c-1c1c-41c1-81c1-1c1c1c1c1c1c', couple, alex, alex_key,
+    jsonb_build_array(jsonb_build_object('key_id', key_id::text, 'box', repeat('a', 13000)))
+  );
+
+  begin
+    insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      '1d1d1d1d-1d1d-41d1-81d1-1d1d1d1d1d1d', couple, alex, alex_key,
+      jsonb_build_array(jsonb_build_object('key_id', key_id::text, 'box', repeat('b', 70000)))
+    );
+    raise exception 'oversized_envelope_inserted';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      '1e1e1e1e-1e1e-41e1-81e1-1e1e1e1e1e1e', couple, alex,
+      encode(set_byte(decode(repeat('00', 32), 'hex'), 0, 7), 'base64'),
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+    raise exception 'forged_sender_inserted';
+  exception
+    when others then
+      if sqlerrm is distinct from 'unknown_sender_key' then
+        raise;
+      end if;
+  end;
+
+  begin
+    insert into public.device_keys (id, user_id, public_key)
+    values (
+      '1f1f1f1f-1f1f-41f1-81f1-1f1f1f1f1f1f', alex, 'not-a-key'
+    );
+    raise exception 'bad_key_inserted';
+  exception
+    when others then
+      if sqlerrm is distinct from 'bad_key' then
+        raise;
+      end if;
+  end;
+
+  select count(*) into recent
+  from public.chat_messages
+  where sender_user_id = alex
+    and created_at > now() - interval '1 minute';
+  for i in 1..(30 - recent) loop
+    insert into public.chat_messages (couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+  end loop;
+  begin
+    insert into public.chat_messages (couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+    raise exception 'chat_rate_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'chat_rate' then
+        raise;
+      end if;
+  end;
+
+  delete from public.chat_messages where id = message;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'sender_could_not_unsend';
+  end if;
+
+  for i in 1..3 loop
+    insert into public.device_keys (id, user_id, public_key)
+    values (
+      gen_random_uuid(), alex,
+      encode(set_byte(decode(repeat('00', 32), 'hex'), 0, i), 'base64')
+    );
+  end loop;
+  if (select count(*) from public.device_keys where user_id = alex) <> 3 then
+    raise exception 'device_key_cap';
+  end if;
+  if exists (select 1 from public.device_keys where id = key_id) then
+    raise exception 'oldest_device_key_kept';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.device_keys where user_id = alex) <> 3 then
+    raise exception 'partner_could_not_read_device_keys';
+  end if;
+  begin
+    insert into public.chat_messages (couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+    raise exception 'spoofed_sender_inserted';
+  exception
+    when others then
+      if sqlerrm is distinct from 'not_authenticated' then
+        raise;
+      end if;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.device_keys where user_id = alex) <> 0 then
+    raise exception 'outsider_read_device_keys';
+  end if;
+  insert into public.device_keys (id, user_id, public_key)
+  values (
+    '20202020-2020-4020-8020-202020202020', outsider,
+    encode(set_byte(decode(repeat('00', 32), 'hex'), 0, 9), 'base64')
+  );
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  perform public.leave_couple();
+  execute 'reset role';
+  if exists (select 1 from public.device_keys where user_id in (alex, blair)) then
+    raise exception 'leave_kept_device_keys';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  perform public.delete_my_account();
+  execute 'reset role';
+  if exists (select 1 from public.device_keys where user_id = outsider) then
+    raise exception 'delete_account_kept_device_keys';
+  end if;
+end $$;

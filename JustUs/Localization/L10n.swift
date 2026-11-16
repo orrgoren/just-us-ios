@@ -93,6 +93,8 @@ enum L10n {
   static var chatEmpty: String { text("chat.empty", "Nothing here yet.") }
   static var chatField: String { text("chat.field", "Message") }
   static var chatSend: String { text("chat.send", "Send") }
+  static var chatTooLong: String { text("chat.tooLong", "A message can be at most 2,000 bytes.") }
+  static var chatKeyChanged: String { text("chat.keyChanged", "Your partner's key changed.") }
   static var chatUnreadable: String { text("chat.unreadable", "This phone can't read that message.") }
   static var chatPartner: String { text("chat.partner", "Their phone needs to open the app once before a message can be locked to them.") }
   static var homeBody: String { text("home.body", "Pick a mood. Whoever is planning keeps the surprise.") }
@@ -314,6 +316,7 @@ enum L10n {
     case .signOutBlocked: return text("err.signOut", "This phone is still on the account, so you're still signed in. Try again.")
     case .accountDeleteBlocked: return text("err.deleteAccount", "This phone is still on the account, so the account was not deleted. Try again.")
     case .partnerNotReady: return chatPartner
+    case .chatTooLong: return chatTooLong
     case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
     }
   }

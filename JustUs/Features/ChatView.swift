@@ -7,6 +7,12 @@ struct ChatScreen: View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
       Text(L10n.chatTitle).font(Theme.title).accessibilityIdentifier(A11y.chatRoot)
       HelperText(text: L10n.chatHelp)
+      if let notice = model.chatKeyNotice {
+        Text(notice)
+          .font(Theme.body)
+          .foregroundStyle(Theme.ink)
+          .accessibilityIdentifier(A11y.chatKeyNotice)
+      }
       if model.ritual?.partner == nil {
         Text(L10n.chatWaiting)
       } else if model.messages.isEmpty {
@@ -17,7 +23,7 @@ struct ChatScreen: View {
         }
       }
       if model.ritual?.partner != nil {
-        LabeledField(title: L10n.chatField, text: $model.chatDraft, identifier: A11y.chatField, need: .optional)
+        LabeledField(title: L10n.chatField, text: $model.chatDraft, identifier: A11y.chatField, need: .labelOnly)
         WineButton(
           title: L10n.chatSend, identifier: A11y.chatSend,
           busy: model.activity == .sendChat, busyTitle: L10n.loading

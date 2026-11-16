@@ -63,6 +63,15 @@ struct FakeDeviceKey: Codable, Equatable {
   var userId: UUID
   var publicKey: Data
   var privateKey: Data
+  var createdAt: Date
+
+  init(id: UUID, userId: UUID, publicKey: Data, privateKey: Data, createdAt: Date = Date()) {
+    self.id = id
+    self.userId = userId
+    self.publicKey = publicKey
+    self.privateKey = privateKey
+    self.createdAt = createdAt
+  }
 }
 
 struct FakeEnvelope: Codable, Equatable {

@@ -212,10 +212,12 @@ struct DeviceKeyRow: Decodable {
   var id: UUID
   var userId: UUID
   var publicKey: String
+  var createdAt: String
   enum CodingKeys: String, CodingKey {
     case id
     case userId = "user_id"
     case publicKey = "public_key"
+    case createdAt = "created_at"
   }
 }
 
@@ -255,11 +257,13 @@ struct ChatMessageRow: Decodable {
 }
 
 struct ChatInsert: Encodable {
+  var id: UUID
   var coupleId: UUID
   var senderUserId: UUID
   var senderPublicKey: String
   var envelopes: [EnvelopeWire]
   enum CodingKeys: String, CodingKey {
+    case id
     case coupleId = "couple_id"
     case senderUserId = "sender_user_id"
     case senderPublicKey = "sender_public_key"
