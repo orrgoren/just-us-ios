@@ -482,6 +482,12 @@ final class FakeFlowTests: XCTestCase {
   func testChatLoadErrorsStayVisible() async throws {
     let store = FakeStore(inMemory: true)
     let backend = FakeBackend(store: store, cooldown: 0)
+    let blair = SessionModel(backend: backend)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
     let alex = SessionModel(backend: backend)
     alex.email = "alex@couple-a.test"
     await alex.sendCode()
@@ -489,6 +495,7 @@ final class FakeFlowTests: XCTestCase {
     await alex.verify()
     alex.chatDraft = "hello"
     await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
     XCTAssertEqual(alex.messages.count, 1)
     backend.chatFailure = .server(code: "chat")
     await alex.refresh()
