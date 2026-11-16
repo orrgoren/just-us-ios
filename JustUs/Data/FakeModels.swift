@@ -142,7 +142,8 @@ enum SeedBuilder {
     addSpace(&world, id: SeedID.coupleA, invitee: "Blair", members: [
       (SeedID.alex, "Alex", 0), (SeedID.blair, "Blair", 1)
     ])
-    let when = (try? ZonedTime.zonedLocalToUtc(date: "2026-11-19", time: "20:30", timeZone: "Asia/Jerusalem")) ?? now
+    let zone = "Asia/Jerusalem"
+    let when = (try? ZonedTime.nextWeeklySlot(weekday: 4, time: "20:30", timeZone: zone, from: now)) ?? now
     world.dates.append(FakeDate(
       id: SeedID.dateA, coupleId: SeedID.coupleA, status: .draft, scheduledAt: when, createdAt: now,
       durationMinutes: 90, location: .home, locationIsOverride: false,
@@ -153,20 +154,35 @@ enum SeedBuilder {
     ))
     world.moods.append(FakeMood(dateId: SeedID.dateA, userId: SeedID.alex, mood: .romance))
     // Blair planned the latest finished night, so this draft is Alex's turn.
-    // The November skip is the one free skip that month.
-    pastNight(&world, id: "15151515-1515-4151-8151-151515151515", status: .completed, day: "2026-10-29", planner: SeedID.alex)
-    pastNight(&world, id: "16161616-1616-4161-8161-161616161616", status: .skipped, day: "2026-11-05", planner: SeedID.blair)
-    pastNight(&world, id: "17171717-1717-4171-8171-171717171717", status: .completed, day: "2026-11-12", planner: SeedID.blair)
+    // One skipped week sits between two finished weeks, always just behind `now`.
+    pastNight(
+      &world, id: "15151515-1515-4151-8151-151515151515", status: .completed,
+      at: weeksBefore(when, 3, zone), planner: SeedID.alex
+    )
+    pastNight(
+      &world, id: "16161616-1616-4161-8161-161616161616", status: .skipped,
+      at: weeksBefore(when, 2, zone), planner: SeedID.blair
+    )
+    pastNight(
+      &world, id: "17171717-1717-4171-8171-171717171717", status: .completed,
+      at: weeksBefore(when, 1, zone), planner: SeedID.blair
+    )
+  }
+
+  private static func weeksBefore(_ instant: Date, _ weeks: Int, _ timeZone: String) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(secondsFromGMT: 0) ?? calendar.timeZone
+    calendar.firstWeekday = 1
+    return calendar.date(byAdding: .weekOfYear, value: -weeks, to: instant) ?? instant
   }
 
   private static func pastNight(
     _ world: inout FakeWorld,
     id: String,
     status: DateStatus,
-    day: String,
+    at when: Date,
     planner: UUID
   ) {
-    let when = (try? ZonedTime.zonedLocalToUtc(date: day, time: "20:30", timeZone: "Asia/Jerusalem")) ?? Date()
     let finished = status == .completed
     world.dates.append(FakeDate(
       id: SeedID.uuid(id), coupleId: SeedID.coupleA, status: status, scheduledAt: when, createdAt: when,

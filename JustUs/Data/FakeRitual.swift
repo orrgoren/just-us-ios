@@ -259,7 +259,7 @@ extension FakeBackend {
       isPlanner: isPlanner,
       revealed: revealed,
       plan: plan,
-      streakWeeks: TogetherStreak.weeks(nights: nights, timeZone: couple.timezone, now: Date())
+      streakWeeks: TogetherStreak.weeks(nights: nights, timeZone: couple.timezone, now: clock())
     )
     return RitualPrivacy.seal(view)
   }

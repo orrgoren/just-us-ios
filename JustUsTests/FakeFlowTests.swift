@@ -32,6 +32,20 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(handedOn.streakWeeks, 3)
   }
 
+  func testStreakStillHoldsThirtyDaysOut() async throws {
+    let later = Date().addingTimeInterval(30 * 24 * 60 * 60)
+    let backend = FakeBackend(cooldown: 0, now: later)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    let loaded = try XCTUnwrap(try await backend.ritual())
+    XCTAssertEqual(loaded.date?.plannerUserId, SeedID.alex)
+    XCTAssertEqual(loaded.streakWeeks, 2)
+    try await backend.complete(note: "A good night")
+    let handedOn = try XCTUnwrap(try await backend.ritual())
+    XCTAssertEqual(handedOn.date?.plannerUserId, SeedID.blair)
+    XCTAssertEqual(handedOn.streakWeeks, 3)
+  }
+
   func testSkipDoesNotHandTheTurnOver() async throws {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     _ = try await backend.sendCode(email: "alex@couple-a.test")

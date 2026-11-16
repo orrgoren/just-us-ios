@@ -8,12 +8,20 @@ final class FakeBackend: DateBackend {
   var moodFailure: AppError?
   let store: FakeStore
   private let cooldown: TimeInterval
+  /// Wall clock for the streak and for a new draft. Tests can freeze it.
+  var clock: @MainActor () -> Date = { Date() }
   /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
   private(set) var codeVerifier: String?
 
-  init(store: FakeStore? = nil, cooldown: TimeInterval? = nil) {
+  init(store: FakeStore? = nil, cooldown: TimeInterval? = nil, now: Date? = nil) {
     // Default arguments are nonisolated, so the MainActor store is built in the body.
-    self.store = store ?? FakeStore()
+    if let now {
+      self.store = store ?? FakeStore(inMemory: true, now: now)
+      self.clock = { @MainActor in now }
+    } else {
+      self.store = store ?? FakeStore()
+      self.clock = { Date() }
+    }
     if let cooldown {
       self.cooldown = cooldown
     } else {
@@ -288,7 +296,7 @@ final class FakeBackend: DateBackend {
     }
     guard let couple = store.world.couples.first(where: { $0.id == coupleId }) else { throw AppError.saveFailed }
     let when = try ZonedTime.nextWeeklySlot(
-      weekday: couple.weekday, time: couple.localTime, timeZone: couple.timezone, from: Date()
+      weekday: couple.weekday, time: couple.localTime, timeZone: couple.timezone, from: clock()
     )
     let completed = store.world.dates.filter { $0.coupleId == coupleId && $0.status == .completed }.count
     let members = store.world.members.filter { $0.coupleId == coupleId }.sorted { $0.memberIndex < $1.memberIndex }
@@ -301,7 +309,7 @@ final class FakeBackend: DateBackend {
     let plannerId = PlannerTurn.nextPlanner(nights: nights, members: memberRefs) ?? planner
     let location = try Recommendation.suggestedLocation(completedCount: completed)
     store.world.dates.append(FakeDate(
-      id: UUID(), coupleId: coupleId, status: .draft, scheduledAt: when, createdAt: Date(),
+      id: UUID(), coupleId: coupleId, status: .draft, scheduledAt: when, createdAt: clock(),
       durationMinutes: couple.durationMinutes, location: location, locationIsOverride: false,
       publicTeaser: nil, outfitHint: nil, revealedAt: nil, plannerUserId: plannerId,
       ideaId: nil, planTitle: nil, privateNotes: nil, photoJPEG: nil,
