@@ -40,11 +40,20 @@ enum Palette {
   static func moodSelected(_ mood: MoodKey) -> RGB {
     switch mood {
     case .fun: return RGB(0x8E5713)
-    case .romance: return RGB(0x8C5260)
+    case .romance: return wine
     case .deep: return RGB(0x4C6584)
     case .intimacy: return RGB(0x974A63)
     case .adventure: return RGB(0x287051)
     case .chill: return RGB(0x3E6C64)
+    }
+  }
+
+  /// Dark selected fill. Romance uses the brand wine in light mode. That wine
+  /// is under 3:1 on the dark canvas, so the dark fill is wine lightened to 3:1.
+  static func moodSelectedDark(_ mood: MoodKey) -> RGB {
+    switch mood {
+    case .romance: return RGB(0x8C5260)
+    default: return moodSelected(mood)
     }
   }
 

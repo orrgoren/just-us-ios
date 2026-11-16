@@ -331,10 +331,49 @@ final class FakeFlowTests: XCTestCase {
     backend.setOffline(false)
     await model.flush()
     XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .romance)
     XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
     await model.signOut()
     XCTAssertEqual(model.screen, .login)
     XCTAssertFalse(model.signedIn)
+  }
+
+  func testFinishedDateAndPermissionDenialDropTheQueuedMood() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.setOffline(true)
+    await model.choose(mood: .chill)
+    backend.finishDate()
+    backend.setOffline(false)
+    await model.flush()
+    XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .saveFailed))
+    XCTAssertEqual(model.ritual?.date, nil)
+    await model.signOut()
+    XCTAssertEqual(model.screen, .login)
+  }
+
+  func testPermissionDeniedReplayDropsTheQueuedMood() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    let model = SessionModel(backend: backend)
+    model.email = "alex@couple-a.test"
+    await model.sendCode()
+    model.code = "000000"
+    await model.verify()
+    backend.setOffline(true)
+    await model.choose(mood: .adventure)
+    backend.moodFailure = .server(code: "42501")
+    backend.setOffline(false)
+    await model.flush()
+    XCTAssertNil(model.outbox["mood"])
+    XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .romance)
+    XCTAssertEqual(model.errorMessage, L10n.message(for: .notEditable))
+    await model.signOut()
+    XCTAssertEqual(model.screen, .login)
   }
 
   func testScheduledMoodSavesAndRevealDoesNot() async throws {

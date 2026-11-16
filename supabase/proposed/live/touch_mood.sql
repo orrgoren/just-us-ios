@@ -2,7 +2,8 @@
 -- Already on the project. Recorded so the harness matches. Do not re-apply.
 -- A mood update cannot move the vote to another date or another person.
 -- That is what stops a vote from being rewritten onto a finished date.
--- 014_mood_update_using.sql repeats the date rule in the policy. It is not applied.
+-- 014_mood_update_using.sql repeats the date rule in the policy. It was applied
+-- live on 2026-11-16 as 20261116005108. Do not re-apply it.
 
 CREATE OR REPLACE FUNCTION app_private.touch_mood()
  RETURNS trigger

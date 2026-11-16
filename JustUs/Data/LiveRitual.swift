@@ -14,11 +14,16 @@ extension LiveBackend {
 
   func setMood(_ mood: MoodKey) async throws {
     guard let context = try await loadContext(), let date = try await activeDate(context) else { throw AppError.saveFailed }
-    try await runWrite { client in
-      try await client.from("mood_votes").upsert(
-        MoodWrite(dateId: date.id, userId: context.userId, mood: mood.rawValue),
-        onConflict: "date_id,user_id"
-      ).execute()
+    guard MoodEdit.allowed(status: date.status, revealed: date.revealedAt != nil) else { throw AppError.notEditable }
+    do {
+      try await runWrite { client in
+        try await client.from("mood_votes").upsert(
+          MoodWrite(dateId: date.id, userId: context.userId, mood: mood.rawValue),
+          onConflict: "date_id,user_id"
+        ).execute()
+      }
+    } catch {
+      throw ErrorMap.moodReplay(error)
     }
     await notify("partnerMood")
   }

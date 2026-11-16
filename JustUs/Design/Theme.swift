@@ -352,7 +352,8 @@ struct MoodChipStyle: ButtonStyle {
   private func fill(pressed: Bool) -> Color {
     if !enabled { return scheme == .dark ? Theme.color(Palette.disabledFillDark) : Theme.champagne }
     if selected {
-      return Theme.color(Palette.moodSelected(mood))
+      let fill = scheme == .dark ? Palette.moodSelectedDark(mood) : Palette.moodSelected(mood)
+      return Theme.color(fill)
     }
     if scheme == .dark {
       return Theme.color(pressed ? Palette.secondaryDarkPressed : Palette.moodTintDark(mood))

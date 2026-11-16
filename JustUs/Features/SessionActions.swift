@@ -231,9 +231,12 @@ extension SessionModel {
       outbox["mood"] = nil
       offline = false
     } catch {
-      let appError = ErrorMap.app(error)
-      if appError == .notEditable {
+      let appError = ErrorMap.moodReplay(error)
+      if appError == .notEditable || appError == .saveFailed {
         outbox["mood"] = nil
+        errorMessage = L10n.message(for: appError)
+        await refresh()
+        return
       }
       errorMessage = L10n.message(for: appError)
     }

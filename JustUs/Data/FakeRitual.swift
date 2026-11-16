@@ -14,6 +14,7 @@ extension FakeBackend {
 
   func setMood(_ mood: MoodKey) async throws {
     try online()
+    if let moodFailure { throw moodFailure }
     guard let user = currentUser(), let mine = member(user.id), let date = activeDate(mine.coupleId) else {
       throw AppError.saveFailed
     }
