@@ -1,4 +1,4 @@
--- Not applied. Orr applies this separately. Do not run it on the live project.
+-- Applied live on 2026-11-16 as 20261116005108. Do not re-apply.
 --
 -- mood_votes_update USING only checked user_id = auth.uid(). WITH CHECK
 -- looked at the new row, so a member could match their own vote and the
