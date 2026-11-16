@@ -7,12 +7,12 @@ final class FakeStore {
   private var spaceClosed: Set<UUID> = []
   private let persist: Bool
 
-  init(inMemory: Bool = false) {
+  init(inMemory: Bool = false, now: Date = Date()) {
     persist = !inMemory
     if inMemory {
-      world = FakeWorld.seed()
+      world = FakeWorld.seed(now: now)
     } else {
-      world = Self.read() ?? FakeWorld.seed()
+      world = Self.read() ?? FakeWorld.seed(now: now)
     }
   }
 

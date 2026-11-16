@@ -15,6 +15,50 @@ final class FakeFlowTests: XCTestCase {
     super.tearDown()
   }
 
+  func testTurnFollowsTheLastPlanner() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    let loaded = try await backend.ritual()
+    let alex = try XCTUnwrap(loaded)
+    XCTAssertTrue(alex.isPlanner)
+    XCTAssertEqual(alex.date?.plannerUserId, SeedID.alex)
+    XCTAssertEqual(alex.streakWeeks, 2)
+    try await backend.complete(note: "A good night")
+    let next = try await backend.ritual()
+    let handedOn = try XCTUnwrap(next)
+    XCTAssertEqual(handedOn.date?.plannerUserId, SeedID.blair)
+    XCTAssertFalse(handedOn.isPlanner)
+    XCTAssertEqual(handedOn.streakWeeks, 3)
+  }
+
+  func testStreakStillHoldsThirtyDaysOut() async throws {
+    let later = Date().addingTimeInterval(30 * 24 * 60 * 60)
+    let backend = FakeBackend(cooldown: 0, now: later)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    let loaded = try await backend.ritual()
+    let alex = try XCTUnwrap(loaded)
+    XCTAssertEqual(alex.date?.plannerUserId, SeedID.alex)
+    XCTAssertEqual(alex.streakWeeks, 2)
+    try await backend.complete(note: "A good night")
+    let next = try await backend.ritual()
+    let handedOn = try XCTUnwrap(next)
+    XCTAssertEqual(handedOn.date?.plannerUserId, SeedID.blair)
+    XCTAssertEqual(handedOn.streakWeeks, 3)
+  }
+
+  func testSkipDoesNotHandTheTurnOver() async throws {
+    let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
+    _ = try await backend.sendCode(email: "alex@couple-a.test")
+    _ = try await backend.verify(email: "alex@couple-a.test", code: "000000")
+    try await backend.skipWeek()
+    let loaded = try await backend.ritual()
+    let again = try XCTUnwrap(loaded)
+    XCTAssertEqual(again.date?.plannerUserId, SeedID.alex)
+    XCTAssertTrue(again.isPlanner)
+  }
+
   func testPartnerCannotSeePlan() async throws {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     _ = try await backend.sendCode(email: "blair@couple-a.test")

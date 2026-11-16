@@ -26,6 +26,7 @@ struct FakeDate: Codable, Equatable {
   var coupleId: UUID
   var status: DateStatus
   var scheduledAt: Date
+  var createdAt: Date
   var durationMinutes: Int
   var location: LocationKind
   var locationIsOverride: Bool
@@ -141,9 +142,10 @@ enum SeedBuilder {
     addSpace(&world, id: SeedID.coupleA, invitee: "Blair", members: [
       (SeedID.alex, "Alex", 0), (SeedID.blair, "Blair", 1)
     ])
-    let when = (try? ZonedTime.zonedLocalToUtc(date: "2026-11-19", time: "20:30", timeZone: "Asia/Jerusalem")) ?? now
+    let zone = "Asia/Jerusalem"
+    let when = (try? ZonedTime.nextWeeklySlot(weekday: 4, time: "20:30", timeZone: zone, from: now)) ?? now
     world.dates.append(FakeDate(
-      id: SeedID.dateA, coupleId: SeedID.coupleA, status: .draft, scheduledAt: when,
+      id: SeedID.dateA, coupleId: SeedID.coupleA, status: .draft, scheduledAt: when, createdAt: now,
       durationMinutes: 90, location: .home, locationIsOverride: false,
       publicTeaser: "Come hungry", outfitHint: "Cozy", revealedAt: nil,
       plannerUserId: SeedID.alex, ideaId: "h6", planTitle: "A table for two",
@@ -151,6 +153,46 @@ enum SeedBuilder {
       snapshotTitle: nil, snapshotEmoji: nil, snapshotSummary: nil, completedAt: nil
     ))
     world.moods.append(FakeMood(dateId: SeedID.dateA, userId: SeedID.alex, mood: .romance))
+    // Blair planned the latest finished night, so this draft is Alex's turn.
+    // One skipped week sits between two finished weeks, always just behind `now`.
+    pastNight(
+      &world, id: "15151515-1515-4151-8151-151515151515", status: .completed,
+      at: weeksBefore(when, 3, zone), planner: SeedID.alex
+    )
+    pastNight(
+      &world, id: "16161616-1616-4161-8161-161616161616", status: .skipped,
+      at: weeksBefore(when, 2, zone), planner: SeedID.blair
+    )
+    pastNight(
+      &world, id: "17171717-1717-4171-8171-171717171717", status: .completed,
+      at: weeksBefore(when, 1, zone), planner: SeedID.blair
+    )
+  }
+
+  private static func weeksBefore(_ instant: Date, _ weeks: Int, _ timeZone: String) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(secondsFromGMT: 0) ?? calendar.timeZone
+    calendar.firstWeekday = 1
+    return calendar.date(byAdding: .weekOfYear, value: -weeks, to: instant) ?? instant
+  }
+
+  private static func pastNight(
+    _ world: inout FakeWorld,
+    id: String,
+    status: DateStatus,
+    at when: Date,
+    planner: UUID
+  ) {
+    let finished = status == .completed
+    world.dates.append(FakeDate(
+      id: SeedID.uuid(id), coupleId: SeedID.coupleA, status: status, scheduledAt: when, createdAt: when,
+      durationMinutes: 90, location: .home, locationIsOverride: false,
+      publicTeaser: nil, outfitHint: nil, revealedAt: finished ? when : nil,
+      plannerUserId: planner, ideaId: finished ? "h1" : nil, planTitle: nil,
+      privateNotes: nil, photoJPEG: nil,
+      snapshotTitle: finished ? "A week together" : nil, snapshotEmoji: finished ? "♥" : nil,
+      snapshotSummary: nil, completedAt: finished ? when : nil
+    ))
   }
 
   private static func addCoupleB(_ world: inout FakeWorld, now: Date) {
@@ -183,7 +225,7 @@ enum SeedBuilder {
     addUser(&world, id: SeedID.riley, email: "riley@busy.test")
     addSpace(&world, id: SeedID.coupleRiley, invitee: "Someone", members: [(SeedID.riley, "Riley", 0)])
     world.dates.append(FakeDate(
-      id: SeedID.dateRiley, coupleId: SeedID.coupleRiley, status: .completed, scheduledAt: now,
+      id: SeedID.dateRiley, coupleId: SeedID.coupleRiley, status: .completed, scheduledAt: now, createdAt: now,
       durationMinutes: 90, location: .home, locationIsOverride: false,
       publicTeaser: nil, outfitHint: nil, revealedAt: now, plannerUserId: SeedID.riley,
       ideaId: "h1", planTitle: "Kept night", privateNotes: nil, photoJPEG: PhotoBytes.sample(),
