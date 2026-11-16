@@ -463,8 +463,10 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(alex.messages.last?.text, secret)
     let stored = store.world.chats.flatMap(\.envelopes).map(\.box).reduce(into: Data()) { $0.append($1) }
     XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(secret))
-    _ = try await blair.backend.messages()
-    await blair.refresh()
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
     XCTAssertEqual(blair.messages.last?.text, secret)
     XCTAssertEqual(blair.messages.last?.mine, false)
   }
