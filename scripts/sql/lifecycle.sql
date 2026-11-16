@@ -1095,6 +1095,18 @@ begin
   ) then
     raise exception 'chat_has_plaintext';
   end if;
+  if not exists (
+    select 1
+    from pg_publication_rel as publication_table
+    join pg_publication as publication on publication.oid = publication_table.prpubid
+    join pg_class as relation on relation.oid = publication_table.prrelid
+    join pg_namespace as namespace on namespace.oid = relation.relnamespace
+    where publication.pubname = 'supabase_realtime'
+      and namespace.nspname = 'public'
+      and relation.relname = 'chat_messages'
+  ) then
+    raise exception 'chat_not_in_realtime';
+  end if;
 
   begin
     update public.chat_messages set sender_public_key = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB='

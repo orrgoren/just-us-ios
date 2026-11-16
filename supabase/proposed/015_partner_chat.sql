@@ -1,5 +1,8 @@
--- Not applied. Orr applies this separately. Do not run it on the live project.
+-- Applied live on 2026-11-16 as migration partner_chat. Do not re-apply.
 -- Numbered 015 because 013 and 014 are already claimed by other pull requests.
+-- chat_messages was not in supabase_realtime. That step is the separate
+-- live migration chat_messages_realtime, recorded in
+-- 015b_chat_messages_realtime.sql. Do not re-apply that either.
 --
 -- A chat is ciphertext only. Each phone keeps a Curve25519 private key in
 -- the Keychain and publishes the public key. A message is one sealed box
@@ -9,9 +12,10 @@
 -- chatMessage is a transactional push. claim_push_delivery skips the daily
 -- cap and the six-hour dedupe for that kind, and records transactional true.
 -- Other kinds keep the live rules. The push body is fixed in send-push and
--- must not include the message. Do not deploy send-push until this file is
--- applied and the function change is approved. Live send-push is still v3
--- from a12f1d1.
+-- must not include the message. Live send-push is v6, deployed on 2026-11-16
+-- from 5013075. a12f1d1 is v3 and is the rollback source. chatMessage is
+-- added on top of that v6 source and is deployed from main after this
+-- branch merges.
 
 do $$
 declare
