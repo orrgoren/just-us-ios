@@ -202,6 +202,20 @@ test("an error message drops the device token, the key, and a provider jwt", () 
   assert.match(message, /\[redacted-jwt\]|bearer \[redacted\]/);
 });
 
+test("an error message drops an sb_secret and a bare p8 body", () => {
+  const secret = "sb_secret_" + "examplekeybody0123456789";
+  const bare = "A".repeat(40) + "p8body" + "B".repeat(40);
+  const lines = ["C".repeat(64), "D".repeat(64), "E".repeat(32)].join("\n");
+  const message = safeErrorMessage(new Error(`env ${secret} key ${bare}\n${lines}`));
+  assert.equal(message.includes("sb_secret_"), false);
+  assert.equal(message.includes(secret.slice("sb_secret_".length)), false);
+  assert.equal(message.includes(bare), false);
+  assert.equal(message.includes("C".repeat(64)), false);
+  assert.equal(message.includes("D".repeat(64)), false);
+  assert.match(message, /\[redacted-secret\]/);
+  assert.match(message, /\[redacted-key\]/);
+});
+
 test("an APNs token is reused for 50 minutes", () => {
   assert.equal(APNS_JWT_TTL_MS, 50 * 60 * 1000);
   const mintedAt = Date.parse("2026-11-15T00:00:00Z");

@@ -3,8 +3,8 @@
 --
 -- It would unschedule justus-push-flush and justus-photo-sweep, restore the
 -- previous leave_couple, and drop push_outbox and push_deliveries. It does
--- not delete the vault secrets. Live send-push is v3. This file does not
--- deploy or replace it.
+-- not delete the vault secrets. Live send-push is v6. a12f1d1 is v3 and is
+-- the rollback source. This file does not deploy or replace the function.
 --
 -- One transaction. The live function bodies are inlined below, copied from
 -- supabase/proposed/live/. This file has no include directive. Any error
@@ -15,10 +15,11 @@
 -- undoes 003 and 004 as well as push. Push alone is 008_push_rollback.sql,
 -- which leaves the photo sweep scheduled.
 --
--- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
--- This file does not deploy or replace it. 008_push_rollback.sql is the
--- push-only rollback. The schedule is removed first so it cannot call
--- send-push after the tables are gone.
+-- Live send-push is v6, deployed on 2026-11-16 with the content of 5013075
+-- (the same content as 7872d1e) and verify_jwt on. a12f1d1 is v3 and is the
+-- rollback source. This file does not deploy or replace the function.
+-- 008_push_rollback.sql is the push-only rollback. The schedule is removed
+-- first so it cannot call send-push after the tables are gone.
 --
 -- author_name, memory_photo_path, device_tokens, notification_preferences,
 -- and the date-photos bucket are already live. This file does not drop them.

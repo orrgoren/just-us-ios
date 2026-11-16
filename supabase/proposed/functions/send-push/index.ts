@@ -1,6 +1,6 @@
-// Live send-push is still v3, deployed from main at a12f1d1 with verify_jwt on.
-// This source turns quiet hours off. It is not deployed until that change is
-// approved. 002, 006, and 007 are already applied. Do not re-apply them.
+// Live send-push is v6, deployed on 2026-11-16 from 5013075 (the same
+// content as 7872d1e) with verify_jwt on. a12f1d1 is v3 and is the rollback
+// source. 002, 006, and 007 are already applied. Do not re-apply them.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,
 // and the nudge index are never taken from the client. The recipient's tokens

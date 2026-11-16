@@ -61,9 +61,12 @@ export function safeErrorMessage(error) {
   return message
     .replace(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g, "[redacted-key]")
     .replace(/\/3\/device\/[^/?\s]+/gi, "/3/device/[token]")
+    .replace(/\bsb_secret_[A-Za-z0-9_-]+/g, "[redacted-secret]")
     .replace(/\b[0-9a-f]{32,}\b/gi, "[token]")
     .replace(/\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[redacted-jwt]")
-    .replace(/bearer\s+\S+/gi, "bearer [redacted]");
+    .replace(/bearer\s+\S+/gi, "bearer [redacted]")
+    .replace(/(?:[A-Za-z0-9+/]{16,}[ \t]*\r?\n[ \t]*){2,}[A-Za-z0-9+/]{16,}={0,2}/g, "[redacted-key]")
+    .replace(/\b[A-Za-z0-9+/]{64,}={0,2}\b/g, "[redacted-key]");
 }
 
 function logValue(value) {

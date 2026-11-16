@@ -5,8 +5,9 @@
 -- 008_push_rollback.sql is the push-only rollback. It unschedules
 -- justus-push-flush and drops the push tables. It leaves the photo sweep
 -- alone. 005_rollback.sql also undoes 003 and 004 and must never be applied.
--- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
--- The source is supabase/proposed/functions/send-push/index.ts.
+-- Live send-push is v6, deployed on 2026-11-16 with the content of 5013075
+-- (the same content as 7872d1e) and verify_jwt on. a12f1d1 is v3 and is the
+-- rollback source. The source is supabase/proposed/functions/send-push/index.ts.
 -- Rolling the SQL back does not deploy or replace the function.
 --
 -- pg_cron and pg_net are installed on the live project as of 2026-11-15.
