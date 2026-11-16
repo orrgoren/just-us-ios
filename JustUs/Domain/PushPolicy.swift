@@ -1,29 +1,6 @@
 import Foundation
 
 enum PushPolicy {
-  static let quietStartHour = 22
-  static let quietEndHour = 8
-
-  static func isQuietHour(_ date: Date, timeZone: TimeZone) -> Bool {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = timeZone
-    let hour = calendar.component(.hour, from: date)
-    return hour >= quietStartHour || hour < quietEndHour
-  }
-
-  static func nextQuietEnd(_ date: Date, timeZone: TimeZone) -> Date {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = timeZone
-    let hour = calendar.component(.hour, from: date)
-    var components = calendar.dateComponents([.year, .month, .day], from: date)
-    components.hour = quietEndHour
-    components.minute = 0
-    components.second = 0
-    let today = calendar.date(from: components) ?? date
-    if hour < quietEndHour { return today }
-    return calendar.date(byAdding: .day, value: 1, to: today) ?? today
-  }
-
   static func isTransactional(_ kind: PushKind) -> Bool {
     switch kind {
     case .partnerMood, .planReady, .inviteAccepted, .weeklyReminder, .inviteNudge: return false
@@ -39,9 +16,6 @@ enum PushPolicy {
     inviteAgeHours: Double? = nil
   ) -> PushDecision {
     guard preferences.allows(kind) else { return .suppress("preference") }
-    if isQuietHour(now, timeZone: timeZone) {
-      return .deferUntil(nextQuietEnd(now, timeZone: timeZone))
-    }
     switch kind {
     case .partnerMood, .inviteAccepted, .planReady:
       let recent = history.contains { $0.kind == kind && now.timeIntervalSince($0.sentAt) < 6 * 3600 }

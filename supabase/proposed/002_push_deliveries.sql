@@ -3,8 +3,9 @@
 --
 -- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
 -- supabase/proposed/functions/send-push/index.ts reads this table to enforce
--- the quiet-hours, daily-cap, six-hour dedupe, and invite-nudge rules from
--- JustUs/Domain/PushPolicy.swift. There is no client policy: the service role
+-- the daily-cap, six-hour dedupe, and invite-nudge rules from
+-- JustUs/Domain/PushPolicy.swift. Quiet hours are not one of those rules.
+-- There is no client policy: the service role
 -- is the only writer, and the iOS app cannot insert or read these rows.
 
 create table if not exists public.push_deliveries (

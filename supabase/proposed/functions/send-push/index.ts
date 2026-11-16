@@ -1,11 +1,12 @@
-// Live send-push v3. Deployed from main at a12f1d1 with verify_jwt on.
-// 002, 006, and 007 are already applied. Do not redeploy from this branch.
+// Live send-push is still v3, deployed from main at a12f1d1 with verify_jwt on.
+// This source turns quiet hours off. It is not deployed until that change is
+// approved. 002, 006, and 007 are already applied. Do not re-apply them.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,
 // and the nudge index are never taken from the client. The recipient's tokens
 // are loaded with the service role after the caller's JWT is confirmed to be
-// a user. Quiet hours, the daily cap, the six-hour dedupe, and the invite
-// nudge windows match JustUs/Domain/PushPolicy.swift.
+// a user. The daily cap, the six-hour dedupe, and the invite nudge windows
+// match JustUs/Domain/PushPolicy.swift. A push is not held for 22:00–08:00.
 //
 // A flush is { "kind": "flush" } from the justus-push-flush cron. The bearer
 // is the legacy service_role JWT in the justus_service_role vault secret.
@@ -13,9 +14,10 @@
 // compare is not enough. verify_jwt is pinned on in supabase/config.toml,
 // and the payload role is what identifies the cron. A queued row is deleted
 // on any final decision, sent or held. It stays only when the send throws
-// or APNs asks for a retry, and only until the attempt cap. Quiet hours
-// move that row's not_before instead of inserting another. The APNs
-// provider token is reused for 50 minutes and dropped on 403.
+// or APNs asks for a retry, and only until the attempt cap. Rows already
+// waiting in push_outbox are sent once not_before is due. They are not
+// moved to the morning. The APNs provider token is reused for 50 minutes
+// and dropped on 403.
 //
 // Secrets stay on the function and are never committed:
 //   APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, APNS_KEY_P8
@@ -23,10 +25,8 @@
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
-import { dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns } from "./push.mjs";
+import { apnsAttemptLog, dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage } from "./push.mjs";
 
-const QUIET_START = 22;
-const QUIET_END = 8;
 const DEDUPE_MS = 6 * 60 * 60 * 1000;
 const INVITE_TTL_HOURS = 7 * 24;
 const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge"] as const;
@@ -60,6 +60,7 @@ Deno.serve(async (request) => {
       const flushed = await flushOutbox(supabaseUrl, serviceKey);
       return json(flushed, 200);
     } catch (error) {
+      console.log(`send-push flush error ${safeErrorMessage(error)}`);
       const message = error instanceof Error ? error.message : "";
       if (message === "push_log_missing") return json({ error: "push_log_missing" }, 503);
       return json({ error: "unavailable" }, 500);
@@ -72,9 +73,10 @@ Deno.serve(async (request) => {
   if (!callerId) return json({ error: "not_authenticated" }, 401);
 
   try {
-    const decision = await deliver(kind as Kind, callerId, supabaseUrl, serviceKey, {});
+    const decision = await deliver(kind as Kind, callerId, supabaseUrl, serviceKey);
     return json(decision.body, decision.status);
   } catch (error) {
+    console.log(`send-push error ${safeErrorMessage(error)}`);
     const message = error instanceof Error ? error.message : "";
     if (message === "push_log_missing") return json({ error: "push_log_missing" }, 503);
     return json({ error: "unavailable" }, 500);
@@ -86,7 +88,6 @@ async function deliver(
   callerId: string,
   supabaseUrl: string,
   serviceKey: string,
-  options: { outboxId?: string },
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const db = new Db(supabaseUrl, serviceKey);
   const callerRows = await db.select<{ couple_id: string; display_name: string }[]>(
@@ -154,26 +155,10 @@ async function deliver(
   };
   if (!allows(kind, preferences)) return { status: 200, body: { decision: "suppress", reason: "preference" } };
 
-  let zoned: { hour: number; day: string };
   try {
-    zoned = localParts(new Date(), couple.timezone);
+    localParts(new Date(), couple.timezone);
   } catch {
     return { status: 200, body: { decision: "suppress", reason: "invalid_timezone" } };
-  }
-  if (zoned.hour >= QUIET_START || zoned.hour < QUIET_END) {
-    const hours = zoned.hour >= QUIET_START ? 24 - zoned.hour + QUIET_END : QUIET_END - zoned.hour;
-    const notBefore = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-    // A row that is already queued is moved. Inserting here would leave
-    // the original due row beside the new one.
-    if (!options.outboxId) {
-      await db.insert("push_outbox", {
-        caller_user_id: callerId,
-        recipient_user_id: recipientId,
-        kind,
-        not_before: notBefore,
-      });
-    }
-    return { status: 202, body: { decision: "defer", reason: "quiet_hours", not_before: notBefore } };
   }
 
   const since = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
@@ -235,6 +220,7 @@ async function deliver(
       await db.remove("push_deliveries", `id=eq.${claimed.id}`);
       throw error;
     }
+    console.log(`send-push apns error ${safeErrorMessage(error)}`);
     // A later device threw after one send. Deleting the row is final, so
     // the next flush cannot deliver the same alert again.
     return { status: 200, body: { decision: "send", devices: sent } };
@@ -307,19 +293,15 @@ function forbidden(text: string): boolean {
   return ["outfit", "at home", "out tonight"].some((secret) => lower.includes(secret));
 }
 
-function localParts(now: Date, timeZone: string): { hour: number; day: string } {
+function localParts(now: Date, timeZone: string): { day: string } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    hourCycle: "h23",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
   }).formatToParts(now);
   const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  let hour = Number(pick("hour"));
-  if (hour === 24) hour = 0;
-  return { hour, day: `${pick("year")}-${pick("month")}-${pick("day")}` };
+  return { day: `${pick("year")}-${pick("month")}-${pick("day")}` };
 }
 
 class Db {
@@ -330,20 +312,6 @@ class Db {
     if (response.status === 404) throw new Error("push_log_missing");
     if (!response.ok) throw new Error("db");
     return await response.json() as T;
-  }
-
-  async insert(table: string, row: Record<string, unknown>): Promise<{ id: string }> {
-    const response = await this.request(table, {
-      method: "POST",
-      headers: { prefer: "return=representation" },
-      body: JSON.stringify(row),
-    });
-    if (response.status === 404) throw new Error("push_log_missing");
-    if (!response.ok) throw new Error("db");
-    const rows = await response.json() as { id: string }[];
-    const id = rows[0]?.id;
-    if (!id) throw new Error("db");
-    return { id };
   }
 
   async remove(table: string, filter: string): Promise<void> {
@@ -428,7 +396,7 @@ async function flushOutbox(supabaseUrl: string, serviceKey: string): Promise<Rec
   const due = orderedDue(await db.claimDue(50));
   const outcome = await flushDue(due, {
     deliver: async (row) => {
-      const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey, { outboxId: row.id });
+      const decision = await deliver(row.kind, row.caller_user_id, supabaseUrl, serviceKey);
       return decision.body;
     },
     remove: (row) => db.remove("push_outbox", `id=eq.${row.id}`),
@@ -465,6 +433,17 @@ async function send(
   } catch {
     reason = "";
   }
+  console.log(apnsAttemptLog({
+    kind,
+    status: response.status,
+    reason,
+    apnsId: response.headers.get("apns-id") ?? "",
+    sandbox,
+    topic,
+    keyId: Deno.env.get("APNS_KEY_ID") ?? "",
+    teamId: Deno.env.get("APNS_TEAM_ID") ?? "",
+    token,
+  }));
   return { status: response.status, reason };
 }
 

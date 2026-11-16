@@ -36,6 +36,40 @@ export function retryableApns(status, reason) {
   return providerTokenRejected(status, reason);
 }
 
+// One log line per APNs attempt. The device token is only its first six
+// characters. The provider JWT and the .p8 never belong in this line.
+export function apnsAttemptLog(attempt) {
+  const token = String(attempt.token ?? "");
+  const prefix = token.slice(0, 6).replace(/[\r\n\s]/g, "");
+  const fields = [
+    ["kind", attempt.kind],
+    ["status", attempt.status],
+    ["reason", attempt.reason || "-"],
+    ["apns_id", attempt.apnsId || "-"],
+    ["sandbox", attempt.sandbox === true],
+    ["topic", attempt.topic],
+    ["key_id", attempt.keyId],
+    ["team_id", attempt.teamId],
+    ["token_prefix", prefix],
+  ];
+  const body = fields.map(([key, value]) => `${key}=${logValue(value)}`).join(" ");
+  return `send-push apns ${body}`;
+}
+
+export function safeErrorMessage(error) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message
+    .replace(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g, "[redacted-key]")
+    .replace(/\/3\/device\/[^/?\s]+/gi, "/3/device/[token]")
+    .replace(/\b[0-9a-f]{32,}\b/gi, "[token]")
+    .replace(/\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[redacted-jwt]")
+    .replace(/bearer\s+\S+/gi, "bearer [redacted]");
+}
+
+function logValue(value) {
+  return String(value ?? "").replace(/[\r\n]/g, " ").replace(/\s+/g, "_").slice(0, 120);
+}
+
 export function orderedDue(rows, now = Number.POSITIVE_INFINITY, limit = 50) {
   const due = Number.isFinite(now)
     ? rows.filter((row) => Date.parse(row.not_before) <= now)
@@ -48,9 +82,10 @@ export function orderedDue(rows, now = Number.POSITIVE_INFINITY, limit = 50) {
   return due.slice(0, limit);
 }
 
-// A send or a hold is final: delete the row. A defer moves not_before on
-// the same row. A throw, an APNs error, or a retry stays until the attempt
-// cap, and the next row still runs.
+// A send or a hold is final: delete the row. A due row is sent even when
+// the local time is between 22:00 and 08:00. A throw, an APNs error, or a
+// retry stays until the attempt cap, and the next row still runs. A defer,
+// if a caller returns one, still moves not_before on that same row.
 export async function flushDue(rows, work) {
   let sent = 0;
   const removed = [];

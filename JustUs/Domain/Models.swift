@@ -220,7 +220,6 @@ struct PushRecord: Codable, Equatable, Sendable {
 enum PushDecision: Equatable, Sendable {
   case send
   case suppress(String)
-  case deferUntil(Date)
 }
 
 enum AnalyticsEvent: Equatable, Sendable {

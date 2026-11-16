@@ -2,18 +2,19 @@
 -- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
 -- claim_push_delivery is the atomic cap and dedupe. send-push calls it with
--- the service role after it has already checked the night, the mood, and the
--- invite. The insert and the re-check share one advisory lock, so two
--- requests cannot both pass.
+-- the service role after it has already checked the mood and the invite.
+-- The insert and the re-check share one advisory lock, so two requests
+-- cannot both pass.
 --
--- push_outbox holds a quiet-hours send until not_before. The edge function
--- accepts a service-role body { "kind": "flush" } and sends due rows.
+-- push_outbox holds a send until not_before. The edge function accepts a
+-- service-role body { "kind": "flush" } and sends due rows. Quiet hours do
+-- not write or move these rows. A row that is already queued is sent once
+-- it is due.
 -- claim_due_outbox locks the oldest due rows with FOR UPDATE SKIP LOCKED,
 -- counts the attempt, and leases them for 15 minutes so a second flush
 -- cannot take the same rows. A row is deleted on a final decision, sent
 -- or held. It stays only when the send throws or APNs asks for a retry,
--- and only until attempts reaches the cap. A quiet-hours defer moves
--- not_before on that same row. Nothing here schedules that call.
+-- and only until attempts reaches the cap. Nothing here schedules that call.
 -- pg_cron is not enabled by this file. 007 schedules justus-push-flush.
 -- 008_push_rollback.sql is the push-only rollback.
 
