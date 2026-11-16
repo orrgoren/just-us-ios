@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatScreen: View {
   @Bindable var model: SessionModel
+  @Environment(\.colorScheme) private var scheme
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
@@ -10,7 +11,7 @@ struct ChatScreen: View {
       if let notice = model.chatKeyNotice {
         Text(notice)
           .font(Theme.body)
-          .foregroundStyle(Theme.ink)
+          .foregroundStyle(Theme.ink(scheme))
           .accessibilityIdentifier(A11y.chatKeyNotice)
       }
       if model.ritual?.partner == nil {

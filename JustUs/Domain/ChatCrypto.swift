@@ -32,19 +32,19 @@ enum ChatCryptoError: Error {
 }
 
 enum ChatText {
-  /// UTF-8 bytes, not Swift characters. An emoji counts as more than one.
-  static let maxBytes = 2000
+  /// Swift characters, so one emoji counts as one.
+  static let maxCharacters = 1000
 
   static func normalized(_ raw: String) throws -> String {
     let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     if text.isEmpty { throw AppError.invalid(.note) }
-    if text.utf8.count > maxBytes { throw AppError.chatTooLong }
+    if text.count > maxCharacters { throw AppError.chatTooLong }
     return text
   }
 }
 
 enum SenderKey {
-  /// The row's sender key is trusted only when that exact key is published for the sender.
+  /// Active and retired keys both count. A rotated key still opens old messages.
   static func trusted(sender: Data, senderUserId: UUID, keys: [(userId: UUID, publicKey: Data)]) -> Bool {
     sender.count == 32 && keys.contains { $0.userId == senderUserId && $0.publicKey == sender }
   }
@@ -57,8 +57,9 @@ enum ChatRecipients {
   static func choose(
     senderUserId: UUID,
     senderKeyId: UUID,
-    keys: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)]
+    keys: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date, retired: Bool)]
   ) -> [ChatTarget] {
+    let keys = keys.filter { $0.retired == false }
     let own = keys.filter { $0.userId == senderUserId }
     var kept: [ChatTarget] = []
     if let current = own.first(where: { $0.id == senderKeyId }) {
@@ -77,8 +78,8 @@ enum ChatRecipients {
   }
 
   private static func newest(
-    _ keys: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)]
-  ) -> [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)] {
+    _ keys: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date, retired: Bool)]
+  ) -> [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date, retired: Bool)] {
     keys.sorted { lhs, rhs in
       if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
       return lhs.id.uuidString > rhs.id.uuidString

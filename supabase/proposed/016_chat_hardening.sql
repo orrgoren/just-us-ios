@@ -1,5 +1,6 @@
--- NOT APPLIED. Apply this live once, after 015 and 015b. Do not re-apply.
+-- Applied live on 2026-11-16 as 20261116050321. Do not re-apply.
 -- scripts/sql-lifecycle.sh runs it against a throwaway database only.
+-- Retiring a key instead of deleting it is 018_chat_key_retire.sql.
 --
 -- Hardens partner chat on top of the applied 015 schema:
 -- * sender_public_key must already be in device_keys for auth.uid()

@@ -209,14 +209,14 @@ final class DomainTests: XCTestCase {
     XCTAssertThrowsError(try ChatText.normalized("   ")) { error in
       XCTAssertEqual(error as? AppError, .invalid(.note))
     }
-    XCTAssertEqual(try ChatText.normalized(String(repeating: "a", count: 2000)).utf8.count, 2000)
-    XCTAssertThrowsError(try ChatText.normalized(String(repeating: "a", count: 2001))) { error in
-      XCTAssertEqual(error as? AppError, .chatTooLong)
-    }
-    XCTAssertThrowsError(try ChatText.normalized(String(repeating: "🙂", count: 501))) { error in
+    XCTAssertEqual(try ChatText.normalized(String(repeating: "a", count: 1000)).count, 1000)
+    XCTAssertEqual(try ChatText.normalized(String(repeating: "🙂", count: 1000)).count, 1000)
+    XCTAssertThrowsError(try ChatText.normalized(String(repeating: "a", count: 1001))) { error in
       XCTAssertEqual(error as? AppError, .chatTooLong)
     }
     XCTAssertEqual(L10n.message(for: .chatTooLong), L10n.chatTooLong)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.canvas), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
   }
 
   func testChatKeepsTheCurrentKeyAndTheNewestPartnerKeys() {
@@ -225,17 +225,30 @@ final class DomainTests: XCTestCase {
     let current = UUID()
     let older = Date(timeIntervalSince1970: 1)
     let keys = (0..<5).map { index in
-      (id: UUID(), userId: sender, publicKey: Data([UInt8(index)]), createdAt: older.addingTimeInterval(TimeInterval(index)))
+      (
+        id: UUID(), userId: sender, publicKey: Data([UInt8(index)]),
+        createdAt: older.addingTimeInterval(TimeInterval(index)), retired: false
+      )
     }
-    let currentKey = (id: current, userId: sender, publicKey: Data([9]), createdAt: older)
+    let currentKey = (id: current, userId: sender, publicKey: Data([9]), createdAt: older, retired: false)
     let partnerKeys = (0..<4).map { index in
-      (id: UUID(), userId: partner, publicKey: Data([UInt8(20 + index)]), createdAt: older.addingTimeInterval(TimeInterval(index)))
+      (
+        id: UUID(), userId: partner, publicKey: Data([UInt8(20 + index)]),
+        createdAt: older.addingTimeInterval(TimeInterval(index)), retired: false
+      )
     }
-    let chosen = ChatRecipients.choose(senderUserId: sender, senderKeyId: current, keys: [currentKey] + keys + partnerKeys)
+    let retiredPartner = (
+      id: UUID(), userId: partner, publicKey: Data([99]),
+      createdAt: older.addingTimeInterval(50), retired: true
+    )
+    let chosen = ChatRecipients.choose(
+      senderUserId: sender, senderKeyId: current, keys: [currentKey, retiredPartner] + keys + partnerKeys
+    )
     let own = chosen.filter { $0.userId == sender }
     XCTAssertEqual(own.count, 3)
     XCTAssertEqual(own.first?.keyId, current)
     XCTAssertEqual(chosen.filter { $0.userId == partner }.count, 3)
+    XCTAssertFalse(chosen.contains { $0.keyId == retiredPartner.id })
   }
 
   func testChatWindowShowsTheNewestHundred() {

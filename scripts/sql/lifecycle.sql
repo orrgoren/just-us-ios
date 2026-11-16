@@ -1138,12 +1138,20 @@ begin
 
   execute 'reset role';
   perform public.claim_push_delivery(blair, 'chatMessage', 'Asia/Jerusalem');
-  perform public.claim_push_delivery(blair, 'chatMessage', 'Asia/Jerusalem');
+  begin
+    perform public.claim_push_delivery(blair, 'chatMessage', 'Asia/Jerusalem');
+    raise exception 'second_chat_push_was_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'coalesced' then
+        raise;
+      end if;
+  end;
   if (
     select count(*) from public.push_deliveries
     where recipient_user_id = blair and kind = 'chatMessage' and transactional
-  ) <> 2 then
-    raise exception 'chat_push_was_capped';
+  ) <> 1 then
+    raise exception 'chat_push_was_not_claimed';
   end if;
   perform public.claim_push_delivery(blair, 'partnerMood', 'Asia/Jerusalem');
   begin
@@ -1158,7 +1166,7 @@ begin
 end $$;
 
 -- 016. The sender key has to be one of theirs, the clock is the server's,
--- a fourth device key drops the oldest, and leaving drops the keys.
+-- a fourth device key retires the oldest, and leaving deletes the keys.
 do $$
 declare
   n int;
@@ -1273,17 +1281,17 @@ begin
       encode(set_byte(decode(repeat('00', 32), 'hex'), 0, i), 'base64')
     );
   end loop;
-  if (select count(*) from public.device_keys where user_id = alex) <> 3 then
+  if (select count(*) from public.device_keys where user_id = alex and retired_at is null) <> 3 then
     raise exception 'device_key_cap';
   end if;
-  if exists (select 1 from public.device_keys where id = key_id) then
-    raise exception 'oldest_device_key_kept';
+  if (select retired_at from public.device_keys where id = key_id) is null then
+    raise exception 'oldest_device_key_not_retired';
   end if;
 
   execute 'reset role';
   perform set_config('request.jwt.claim.sub', blair::text, true);
   execute 'set local role authenticated';
-  if (select count(*) from public.device_keys where user_id = alex) <> 3 then
+  if (select count(*) from public.device_keys where user_id = alex) <> 4 then
     raise exception 'partner_could_not_read_device_keys';
   end if;
   begin
@@ -1327,5 +1335,70 @@ begin
   execute 'reset role';
   if exists (select 1 from public.device_keys where user_id = outsider) then
     raise exception 'delete_account_kept_device_keys';
+  end if;
+end $$;
+
+-- 018. created_at is the server clock. Retiring a key keeps the row and the
+-- message. Rewriting the public key is rejected.
+do $$
+declare
+  alex uuid := '2a2a2a2a-2a2a-42a2-82a2-2a2a2a2a2a2a';
+  blair uuid := '2b2b2b2b-2b2b-42b2-82b2-2b2b2b2b2b2b';
+  couple uuid := '2c2c2c2c-2c2c-42c2-82c2-2c2c2c2c2c2c';
+  key_id uuid := '2d2d2d2d-2d2d-42d2-82d2-2d2d2d2d2d2d';
+  message uuid := '2e2e2e2e-2e2e-42e2-82e2-2e2e2e2e2e2e';
+  alex_key text := 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
+  stamped timestamptz;
+begin
+  insert into auth.users (id) values (alex), (blair) on conflict do nothing;
+  insert into public.couples (
+    id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name
+  ) values (
+    couple, alex, 4, '20:30', 'Asia/Jerusalem', 90, 'Blair'
+  );
+  insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+    (couple, alex, 'Alex', 0),
+    (couple, blair, 'Blair', 1);
+
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  insert into public.device_keys (id, user_id, public_key, created_at)
+  values (key_id, alex, alex_key, timestamptz '1999-01-01+00');
+  select created_at into stamped from public.device_keys where id = key_id;
+  if stamped < now() - interval '1 minute' then
+    raise exception 'device_key_created_at_was_client';
+  end if;
+
+  insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+  values (
+    message, couple, alex, alex_key,
+    '[{"key_id":"2d2d2d2d-2d2d-42d2-82d2-2d2d2d2d2d2d","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+  );
+  update public.device_keys set retired_at = timestamptz '1999-01-01+00' where id = key_id;
+  select retired_at into stamped from public.device_keys where id = key_id;
+  if stamped is null or stamped < now() - interval '1 minute' then
+    raise exception 'retire_did_not_stamp_now';
+  end if;
+
+  begin
+    update public.device_keys set public_key = 'AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=' where id = key_id;
+    raise exception 'public_key_was_rewritten';
+  exception
+    when insufficient_privilege then
+      null;
+    when others then
+      if sqlerrm is distinct from 'not_editable' then
+        raise;
+      end if;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.chat_messages where id = message) <> 1 then
+    raise exception 'retired_key_hid_the_message';
+  end if;
+  if (select count(*) from public.device_keys where id = key_id) <> 1 then
+    raise exception 'retired_key_was_deleted';
   end if;
 end $$;

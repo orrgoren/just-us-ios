@@ -15,6 +15,7 @@ export const APNS_JWT_TTL_MS = 50 * 60 * 1000;
 export const MAX_FLUSH_ATTEMPTS = 5;
 
 // One chat notification per recipient in this window. The daily cap does not apply.
+// The live check is inside claim_push_delivery, in the same transaction as the insert.
 export const CHAT_PUSH_WINDOW_MS = 60 * 1000;
 
 export function skipsDailyCap(kind) {

@@ -93,6 +93,11 @@ final class FakeBackend: DateBackend {
 
   func signOut() async throws {
     if blockSignOut { throw AppError.signOutBlocked }
+    if let id = store.world.sessionUserId {
+      for index in store.world.deviceKeys.indices where store.world.deviceKeys[index].userId == id {
+        store.world.deviceKeys[index].retiredAt = Date()
+      }
+    }
     await dropExpiredSession()
   }
 
@@ -336,10 +341,9 @@ final class FakeBackend: DateBackend {
     if let chatFailure { throw chatFailure }
     guard let user = current(), let mine = member(user.id) else { return [] }
     let identity = try ensureKey(userId: user.id)
-    let published = store.world.deviceKeys
-      .filter { member($0.userId)?.coupleId == mine.coupleId }
-      .map { (userId: $0.userId, publicKey: $0.publicKey) }
-    let partnerKeys = published.filter { $0.userId != user.id }.map(\.publicKey)
+    let coupleKeys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
+    let published = coupleKeys.map { (userId: $0.userId, publicKey: $0.publicKey) }
+    let partnerKeys = coupleKeys.filter { $0.userId != user.id && $0.retiredAt == nil }.map(\.publicKey)
     let previous = seenPartnerKeys[user.id] ?? []
     if PartnerKeyMemory.changed(previous: previous, current: partnerKeys) {
       keyNotice = L10n.chatKeyChanged
@@ -376,7 +380,9 @@ final class FakeBackend: DateBackend {
     let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
     let targets = ChatRecipients.choose(
       senderUserId: user.id, senderKeyId: identity.id,
-      keys: keys.map { (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt) }
+      keys: keys.map {
+        (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt, retired: $0.retiredAt != nil)
+      }
     )
     guard targets.contains(where: { $0.userId != user.id }) else { throw AppError.partnerNotReady }
     let messageId = UUID()
@@ -401,7 +407,9 @@ final class FakeBackend: DateBackend {
       let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == alex.coupleId }
       let targets = ChatRecipients.choose(
         senderUserId: userId, senderKeyId: key.id,
-        keys: keys.map { (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt) }
+        keys: keys.map {
+          (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt, retired: $0.retiredAt != nil)
+        }
       )
       let messageId = UUID()
       guard let envelopes = try? ChatCrypto.seal(
@@ -416,7 +424,7 @@ final class FakeBackend: DateBackend {
   }
 
   private func ensureKey(userId: UUID) throws -> ChatIdentity {
-    if let existing = store.world.deviceKeys.first(where: { $0.userId == userId }) {
+    if let existing = store.world.deviceKeys.first(where: { $0.userId == userId && $0.retiredAt == nil }) {
       return try ChatIdentity.restored(id: existing.id, privateKey: existing.privateKey)
     }
     let created = ChatIdentity.generate()

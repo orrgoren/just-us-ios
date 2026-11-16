@@ -213,12 +213,19 @@ struct DeviceKeyRow: Decodable {
   var userId: UUID
   var publicKey: String
   var createdAt: String
+  var retiredAt: String?
   enum CodingKeys: String, CodingKey {
     case id
     case userId = "user_id"
     case publicKey = "public_key"
     case createdAt = "created_at"
+    case retiredAt = "retired_at"
   }
+}
+
+struct DeviceKeyRetire: Encodable {
+  var retiredAt: String
+  enum CodingKeys: String, CodingKey { case retiredAt = "retired_at" }
 }
 
 struct DeviceKeyInsert: Encodable {

@@ -64,13 +64,18 @@ struct FakeDeviceKey: Codable, Equatable {
   var publicKey: Data
   var privateKey: Data
   var createdAt: Date
+  var retiredAt: Date?
 
-  init(id: UUID, userId: UUID, publicKey: Data, privateKey: Data, createdAt: Date = Date()) {
+  init(
+    id: UUID, userId: UUID, publicKey: Data, privateKey: Data,
+    createdAt: Date = Date(), retiredAt: Date? = nil
+  ) {
     self.id = id
     self.userId = userId
     self.publicKey = publicKey
     self.privateKey = privateKey
     self.createdAt = createdAt
+    self.retiredAt = retiredAt
   }
 }
 

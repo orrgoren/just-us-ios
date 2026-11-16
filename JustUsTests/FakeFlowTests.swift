@@ -479,6 +479,37 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(blair.chatKeyNotice, L10n.chatKeyChanged)
   }
 
+  func testMessageFromARetiredKeyStaysReadable() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let blair = SessionModel(backend: backend)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    let secret = "still-readable"
+    alex.chatDraft = secret
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    await alex.signOut()
+    let retired = store.world.deviceKeys.filter { $0.userId == SeedID.alex }
+    XCTAssertEqual(retired.count, 1)
+    XCTAssertNotNil(retired.first?.retiredAt)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    await blair.refresh()
+    XCTAssertEqual(blair.messages.last?.text, secret)
+    XCTAssertEqual(blair.messages.last?.unreadable, false)
+  }
+
   func testChatLoadErrorsStayVisible() async throws {
     let store = FakeStore(inMemory: true)
     let backend = FakeBackend(store: store, cooldown: 0)
@@ -501,7 +532,7 @@ final class FakeFlowTests: XCTestCase {
     await alex.refresh()
     XCTAssertEqual(alex.errorMessage, L10n.message(for: .server(code: "chat")))
     XCTAssertEqual(alex.messages.count, 1)
-    alex.chatDraft = String(repeating: "a", count: 2001)
+    alex.chatDraft = String(repeating: "a", count: 1001)
     backend.chatFailure = nil
     await alex.sendChat()
     XCTAssertEqual(alex.errorMessage, L10n.message(for: .chatTooLong))

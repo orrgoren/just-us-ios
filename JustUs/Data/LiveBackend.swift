@@ -99,8 +99,26 @@ final class LiveBackend: DateBackend {
   func signOut() async throws {
     watchTask?.cancel()
     chatWatch?.cancel()
+    try await retirePublishedKey()
     try await deleteTokenThenSignOut()
     wipeAfterSignOut()
+  }
+
+  /// The server keeps the public key and marks it retired, so old messages still open.
+  private func retirePublishedKey() async throws {
+    guard let user = cachedUser, let identity = try? DeviceKeyStore.load(userId: user) else { return }
+    let stamp = ISO8601DateFormatter().string(from: Date())
+    do {
+      try await run { client in
+        try await client.from("device_keys")
+          .update(DeviceKeyRetire(retiredAt: stamp))
+          .eq("id", value: identity.id.uuidString)
+          .eq("user_id", value: user.uuidString)
+          .execute()
+      }
+    } catch {
+      throw AppError.signOutBlocked
+    }
   }
 
   func dropExpiredSession() async {
@@ -398,7 +416,10 @@ final class LiveBackend: DateBackend {
     try await publishDeviceKey(identity, userId: context.userId)
     watchChat(coupleId: context.couple.id)
     let keys = try await loadDeviceKeys(coupleId: context.couple.id)
-    let partnerKeys = keys.filter { $0.userId != context.userId }.map(\.publicKey).sorted()
+    let partnerKeys = keys
+      .filter { $0.userId != context.userId && $0.retiredAt == nil }
+      .map(\.publicKey)
+      .sorted()
     if PartnerKeyMemory.remember(userId: context.userId, current: partnerKeys) {
       partnerKeyNoticeText = L10n.chatKeyChanged
     }
@@ -430,7 +451,7 @@ final class LiveBackend: DateBackend {
     let identity = try DeviceKeyStore.loadOrCreate(userId: context.userId)
     try await publishDeviceKey(identity, userId: context.userId)
     let keys = try await loadDeviceKeys(coupleId: context.couple.id)
-    let targets = chatTargets(keys: keys, userId: context.userId, identity: identity)
+    let targets = chatTargets(keys: keys.filter { $0.retiredAt == nil }, userId: context.userId, identity: identity)
     guard targets.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
     let messageId = UUID()
     let envelopes = try ChatCrypto.seal(
@@ -449,9 +470,9 @@ final class LiveBackend: DateBackend {
   }
 
   private func chatTargets(keys: [DeviceKeyRow], userId: UUID, identity: ChatIdentity) -> [ChatTarget] {
-    let parsed: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date)] = keys.compactMap { key in
+    let parsed: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date, retired: Bool)] = keys.compactMap { key in
       guard let raw = ChatCoding.data(key.publicKey), raw.count == 32 else { return nil }
-      return (key.id, key.userId, raw, APIDate.parse(key.createdAt) ?? .distantPast)
+      return (key.id, key.userId, raw, APIDate.parse(key.createdAt) ?? .distantPast, key.retiredAt != nil)
     }
     return ChatRecipients.choose(senderUserId: userId, senderKeyId: identity.id, keys: parsed)
   }

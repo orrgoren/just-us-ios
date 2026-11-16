@@ -93,7 +93,7 @@ enum L10n {
   static var chatEmpty: String { text("chat.empty", "Nothing here yet.") }
   static var chatField: String { text("chat.field", "Message") }
   static var chatSend: String { text("chat.send", "Send") }
-  static var chatTooLong: String { text("chat.tooLong", "A message can be at most 2,000 bytes.") }
+  static var chatTooLong: String { text("chat.tooLong", "A message can be at most 1,000 characters.") }
   static var chatKeyChanged: String { text("chat.keyChanged", "Your partner's key changed.") }
   static var chatUnreadable: String { text("chat.unreadable", "This phone can't read that message.") }
   static var chatPartner: String { text("chat.partner", "Their phone needs to open the app once before a message can be locked to them.") }
