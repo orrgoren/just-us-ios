@@ -54,7 +54,7 @@ final class DomainTests: XCTestCase {
     XCTAssertTrue(PushPolicy.forbiddenFragments(in: body, secrets: ["A table for two", "Cozy", "home"]).isEmpty)
   }
 
-  func testDailyCapAndQuietHours() throws {
+  func testNightSendsAndTheOtherRulesStay() throws {
     var calendar = Calendar(identifier: .gregorian)
     let zone = try XCTUnwrap(TimeZone(identifier: "Asia/Jerusalem"))
     calendar.timeZone = zone
@@ -63,8 +63,17 @@ final class DomainTests: XCTestCase {
     parts.month = 11
     parts.day = 12
     parts.hour = 23
-    let quiet = try XCTUnwrap(calendar.date(from: parts))
-    XCTAssertEqual(PushPolicy.decide(kind: .partnerMood, now: quiet, timeZone: zone, history: [], preferences: .allOn), .deferUntil(PushPolicy.nextQuietEnd(quiet, timeZone: zone)))
+    let late = try XCTUnwrap(calendar.date(from: parts))
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .partnerMood, now: late, timeZone: zone, history: [], preferences: .allOn),
+      .send
+    )
+    parts.hour = 3
+    let early = try XCTUnwrap(calendar.date(from: parts))
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .weeklyReminder, now: early, timeZone: zone, history: [], preferences: .allOn),
+      .send
+    )
     parts.hour = 12
     let noon = try XCTUnwrap(calendar.date(from: parts))
     let prior = PushRecord(kind: .weeklyReminder, sentAt: noon, transactional: false)
@@ -75,6 +84,27 @@ final class DomainTests: XCTestCase {
     XCTAssertEqual(
       PushPolicy.decide(kind: .planReady, now: noon.addingTimeInterval(60), timeZone: zone, history: [prior], preferences: .allOn),
       .suppress("daily_non_transactional")
+    )
+    let recentMood = PushRecord(kind: .partnerMood, sentAt: noon, transactional: false)
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .partnerMood, now: noon.addingTimeInterval(3600), timeZone: zone, history: [recentMood], preferences: .allOn),
+      .suppress("deduped_6h")
+    )
+    parts.day = 11
+    parts.hour = 20
+    let previousEvening = try XCTUnwrap(calendar.date(from: parts))
+    let previousMood = PushRecord(kind: .partnerMood, sentAt: previousEvening, transactional: false)
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .partnerMood, now: early, timeZone: zone, history: [previousMood], preferences: .allOn),
+      .send
+    )
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .inviteNudge, now: noon, timeZone: zone, history: [], preferences: .allOn, inviteAgeHours: 10),
+      .suppress("outside_nudge_window")
+    )
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .inviteNudge, now: noon, timeZone: zone, history: [], preferences: .allOn, inviteAgeHours: 24),
+      .send
     )
   }
 

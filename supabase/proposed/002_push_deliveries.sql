@@ -1,10 +1,13 @@
 -- Applied live at 20261115092359. Do not re-apply.
 -- This file is not a migration. scripts/sql-lifecycle.sh runs it in CI.
 --
--- Live send-push is v3, deployed from main at a12f1d1 with verify_jwt on.
+-- Live send-push is v6, deployed on 2026-11-16 with the content of 5013075
+-- (the same content as 7872d1e) and verify_jwt on. a12f1d1 is v3 and is the
+-- rollback source.
 -- supabase/proposed/functions/send-push/index.ts reads this table to enforce
--- the quiet-hours, daily-cap, six-hour dedupe, and invite-nudge rules from
--- JustUs/Domain/PushPolicy.swift. There is no client policy: the service role
+-- the daily-cap, six-hour dedupe, and invite-nudge rules from
+-- JustUs/Domain/PushPolicy.swift. Quiet hours are not one of those rules.
+-- There is no client policy: the service role
 -- is the only writer, and the iOS app cannot insert or read these rows.
 
 create table if not exists public.push_deliveries (

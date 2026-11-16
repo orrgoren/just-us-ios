@@ -28,7 +28,7 @@ The app sends Sign in with Apple as an ID token, not as a web OAuth redirect:
 
 ## Edge Function secrets
 
-Live `send-push` is v3, deployed from `main` at `a12f1d1` with `verify_jwt` on. That deployed source is `supabase/proposed/functions/send-push/index.ts`. `002_push_deliveries.sql`, `006_push_claim_and_outbox.sql`, and `007_push_flush_schedule.sql` are already live, in that order. Do not re-apply them. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the live sender accepts that flush by the JWT `role` claim. A queued push is removed on a final decision and kept only for a retryable APNs failure, up to the attempt cap. The APNs provider token is reused for 50 minutes. `verify_jwt` is pinned on in `supabase/config.toml`. Set the function secrets to:
+Live `send-push` is v6, deployed on 2026-11-16 with the content of `5013075` (the same content as `7872d1e`) and `verify_jwt` on. `a12f1d1` is v3 and is the rollback source. The deployed source is `supabase/proposed/functions/send-push/index.ts`. It imports `supabase/proposed/functions/send-push/push.mjs` and `supabase/proposed/functions/_shared/jwt-role.mjs`. It does not defer a push between 22:00 and 08:00. The daily cap, the six-hour dedupe, and the invite nudge windows stay, and a `push_outbox` row is still sent once `not_before` is due. `002_push_deliveries.sql`, `006_push_claim_and_outbox.sql`, and `007_push_flush_schedule.sql` are already live, in that order. Do not re-apply them. The flush cron sends the legacy service_role JWT from the vault. The function env may hold the newer `sb_secret` key, so the live sender accepts that flush by the JWT `role` claim. A queued push is removed on a final decision and kept only for a retryable APNs failure, up to the attempt cap. The APNs provider token is reused for 50 minutes. `verify_jwt` is pinned on in `supabase/config.toml`. Set the function secrets to:
 
 | Secret | What to enter |
 | --- | --- |
@@ -40,7 +40,7 @@ Live `send-push` is v3, deployed from `main` at `a12f1d1` with `verify_jwt` on. 
 
 A person who already has the `.p8` sets those secrets from their own machine. CI does not. The function also needs the service role to read `device_tokens`. Supabase injects `SUPABASE_SERVICE_ROLE_KEY` into Edge Functions. Do not copy that key into the iOS app or into GitHub Actions.
 
-Copy for a notification is chosen in `JustUs/Domain/PushPolicy.swift` and in the live `send-push` function. The two have to match. The message does not include the place, the outfit, or the idea title.
+Copy for a notification is chosen in `JustUs/Domain/PushPolicy.swift` and in the `send-push` function. The two have to match. The message does not include the place, the outfit, or the idea title. Neither side holds a notification for quiet hours.
 
 ## Related schema
 

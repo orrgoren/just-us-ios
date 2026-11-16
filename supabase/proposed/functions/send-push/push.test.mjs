@@ -4,6 +4,7 @@ import { jwtRole } from "../_shared/jwt-role.mjs";
 import {
   APNS_JWT_TTL_MS,
   MAX_FLUSH_ATTEMPTS,
+  apnsAttemptLog,
   dropDeviceToken,
   flushDue,
   freshApnsToken,
@@ -11,6 +12,7 @@ import {
   orderedDue,
   providerTokenRejected,
   retryableApns,
+  safeErrorMessage,
 } from "./push.mjs";
 
 function jwt(header, claims) {
@@ -92,11 +94,35 @@ test("an APNs error is kept until the retry cap, including 429", async () => {
   assert.equal(MAX_FLUSH_ATTEMPTS, 5);
 });
 
-test("a quiet-hours defer moves the same row", async () => {
+test("a queued row is sent once it is due, including at night", async () => {
   const removed = [];
   const moved = [];
-  await flushDue([{ id: "quiet", attempts: 1 }], {
-    deliver: async () => ({ decision: "defer", not_before: "2026-11-16T06:00:00Z" }),
+  const now = Date.parse("2026-11-15T22:30:00Z");
+  const due = orderedDue([
+    { id: "night", attempts: 1, not_before: "2026-11-15T20:00:00Z" },
+    { id: "later", attempts: 0, not_before: "2026-11-16T08:00:00Z" },
+  ], now);
+  const outcome = await flushDue(due, {
+    deliver: async () => ({ decision: "send" }),
+    remove: async (row) => {
+      removed.push(row.id);
+    },
+    reschedule: async (row, notBefore) => {
+      moved.push([row.id, notBefore]);
+    },
+  });
+  assert.deepEqual(due.map((row) => row.id), ["night"]);
+  assert.deepEqual(removed, ["night"]);
+  assert.deepEqual(moved, []);
+  assert.equal(outcome.sent, 1);
+  assert.deepEqual(outcome.kept, []);
+});
+
+test("a defer moves the same row instead of leaving it due", async () => {
+  const removed = [];
+  const moved = [];
+  const outcome = await flushDue([{ id: "held", attempts: 1, not_before: "2026-11-15T20:00:00Z" }], {
+    deliver: async () => ({ decision: "defer", not_before: "2026-11-16T12:00:00Z" }),
     remove: async (row) => {
       removed.push(row.id);
     },
@@ -105,7 +131,8 @@ test("a quiet-hours defer moves the same row", async () => {
     },
   });
   assert.deepEqual(removed, []);
-  assert.deepEqual(moved, [["quiet", "2026-11-16T06:00:00Z"]]);
+  assert.deepEqual(moved, [["held", "2026-11-16T12:00:00Z"]]);
+  assert.equal(outcome.sent, 0);
 });
 
 test("due rows are taken in not_before order", () => {
@@ -130,6 +157,63 @@ test("only a dead device token is deleted", () => {
   assert.equal(providerTokenRejected(403, "ExpiredProviderToken"), true);
   assert.equal(providerTokenRejected(403, "InvalidProviderToken"), true);
   assert.equal(providerTokenRejected(403, "ExpiredToken"), false);
+});
+
+test("an APNs attempt log keeps six token characters and no secret", () => {
+  const token = "abcdef0123456789deadbeef";
+  const line = apnsAttemptLog({
+    kind: "partnerMood",
+    status: 403,
+    reason: "InvalidProviderToken",
+    apnsId: "7C0B3E10-1234-4A5B-8C9D-0123456789AB",
+    sandbox: false,
+    topic: "com.orrgoren.justus",
+    keyId: "ABC123DEFG",
+    teamId: "TEAMID1234",
+    token,
+  });
+  assert.match(line, /^send-push apns /);
+  assert.match(line, /kind=partnerMood/);
+  assert.match(line, /status=403/);
+  assert.match(line, /reason=InvalidProviderToken/);
+  assert.match(line, /apns_id=7C0B3E10-1234-4A5B-8C9D-0123456789AB/);
+  assert.match(line, /sandbox=false/);
+  assert.match(line, /topic=com\.orrgoren\.justus/);
+  assert.match(line, /key_id=ABC123DEFG/);
+  assert.match(line, /team_id=TEAMID1234/);
+  assert.match(line, /token_prefix=abcdef/);
+  assert.equal(line.includes(token), false);
+  assert.equal(line.includes("PRIVATE KEY"), false);
+  assert.equal(line.includes("\n"), false);
+});
+
+test("an error message drops the device token, the key, and a provider jwt", () => {
+  const token = "abcdef0123456789deadbeef";
+  const pem = "-----BEGIN PRIVATE KEY-----\nsample-body\n-----END PRIVATE KEY-----";
+  const dotted = ["aaaabbbb", "ccccdddd", "eeeeffff"].join(".");
+  // The word is split so this fixture is not a literal bearer token.
+  const message = safeErrorMessage(new Error(
+    `connect ${pem} https://api.push.apple.com/3/device/${token} ${"bear" + "er"} ${dotted}`,
+  ));
+  assert.equal(message.includes(token), false);
+  assert.equal(message.includes("sample-body"), false);
+  assert.match(message, /\/3\/device\/\[token\]/);
+  assert.match(message, /\[redacted-key\]/);
+  assert.match(message, /\[redacted-jwt\]|bearer \[redacted\]/);
+});
+
+test("an error message drops an sb_secret and a bare p8 body", () => {
+  const secret = "sb_secret_" + "examplekeybody0123456789";
+  const bare = "A".repeat(40) + "p8body" + "B".repeat(40);
+  const lines = ["C".repeat(64), "D".repeat(64), "E".repeat(32)].join("\n");
+  const message = safeErrorMessage(new Error(`env ${secret} key ${bare}\n${lines}`));
+  assert.equal(message.includes("sb_secret_"), false);
+  assert.equal(message.includes(secret.slice("sb_secret_".length)), false);
+  assert.equal(message.includes(bare), false);
+  assert.equal(message.includes("C".repeat(64)), false);
+  assert.equal(message.includes("D".repeat(64)), false);
+  assert.match(message, /\[redacted-secret\]/);
+  assert.match(message, /\[redacted-key\]/);
 });
 
 test("an APNs token is reused for 50 minutes", () => {
