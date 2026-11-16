@@ -183,6 +183,7 @@ enum AppError: Error, Equatable, Sendable {
   case unsyncedChanges
   case signOutBlocked
   case accountDeleteBlocked
+  case partnerNotReady
   case server(code: String)
 }
 
@@ -192,6 +193,7 @@ enum PushKind: String, Codable, Equatable, Sendable {
   case inviteAccepted
   case weeklyReminder
   case inviteNudge
+  case chatMessage
 }
 
 struct PushPreferences: Codable, Equatable, Sendable {
@@ -208,6 +210,7 @@ struct PushPreferences: Codable, Equatable, Sendable {
     case .planReady: return planReady
     case .inviteAccepted: return inviteAccepted
     case .weeklyReminder, .inviteNudge: return weeklyReminder
+    case .chatMessage: return true
     }
   }
 }
@@ -238,7 +241,16 @@ enum AnalyticsEvent: Equatable, Sendable {
 }
 
 enum AppTab: String, Equatable, Hashable, Sendable {
-  case week, memories, settings
+  case week, chat, memories, settings
+}
+
+struct ChatLine: Identifiable, Equatable, Sendable {
+  var id: UUID
+  var senderUserId: UUID
+  var text: String
+  var createdAt: Date
+  var mine: Bool
+  var unreadable: Bool
 }
 
 enum AppRoute: Equatable, Sendable {
@@ -246,5 +258,6 @@ enum AppRoute: Equatable, Sendable {
   case reveal
   case memories
   case settings
+  case chat
   case invite(String)
 }

@@ -120,6 +120,7 @@ enum DeepLinks {
       case "reveal": return .reveal
       case "memories": return .memories
       case "settings": return .settings
+      case "chat": return .chat
       case "invite":
         let token = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard InviteRules.isTokenShape(token) else { return nil }
@@ -141,6 +142,7 @@ enum DeepLinks {
     case "plan_ready", "planReady", "reveal": return .reveal
     case "partner_mood", "partnerMood", "weekly", "weeklyReminder": return .home
     case "invite_accepted", "inviteAccepted", "invite_nudge", "inviteNudge": return .settings
+    case "chat", "chat_message", "chatMessage": return .chat
     default: return .home
     }
   }
@@ -150,6 +152,7 @@ enum DeepLinks {
     if type == "reveal" || type == "plan_ready" || type == "planReady" { return .reveal }
     if type == "memories" { return .memories }
     if type == "settings" || type == "invite_accepted" || type == "inviteAccepted" || type == "invite_nudge" || type == "inviteNudge" { return .settings }
+    if type == "chat" || type == "chat_message" || type == "chatMessage" { return .chat }
     return pushRoute(type)
   }
 }

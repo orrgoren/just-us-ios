@@ -6,6 +6,7 @@ final class LiveBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
   let client: SupabaseClient?
   var watchTask: Task<Void, Never>?
+  var chatWatch: Task<Void, Never>?
   private var cachedUser: UUID?
   private var deviceToken: String?
 
@@ -95,6 +96,7 @@ final class LiveBackend: DateBackend {
 
   func signOut() async throws {
     watchTask?.cancel()
+    chatWatch?.cancel()
     try await deleteTokenThenSignOut()
     wipeAfterSignOut()
   }
@@ -371,6 +373,131 @@ final class LiveBackend: DateBackend {
       try await deleteCouplePhotos(coupleIds)
     } catch {
       return
+    }
+  }
+
+  func messages() async throws -> [ChatLine] {
+    guard let context = try? await loadContext() else { return [] }
+    let identity = try? DeviceKeyStore.loadOrCreate()
+    if let identity {
+      try? await publishDeviceKey(identity, userId: context.userId)
+    }
+    watchChat(coupleId: context.couple.id)
+    let rows: [ChatMessageRow]
+    do {
+      rows = try await run { client in
+        let response: PostgrestResponse<[ChatMessageRow]> = try await client
+          .from("chat_messages")
+          .select()
+          .eq("couple_id", value: context.couple.id.uuidString)
+          .order("created_at", ascending: true)
+          .limit(100)
+          .execute()
+        return response.value
+      }
+    } catch {
+      return []
+    }
+    return rows.map { row in
+      let text = decrypted(row, identity: identity)
+      return ChatLine(
+        id: row.id, senderUserId: row.senderUserId, text: text ?? L10n.chatUnreadable,
+        createdAt: APIDate.parse(row.createdAt) ?? Date(), mine: row.senderUserId == context.userId,
+        unreadable: text == nil
+      )
+    }
+  }
+
+  func sendMessage(_ text: String) async throws {
+    guard let clear = ChatText.normalized(text) else { throw AppError.invalid(.note) }
+    guard let context = try await loadContext() else { throw AppError.saveFailed }
+    guard context.members.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
+    let identity = try DeviceKeyStore.loadOrCreate()
+    try await publishDeviceKey(identity, userId: context.userId)
+    let keys = try await loadDeviceKeys(coupleId: context.couple.id)
+    let recipients = keys.filter { $0.userId != context.userId || $0.id == identity.id }
+    guard recipients.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
+    let envelopes = try ChatCrypto.seal(
+      text: clear, from: identity,
+      to: recipients.compactMap { key in
+        guard let raw = ChatCoding.data(key.publicKey) else { return nil }
+        return (id: key.id, publicKey: raw)
+      }
+    )
+    guard envelopes.contains(where: { $0.keyId != identity.id }) else { throw AppError.partnerNotReady }
+    let row = ChatInsert(
+      coupleId: context.couple.id, senderUserId: context.userId,
+      senderPublicKey: ChatCoding.text(identity.publicKey),
+      envelopes: envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) }
+    )
+    try await run { client in
+      try await client.from("chat_messages").insert(row).execute()
+    }
+    await notify("chatMessage")
+  }
+
+  private func decrypted(_ row: ChatMessageRow, identity: ChatIdentity?) -> String? {
+    guard let identity, let sender = ChatCoding.data(row.senderPublicKey) else { return nil }
+    let envelopes = row.envelopes.compactMap { wire -> ChatEnvelope? in
+      guard let box = ChatCoding.data(wire.box) else { return nil }
+      return ChatEnvelope(keyId: wire.keyId, box: box)
+    }
+    return try? ChatCrypto.open(envelopes: envelopes, identity: identity, senderPublic: sender)
+  }
+
+  private func publishDeviceKey(_ identity: ChatIdentity, userId: UUID) async throws {
+    let encoded = ChatCoding.text(identity.publicKey)
+    let existing: [DeviceKeyRow] = try await run { client in
+      let response: PostgrestResponse<[DeviceKeyRow]> = try await client
+        .from("device_keys")
+        .select()
+        .eq("user_id", value: userId.uuidString)
+        .eq("public_key", value: encoded)
+        .limit(1)
+        .execute()
+      return response.value
+    }
+    if existing.isEmpty == false { return }
+    let row = DeviceKeyInsert(id: identity.id, userId: userId, publicKey: encoded)
+    try await run { client in
+      try await client.from("device_keys").insert(row).execute()
+    }
+  }
+
+  private func loadDeviceKeys(coupleId: UUID) async throws -> [DeviceKeyRow] {
+    let members: [MemberIdRow] = try await run { client in
+      let response: PostgrestResponse<[MemberIdRow]> = try await client
+        .from("couple_members")
+        .select("user_id")
+        .eq("couple_id", value: coupleId.uuidString)
+        .execute()
+      return response.value
+    }
+    let ids = members.map(\.userId.uuidString)
+    return try await run { client in
+      let response: PostgrestResponse<[DeviceKeyRow]> = try await client
+        .from("device_keys")
+        .select()
+        .in("user_id", values: ids.map { $0 as any PostgrestFilterValue })
+        .execute()
+      return response.value
+    }
+  }
+
+  private func watchChat(coupleId: UUID) {
+    chatWatch?.cancel()
+    guard let client else { return }
+    chatWatch = Task { [weak self] in
+      let channel = client.channel("chat-\(coupleId.uuidString)")
+      let stream = channel.postgresChange(
+        AnyAction.self, schema: "public", table: "chat_messages",
+        filter: .eq("couple_id", value: coupleId.uuidString)
+      )
+      do { try await channel.subscribeWithError() } catch { return }
+      for await _ in stream {
+        if Task.isCancelled { break }
+        await self?.onRemoteChange?()
+      }
     }
   }
 

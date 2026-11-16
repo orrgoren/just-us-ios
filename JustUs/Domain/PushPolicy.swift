@@ -4,6 +4,7 @@ enum PushPolicy {
   static func isTransactional(_ kind: PushKind) -> Bool {
     switch kind {
     case .partnerMood, .planReady, .inviteAccepted, .weeklyReminder, .inviteNudge: return false
+    case .chatMessage: return true
     }
   }
 
@@ -33,7 +34,7 @@ enum PushPolicy {
       if inSecond && !history.contains(where: { $0.kind == .inviteNudge }) {
         return sendOrDailyCap(kind: kind, now: now, timeZone: timeZone, history: history)
       }
-    case .weeklyReminder:
+    case .weeklyReminder, .chatMessage:
       break
     }
     return sendOrDailyCap(kind: kind, now: now, timeZone: timeZone, history: history)
@@ -60,6 +61,8 @@ enum PushPolicy {
       return "\(partnerName) is in. This night is officially both of yours."
     case .weeklyReminder:
       return "Tonight is yours, \(partnerName)."
+    case .chatMessage:
+      return "\(partnerName) sent a message."
     case .inviteNudge:
       if nudgeIndex >= 2 {
         return "We'll leave the invite here for \(partnerName). No more reminders."

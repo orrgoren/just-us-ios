@@ -41,6 +41,7 @@ run -f supabase/proposed/013_mood_until_reveal.sql
 run -f supabase/proposed/live/touch_mood.sql
 run -f supabase/proposed/014_mood_update_using.sql
 run -f supabase/proposed/017_planner_turn.sql
+run -f supabase/proposed/015_partner_chat.sql
 run -v ON_ERROR_STOP=1 -c "
 insert into auth.users (id) values ('10101010-1010-4010-8010-101010101010');
 insert into public.push_outbox (id, caller_user_id, recipient_user_id, kind, not_before) values

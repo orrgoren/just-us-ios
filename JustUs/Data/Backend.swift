@@ -44,6 +44,8 @@ protocol DateBackend: AnyObject {
   func injectPartnerMood() async
   func preferences() -> PushPreferences
   func savePreferences(_ preferences: PushPreferences) async
+  func messages() async throws -> [ChatLine]
+  func sendMessage(_ text: String) async throws
 }
 
 enum ErrorMap {

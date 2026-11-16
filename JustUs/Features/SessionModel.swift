@@ -11,7 +11,7 @@ final class SessionModel {
   }
 
   enum Activity: Equatable {
-    case generic, sendCode, verify, apple, create, redeem, saveDate, saveHint, reveal, finish, moment, settings
+    case generic, sendCode, verify, apple, create, redeem, saveDate, saveHint, reveal, finish, moment, settings, sendChat
   }
 
   enum Celebration: Equatable {
@@ -61,6 +61,8 @@ final class SessionModel {
   var planDay = ""
   var planTime = ""
   var momentDraft = ""
+  var chatDraft = ""
+  var messages: [ChatLine] = []
   var focusReveal = false
   let backend: any DateBackend
   let pendingAppleNonce = AppleNonceBox()
@@ -333,6 +335,8 @@ final class SessionModel {
     planTime = ""
     noteDraft = ""
     momentDraft = ""
+    chatDraft = ""
+    messages = []
     deleteConfirm = ""
     editingNote = nil
     editingDate = nil
@@ -590,6 +594,8 @@ final class SessionModel {
       tab = .memories
     case .settings:
       tab = .settings
+    case .chat:
+      tab = .chat
     case .invite(let token):
       presentInvite(token)
     }

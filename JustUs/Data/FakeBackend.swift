@@ -324,4 +324,74 @@ final class FakeBackend: DateBackend {
       store.world.moods.append(FakeMood(dateId: dateId, userId: userId, mood: mood))
     }
   }
+
+  func messages() async throws -> [ChatLine] {
+    guard let user = current(), let mine = member(user.id) else { return [] }
+    let identity = try ensureKey(userId: user.id)
+    return store.world.chats
+      .filter { $0.coupleId == mine.coupleId }
+      .sorted { $0.createdAt < $1.createdAt }
+      .map { row in
+        let envelopes = row.envelopes.map { ChatEnvelope(keyId: $0.keyId, box: $0.box) }
+        let text = try? ChatCrypto.open(envelopes: envelopes, identity: identity, senderPublic: row.senderPublicKey)
+        return ChatLine(
+          id: row.id, senderUserId: row.senderUserId, text: text ?? L10n.chatUnreadable,
+          createdAt: row.createdAt, mine: row.senderUserId == user.id, unreadable: text == nil
+        )
+      }
+  }
+
+  func sendMessage(_ text: String) async throws {
+    try guardOnline()
+    guard let clear = ChatText.normalized(text) else { throw AppError.invalid(.note) }
+    guard let user = current(), let mine = member(user.id) else { throw AppError.saveFailed }
+    let partner = store.world.members.contains { $0.coupleId == mine.coupleId && $0.userId != user.id }
+    guard partner else { throw AppError.partnerNotReady }
+    let identity = try ensureKey(userId: user.id)
+    let recipients = store.world.deviceKeys.filter { key in
+      let member = self.member(key.userId)
+      return member?.coupleId == mine.coupleId && (key.userId != user.id || key.id == identity.id)
+    }
+    guard recipients.contains(where: { $0.userId != user.id }) else { throw AppError.partnerNotReady }
+    let envelopes = try ChatCrypto.seal(
+      text: clear, from: identity, to: recipients.map { (id: $0.id, publicKey: $0.publicKey) }
+    )
+    store.world.chats.append(FakeChat(
+      id: UUID(), coupleId: mine.coupleId, senderUserId: user.id, senderPublicKey: identity.publicKey,
+      createdAt: Date(), envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
+    ))
+    store.save()
+  }
+
+  func seedChatPreview() {
+    guard let alex = member(SeedID.alex), let blairKey = try? ensureKey(userId: SeedID.blair),
+          let alexKey = try? ensureKey(userId: SeedID.alex) else { return }
+    let lines = [
+      (SeedID.blair, blairKey, "I'll bring tea."),
+      (SeedID.alex, alexKey, "Thursday still works.")
+    ]
+    for (userId, key, text) in lines {
+      let recipients = store.world.deviceKeys.filter { member($0.userId)?.coupleId == alex.coupleId }
+      guard let envelopes = try? ChatCrypto.seal(
+        text: text, from: key, to: recipients.map { (id: $0.id, publicKey: $0.publicKey) }
+      ) else { continue }
+      store.world.chats.append(FakeChat(
+        id: UUID(), coupleId: alex.coupleId, senderUserId: userId, senderPublicKey: key.publicKey,
+        createdAt: Date(), envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
+      ))
+    }
+    store.save()
+  }
+
+  private func ensureKey(userId: UUID) throws -> ChatIdentity {
+    if let existing = store.world.deviceKeys.first(where: { $0.userId == userId }) {
+      return try ChatIdentity.restored(id: existing.id, privateKey: existing.privateKey)
+    }
+    let created = ChatIdentity.generate()
+    store.world.deviceKeys.append(FakeDeviceKey(
+      id: created.id, userId: userId, publicKey: created.publicKey, privateKey: created.privateKey.rawRepresentation
+    ))
+    store.save()
+    return created
+  }
 }

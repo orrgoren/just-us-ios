@@ -9,6 +9,7 @@ struct MainScreen: View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
       Picker(L10n.tabWeek, selection: $model.tab) {
         Text(L10n.tabWeek).tag(AppTab.week)
+        Text(L10n.tabChat).tag(AppTab.chat)
         Text(L10n.tabMemories).tag(AppTab.memories)
         Text(L10n.tabUs).tag(AppTab.settings)
       }
@@ -21,6 +22,8 @@ struct MainScreen: View {
       switch model.tab {
       case .week:
         RitualScreen(model: model)
+      case .chat:
+        ChatScreen(model: model)
       case .memories:
         MemoriesScreen(model: model)
       case .settings:

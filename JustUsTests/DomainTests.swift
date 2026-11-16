@@ -129,6 +129,14 @@ final class DomainTests: XCTestCase {
       PushPolicy.decide(kind: .planReady, now: noon.addingTimeInterval(60), timeZone: zone, history: [prior], preferences: .allOn),
       .suppress("daily_non_transactional")
     )
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .chatMessage, now: late, timeZone: zone, history: [prior], preferences: .allOn),
+      .send
+    )
+    let secret = "The tea is in the blue tin"
+    let body = PushPolicy.body(kind: .chatMessage, partnerName: "Blair")
+    XCTAssertEqual(body, "Blair sent a message.")
+    XCTAssertTrue(PushPolicy.forbiddenFragments(in: body, secrets: [secret]).isEmpty)
     let recentMood = PushRecord(kind: .partnerMood, sentAt: noon, transactional: false)
     XCTAssertEqual(
       PushPolicy.decide(kind: .partnerMood, now: noon.addingTimeInterval(3600), timeZone: zone, history: [recentMood], preferences: .allOn),
@@ -150,6 +158,21 @@ final class DomainTests: XCTestCase {
       PushPolicy.decide(kind: .inviteNudge, now: noon, timeZone: zone, history: [], preferences: .allOn, inviteAgeHours: 24),
       .send
     )
+  }
+
+  func testChatRoundTripHidesTheText() throws {
+    let alice = ChatIdentity.generate()
+    let blair = ChatIdentity.generate()
+    let secret = "xylophone-harbor"
+    let envelopes = try ChatCrypto.seal(
+      text: secret, from: alice, to: [(id: blair.id, publicKey: blair.publicKey), (id: alice.id, publicKey: alice.publicKey)]
+    )
+    let stored = envelopes.map(\.box).reduce(into: Data()) { $0.append($1) }
+    XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(secret))
+    XCTAssertEqual(try ChatCrypto.open(envelopes: envelopes, identity: blair, senderPublic: alice.publicKey), secret)
+    XCTAssertEqual(try ChatCrypto.open(envelopes: envelopes, identity: alice, senderPublic: alice.publicKey), secret)
+    let stranger = ChatIdentity.generate()
+    XCTAssertThrowsError(try ChatCrypto.open(envelopes: envelopes, identity: stranger, senderPublic: alice.publicKey))
   }
 
   func testPlaceRhythmAndPhotoPolicy() throws {

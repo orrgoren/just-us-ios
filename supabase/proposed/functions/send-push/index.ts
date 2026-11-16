@@ -1,6 +1,7 @@
 // Live send-push is v6, deployed on 2026-11-16 from 5013075 (the same
 // content as 7872d1e) with verify_jwt on. a12f1d1 is v3 and is the rollback
-// source. 002, 006, and 007 are already applied. Do not re-apply them.
+// source. This file adds chatMessage on top of that v6 source. 002, 006, and
+// 007 are already applied. Do not re-apply them.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,
 // and the nudge index are never taken from the client. The recipient's tokens
@@ -29,7 +30,7 @@ import { apnsAttemptLog, dropDeviceToken, flushDue, freshApnsToken, orderedDue, 
 
 const DEDUPE_MS = 6 * 60 * 60 * 1000;
 const INVITE_TTL_HOURS = 7 * 24;
-const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge"] as const;
+const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge", "chatMessage"] as const;
 type Kind = (typeof KINDS)[number];
 
 const CLIENT_FIELDS = ["token", "partnerName", "localHour", "nudgeIndex", "devices"];
@@ -124,6 +125,12 @@ async function deliver(
     );
     if (!votes[0]) return { status: 200, body: { decision: "suppress", reason: "no_mood" } };
   }
+  if (kind === "chatMessage") {
+    const notes = await db.select<{ id: string }[]>(
+      `chat_messages?couple_id=eq.${caller.couple_id}&sender_user_id=eq.${callerId}&select=id&order=created_at.desc&limit=1`,
+    );
+    if (!notes[0]) return { status: 200, body: { decision: "suppress", reason: "no_message" } };
+  }
   if (kind === "inviteAccepted" && !partner) {
     return { status: 200, body: { decision: "suppress", reason: "no_partner" } };
   }
@@ -160,7 +167,6 @@ async function deliver(
   } catch {
     return { status: 200, body: { decision: "suppress", reason: "invalid_timezone" } };
   }
-
   const since = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
   // planReady uses the same daily cap and six-hour dedupe as the other kinds.
   const history = await db.select<{ kind: Kind; transactional: boolean; sent_at: string }[]>(
@@ -233,6 +239,7 @@ async function deliver(
 }
 
 function allows(kind: Kind, preferences: Record<string, boolean>): boolean {
+  if (kind === "chatMessage") return true;
   if (kind === "partnerMood") return preferences.partner_mood !== false;
   if (kind === "planReady") return preferences.plan_ready !== false;
   if (kind === "inviteAccepted") return preferences.invite_accepted !== false;
@@ -245,6 +252,7 @@ function decide(
   inviteAge: number | null,
   timeZone: string,
 ): "send" | string {
+  if (kind === "chatMessage") return "send";
   const now = Date.now();
   if (kind === "partnerMood" || kind === "inviteAccepted" || kind === "planReady") {
     const recent = history.some((row) => row.kind === kind && now - Date.parse(row.sent_at) < DEDUPE_MS);
@@ -280,6 +288,7 @@ async function inviteAgeHours(db: Db, coupleId: string): Promise<number | null> 
 }
 
 function message(kind: Kind, name: string, nudge: number): string {
+  if (kind === "chatMessage") return `${name} sent a message.`;
   if (kind === "planReady") return "Your date is ready to reveal.";
   if (kind === "partnerMood") return `${name} picked a mood for your night.`;
   if (kind === "inviteAccepted") return `${name} is in. This night is officially both of yours.`;

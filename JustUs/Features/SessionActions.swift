@@ -7,6 +7,9 @@ extension SessionModel {
       ritual = try await backendRitual()
       memories = try await backend.memories()
       settings = try await backend.settings()
+      if let lines = try? await backend.messages() {
+        messages = lines
+      }
       if let settings, draft.selfName.isEmpty {
         draft.selfName = settings.selfName
         draft.partnerName = settings.partnerName
@@ -176,6 +179,25 @@ extension SessionModel {
     }
   }
 
+  func sendChat() async {
+    activity = .sendChat
+    busy = true
+    defer {
+      busy = false
+      activity = nil
+    }
+    do {
+      try await backend.sendMessage(chatDraft)
+      chatDraft = ""
+      errorMessage = nil
+      if let lines = try? await backend.messages() {
+        messages = lines
+      }
+    } catch {
+      errorMessage = L10n.message(for: ErrorMap.app(error))
+    }
+  }
+
   func toggle(_ kind: PushKind, on: Bool) async {
     guard var settings else { return }
     switch kind {
@@ -183,6 +205,7 @@ extension SessionModel {
     case .planReady: settings.preferences.planReady = on
     case .inviteAccepted: settings.preferences.inviteAccepted = on
     case .weeklyReminder, .inviteNudge: settings.preferences.weeklyReminder = on
+    case .chatMessage: break
     }
     self.settings = settings
     await backend.savePreferences(settings.preferences)
@@ -295,6 +318,14 @@ extension SessionModel {
     case "settings":
       await signedIn("alex@couple-a.test")
       tab = .settings
+      screen = .main
+    case "chat":
+      await signedIn("alex@couple-a.test")
+      (backend as? FakeBackend)?.seedChatPreview()
+      if let lines = try? await backend.messages() {
+        messages = lines
+      }
+      tab = .chat
       screen = .main
     case "deleteAccount":
       await signedIn("alex@couple-a.test")

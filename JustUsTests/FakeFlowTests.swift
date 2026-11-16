@@ -443,6 +443,32 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
   }
 
+  func testChatIsCiphertextAndThePartnerCanReadIt() async throws {
+    let store = FakeStore(inMemory: true)
+    let blair = SessionModel(backend: FakeBackend(store: store, cooldown: 0))
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: FakeBackend(store: store, cooldown: 0))
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    let secret = "xylophone-harbor"
+    alex.chatDraft = secret
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    XCTAssertEqual(alex.messages.last?.text, secret)
+    let stored = store.world.chats.flatMap(\.envelopes).map(\.box).reduce(into: Data()) { $0.append($1) }
+    XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(secret))
+    _ = try await blair.backend.messages()
+    await blair.refresh()
+    XCTAssertEqual(blair.messages.last?.text, secret)
+    XCTAssertEqual(blair.messages.last?.mine, false)
+  }
+
   func testHintSaveRejectsAnUpdateThatTouchesNoRows() {
     XCTAssertNoThrow(try HintEdit.requireUpdated(dateRows: 1, planRows: 1))
     for (dates, plans) in [(0, 1), (1, 0), (0, 0)] {
