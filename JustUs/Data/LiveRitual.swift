@@ -4,12 +4,14 @@ import Supabase
 extension LiveBackend {
   func ritual() async throws -> RitualSnapshot? {
     guard let context = try await loadContext() else { return nil }
-    let completed = try await completedCount(context)
+    let history = try await dateHistory(context)
     let active = try await activeDate(context)
     if let active {
       watchMoods(dateId: active.id)
     }
-    return try await makeRitual(context: context, completed: completed, active: active)
+    return try await makeRitual(
+      context: context, completed: history.completed, active: active, nights: history.nights
+    )
   }
 
   func setMood(_ mood: MoodKey) async throws {
@@ -331,21 +333,27 @@ extension LiveBackend {
     return rows.first
   }
 
-  private func datedNights(_ context: LiveContext) async throws -> [DatedNight] {
+  private func dateHistory(_ context: LiveContext) async throws -> (nights: [DatedNight], completed: Int) {
     let rows: [NightRow] = try await runWrite { client in
       let response: PostgrestResponse<[NightRow]> = try await client.from("dates")
-        .select("planner_user_id, status, scheduled_at")
+        .select("planner_user_id, status, scheduled_at, created_at")
         .eq("couple_id", value: context.couple.id.uuidString)
         .execute()
       return response.value
     }
-    return rows.compactMap { row in
+    let nights = rows.compactMap { row -> DatedNight? in
       guard let scheduled = row.scheduledAt, let when = APIDate.parse(scheduled) else { return nil }
-      return DatedNight(status: row.status, scheduledAt: when, plannerUserId: row.plannerUserId)
+      return DatedNight(
+        status: row.status, scheduledAt: when, createdAt: APIDate.parse(row.createdAt) ?? when,
+        plannerUserId: row.plannerUserId
+      )
     }
+    return (nights, rows.filter { $0.status == .completed }.count)
   }
 
-  private func makeRitual(context: LiveContext, completed: Int, active: DateRow?) async throws -> RitualSnapshot {
+  private func makeRitual(
+    context: LiveContext, completed: Int, active: DateRow?, nights: [DatedNight]
+  ) async throws -> RitualSnapshot {
     let partner = context.members.first { $0.userId != context.userId }
     var plan: FullPlan?
     var moods: [MoodVote] = []
@@ -380,7 +388,7 @@ extension LiveBackend {
       isPlanner: active?.plannerUserId == context.userId,
       revealed: active?.revealedAt != nil,
       plan: plan,
-      streakWeeks: TogetherStreak.weeks(nights: try await datedNights(context), timeZone: context.couple.timezone)
+      streakWeeks: TogetherStreak.weeks(nights: nights, timeZone: context.couple.timezone, now: Date())
     )
     return RitualPrivacy.seal(view)
   }

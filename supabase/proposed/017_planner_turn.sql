@@ -1,4 +1,6 @@
--- Not applied. Orr applies this separately. Do not run it on the live project.
+-- Applied live on 2026-11-16 as 20261116024327. Do not re-apply it.
+-- Execute on both functions is revoked from anon and authenticated.
+-- That revoke is live as planner_turn_revoke.
 -- Numbered 017. 014 is the applied mood policy. 015 and 016 are the chat pull request.
 --
 -- A new draft's planner is the other member after the last completed or
@@ -66,5 +68,7 @@ create trigger dates_assign_planner
   before insert on public.dates
   for each row execute function public.assign_draft_planner();
 
-revoke all on function public.next_planner_user_id(uuid) from public;
-revoke all on function public.assign_draft_planner() from public;
+revoke all on function public.next_planner_user_id(uuid) from public, anon, authenticated;
+revoke all on function public.assign_draft_planner() from public, anon, authenticated;
+revoke execute on function public.next_planner_user_id(uuid) from anon, authenticated;
+revoke execute on function public.assign_draft_planner() from anon, authenticated;

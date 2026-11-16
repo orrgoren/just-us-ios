@@ -293,7 +293,7 @@ final class FakeBackend: DateBackend {
     let completed = store.world.dates.filter { $0.coupleId == coupleId && $0.status == .completed }.count
     let members = store.world.members.filter { $0.coupleId == coupleId }.sorted { $0.memberIndex < $1.memberIndex }
     let nights = store.world.dates.filter { $0.coupleId == coupleId }.map {
-      DatedNight(status: $0.status, scheduledAt: $0.scheduledAt, plannerUserId: $0.plannerUserId)
+      DatedNight(status: $0.status, scheduledAt: $0.scheduledAt, createdAt: $0.createdAt, plannerUserId: $0.plannerUserId)
     }
     let memberRefs = members.map {
       MemberRef(userId: $0.userId, displayName: $0.displayName, memberIndex: $0.memberIndex)
@@ -301,7 +301,7 @@ final class FakeBackend: DateBackend {
     let plannerId = PlannerTurn.nextPlanner(nights: nights, members: memberRefs) ?? planner
     let location = try Recommendation.suggestedLocation(completedCount: completed)
     store.world.dates.append(FakeDate(
-      id: UUID(), coupleId: coupleId, status: .draft, scheduledAt: when,
+      id: UUID(), coupleId: coupleId, status: .draft, scheduledAt: when, createdAt: Date(),
       durationMinutes: couple.durationMinutes, location: location, locationIsOverride: false,
       publicTeaser: nil, outfitHint: nil, revealedAt: nil, plannerUserId: plannerId,
       ideaId: nil, planTitle: nil, privateNotes: nil, photoJPEG: nil,

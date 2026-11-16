@@ -26,6 +26,7 @@ struct FakeDate: Codable, Equatable {
   var coupleId: UUID
   var status: DateStatus
   var scheduledAt: Date
+  var createdAt: Date
   var durationMinutes: Int
   var location: LocationKind
   var locationIsOverride: Bool
@@ -143,7 +144,7 @@ enum SeedBuilder {
     ])
     let when = (try? ZonedTime.zonedLocalToUtc(date: "2026-11-19", time: "20:30", timeZone: "Asia/Jerusalem")) ?? now
     world.dates.append(FakeDate(
-      id: SeedID.dateA, coupleId: SeedID.coupleA, status: .draft, scheduledAt: when,
+      id: SeedID.dateA, coupleId: SeedID.coupleA, status: .draft, scheduledAt: when, createdAt: now,
       durationMinutes: 90, location: .home, locationIsOverride: false,
       publicTeaser: "Come hungry", outfitHint: "Cozy", revealedAt: nil,
       plannerUserId: SeedID.alex, ideaId: "h6", planTitle: "A table for two",
@@ -168,7 +169,7 @@ enum SeedBuilder {
     let when = (try? ZonedTime.zonedLocalToUtc(date: day, time: "20:30", timeZone: "Asia/Jerusalem")) ?? Date()
     let finished = status == .completed
     world.dates.append(FakeDate(
-      id: SeedID.uuid(id), coupleId: SeedID.coupleA, status: status, scheduledAt: when,
+      id: SeedID.uuid(id), coupleId: SeedID.coupleA, status: status, scheduledAt: when, createdAt: when,
       durationMinutes: 90, location: .home, locationIsOverride: false,
       publicTeaser: nil, outfitHint: nil, revealedAt: finished ? when : nil,
       plannerUserId: planner, ideaId: finished ? "h1" : nil, planTitle: nil,
@@ -208,7 +209,7 @@ enum SeedBuilder {
     addUser(&world, id: SeedID.riley, email: "riley@busy.test")
     addSpace(&world, id: SeedID.coupleRiley, invitee: "Someone", members: [(SeedID.riley, "Riley", 0)])
     world.dates.append(FakeDate(
-      id: SeedID.dateRiley, coupleId: SeedID.coupleRiley, status: .completed, scheduledAt: now,
+      id: SeedID.dateRiley, coupleId: SeedID.coupleRiley, status: .completed, scheduledAt: now, createdAt: now,
       durationMinutes: 90, location: .home, locationIsOverride: false,
       publicTeaser: nil, outfitHint: nil, revealedAt: now, plannerUserId: SeedID.riley,
       ideaId: "h1", planTitle: "Kept night", privateNotes: nil, photoJPEG: PhotoBytes.sample(),

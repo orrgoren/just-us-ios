@@ -845,8 +845,9 @@ begin
   execute 'reset role';
 end $$;
 
--- 017. A new draft takes the other member after the last completed or
--- scheduled night. A skip leaves that turn alone. Not applied live.
+-- 017. Applied live on 2026-11-16 as 20261116024327.
+-- A new draft takes the other member after the last completed or
+-- scheduled night. A skip leaves that turn alone.
 insert into auth.users (id) values
   ('61616161-6161-4161-8161-616161616161'),
   ('62626262-6262-4262-8262-626262626262');
@@ -973,4 +974,83 @@ begin
   ) is distinct from '61616161-6161-4161-8161-616161616161' then
     raise exception 'scheduled_night_did_not_hand_the_turn_on';
   end if;
+end $$;
+
+delete from public.dates where id = '6a6a6a6a-6a6a-46a6-86a6-6a6a6a6a6a6a';
+
+insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, location) values
+  (
+    '6e6e6e6e-6e6e-46e6-86e6-6e6e6e6e6e6e',
+    '63636363-6363-4363-8363-636363636363',
+    '62626262-6262-4262-8262-626262626262',
+    'draft',
+    '2026-11-26 18:30:00+00',
+    'home'
+  );
+
+do $$
+begin
+  if (
+    select planner_user_id from public.dates where id = '6e6e6e6e-6e6e-46e6-86e6-6e6e6e6e6e6e'
+  ) is distinct from '61616161-6161-4161-8161-616161616161' then
+    raise exception 'spoofed_planner_was_kept';
+  end if;
+end $$;
+
+insert into auth.users (id) values ('6b6b6b6b-6b6b-46b6-86b6-6b6b6b6b6b6b');
+
+insert into public.couples (
+  id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name
+) values (
+  '6c6c6c6c-6c6c-46c6-86c6-6c6c6c6c6c6c',
+  '6b6b6b6b-6b6b-46b6-86b6-6b6b6b6b6b6b',
+  4, '20:30', 'Asia/Jerusalem', 90, 'Guest'
+);
+
+insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+  ('6c6c6c6c-6c6c-46c6-86c6-6c6c6c6c6c6c', '6b6b6b6b-6b6b-46b6-86b6-6b6b6b6b6b6b', 'Solo', 0);
+
+insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, location) values
+  (
+    '6d6d6d6d-6d6d-46d6-86d6-6d6d6d6d6d6d',
+    '6c6c6c6c-6c6c-46c6-86c6-6c6c6c6c6c6c',
+    '62626262-6262-4262-8262-626262626262',
+    'draft',
+    '2026-11-19 18:30:00+00',
+    'home'
+  );
+
+do $$
+begin
+  if (
+    select planner_user_id from public.dates where id = '6d6d6d6d-6d6d-46d6-86d6-6d6d6d6d6d6d'
+  ) is distinct from '6b6b6b6b-6b6b-46b6-86b6-6b6b6b6b6b6b' then
+    raise exception 'one_member_draft_was_not_that_member';
+  end if;
+  if has_function_privilege('anon', 'public.next_planner_user_id(uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.next_planner_user_id(uuid)', 'execute')
+     or has_function_privilege('anon', 'public.assign_draft_planner()', 'execute')
+     or has_function_privilege('authenticated', 'public.assign_draft_planner()', 'execute')
+  then
+    raise exception 'planner_functions_are_executable';
+  end if;
+end $$;
+
+do $$
+begin
+  execute 'set local role anon';
+  begin
+    perform public.next_planner_user_id('6c6c6c6c-6c6c-46c6-86c6-6c6c6c6c6c6c');
+    raise exception 'anon_executed_next_planner';
+  exception when insufficient_privilege then
+    null;
+  end;
+  execute 'set local role authenticated';
+  begin
+    perform public.next_planner_user_id('63636363-6363-4363-8363-636363636363');
+    raise exception 'authenticated_executed_next_planner';
+  exception when insufficient_privilege then
+    null;
+  end;
+  execute 'reset role';
 end $$;

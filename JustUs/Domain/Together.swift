@@ -3,31 +3,37 @@ import Foundation
 struct DatedNight: Equatable, Sendable {
   var status: DateStatus
   var scheduledAt: Date
+  var createdAt: Date
   var plannerUserId: UUID
 }
 
 enum PlannerTurn {
   /// The person who plans the next draft. A scheduled or completed night hands
   /// the following one to the other member. A skip leaves the turn where it is.
+  /// The latest night is the one with the latest scheduled time, then the latest
+  /// created time, matching `next_planner_user_id`.
   static func nextPlanner(nights: [DatedNight], members: [MemberRef]) -> UUID? {
     let ordered = members.sorted { $0.memberIndex < $1.memberIndex }
     guard let first = ordered.first else { return nil }
     let history = nights
       .filter { $0.status == .completed || $0.status == .scheduled }
-      .sorted { $0.scheduledAt < $1.scheduledAt }
-    guard let last = history.last else { return first.userId }
+      .sorted { lhs, rhs in
+        if lhs.scheduledAt != rhs.scheduledAt { return lhs.scheduledAt > rhs.scheduledAt }
+        return lhs.createdAt > rhs.createdAt
+      }
+    guard let last = history.first else { return first.userId }
     return ordered.first { $0.userId != last.plannerUserId }?.userId ?? last.plannerUserId
   }
 }
 
 enum TogetherStreak {
-  /// Completed weeks in a row. One skipped week in a calendar month keeps the
-  /// run going and does not add to it. A second skip that month, or a week
-  /// with neither, ends the run.
-  static func weeks(nights: [DatedNight], timeZone: String) -> Int {
-    guard let zone = TimeZone(identifier: timeZone) else { return 0 }
-    var calendar = Calendar(identifier: .iso8601)
-    calendar.timeZone = zone
+  /// Finished weeks in a row as of `now`, in the couple's time zone. Weeks start
+  /// on Sunday. One skipped week in a calendar month keeps the run and does not
+  /// add to it. Two skipped weeks in a row end it, including when they fall in
+  /// different months. A second skip in the same month, a week with no night, or
+  /// a newest week older than last week also ends it.
+  static func weeks(nights: [DatedNight], timeZone: String, now: Date) -> Int {
+    guard let calendar = sundayCalendar(timeZone) else { return 0 }
     struct Bucket {
       var start: Date
       var completed = false
@@ -51,22 +57,40 @@ enum TogetherStreak {
       }
       buckets[start] = bucket
     }
+    let ordered = buckets.values.sorted { $0.start > $1.start }
+    guard let newest = ordered.first,
+          let thisWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start,
+          let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: thisWeek),
+          newest.start >= lastWeek else { return 0 }
     var count = 0
     var skips: [String: Int] = [:]
     var later: Date?
-    for bucket in buckets.values.sorted(by: { $0.start > $1.start }) {
+    var newerWasSkip = false
+    for bucket in ordered {
       if let later {
-        let days = calendar.dateComponents([.day], from: bucket.start, to: later).day ?? 0
-        if days > 8 { break }
+        guard let adjacent = calendar.date(byAdding: .weekOfYear, value: -1, to: later),
+              bucket.start >= adjacent else { break }
       }
       later = bucket.start
       if bucket.completed {
         count += 1
+        newerWasSkip = false
         continue
       }
+      if newerWasSkip { break }
       guard bucket.skipped, let month = bucket.skipMonth, skips[month, default: 0] < 1 else { break }
       skips[month, default: 0] += 1
+      newerWasSkip = true
     }
     return count
+  }
+
+  /// Israel weeks start on Sunday. `firstWeekday` 1 is Sunday.
+  private static func sundayCalendar(_ timeZone: String) -> Calendar? {
+    guard let zone = TimeZone(identifier: timeZone) else { return nil }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = zone
+    calendar.firstWeekday = 1
+    return calendar
   }
 }

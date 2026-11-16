@@ -242,7 +242,7 @@ extension FakeBackend {
       plan = built
     }
     let nights = store.world.dates.filter { $0.coupleId == couple.id }.map {
-      DatedNight(status: $0.status, scheduledAt: $0.scheduledAt, plannerUserId: $0.plannerUserId)
+      DatedNight(status: $0.status, scheduledAt: $0.scheduledAt, createdAt: $0.createdAt, plannerUserId: $0.plannerUserId)
     }
     let view = RitualSnapshot(
       coupleId: couple.id,
@@ -259,7 +259,7 @@ extension FakeBackend {
       isPlanner: isPlanner,
       revealed: revealed,
       plan: plan,
-      streakWeeks: TogetherStreak.weeks(nights: nights, timeZone: couple.timezone)
+      streakWeeks: TogetherStreak.weeks(nights: nights, timeZone: couple.timezone, now: Date())
     )
     return RitualPrivacy.seal(view)
   }
