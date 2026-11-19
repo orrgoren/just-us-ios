@@ -35,7 +35,7 @@ enum ChatText {
   /// Swift characters, so one emoji counts as one.
   static let maxCharacters = 1000
   /// Plaintext UTF-8 that still fits eight sealed boxes inside the 64 KiB envelope cap.
-  static let maxBytes = 6000
+  static let maxBytes = 5600
 
   static func normalized(_ raw: String) throws -> String {
     let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)

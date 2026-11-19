@@ -228,7 +228,7 @@ final class DomainTests: XCTestCase {
     }
     XCTAssertEqual(L10n.message(for: .chatTooLong), L10n.chatTooLong)
     XCTAssertTrue(L10n.chatTooLong.contains("1,000"))
-    XCTAssertTrue(L10n.chatTooLong.contains("6,000"))
+    XCTAssertTrue(L10n.chatTooLong.contains("5,600"))
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.canvas), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
   }
