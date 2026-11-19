@@ -1,4 +1,4 @@
--- NOT APPLIED. Apply this live once, after 016. Do not re-apply.
+-- Applied live on 2026-11-16 as 20261116054250. Do not re-apply.
 -- 016 is applied live on 2026-11-16 as 20261116050321.
 -- scripts/sql-lifecycle.sh runs this against a throwaway database only.
 --

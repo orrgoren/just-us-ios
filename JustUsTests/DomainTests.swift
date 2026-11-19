@@ -214,7 +214,21 @@ final class DomainTests: XCTestCase {
     XCTAssertThrowsError(try ChatText.normalized(String(repeating: "a", count: 1001))) { error in
       XCTAssertEqual(error as? AppError, .chatTooLong)
     }
+    let family = String(repeating: "👨‍👩‍👧‍👦", count: 1000)
+    XCTAssertEqual(family.count, 1000)
+    XCTAssertGreaterThan(family.utf8.count, ChatText.maxBytes)
+    XCTAssertThrowsError(try ChatText.normalized(family)) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
+    let heavy = "e" + String(repeating: "\u{0301}", count: ChatText.maxBytes)
+    XCTAssertEqual(heavy.count, 1)
+    XCTAssertGreaterThan(heavy.utf8.count, ChatText.maxBytes)
+    XCTAssertThrowsError(try ChatText.normalized(heavy)) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
     XCTAssertEqual(L10n.message(for: .chatTooLong), L10n.chatTooLong)
+    XCTAssertTrue(L10n.chatTooLong.contains("1,000"))
+    XCTAssertTrue(L10n.chatTooLong.contains("6,000"))
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.canvas), 4.5)
     XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
   }
@@ -249,6 +263,77 @@ final class DomainTests: XCTestCase {
     XCTAssertEqual(own.first?.keyId, current)
     XCTAssertEqual(chosen.filter { $0.userId == partner }.count, 3)
     XCTAssertFalse(chosen.contains { $0.keyId == retiredPartner.id })
+  }
+
+  func testARetiredOwnKeyIsReplacedInsteadOfReused() {
+    XCTAssertEqual(OwnKeyPublish.action(hasRow: false, retired: false), .insert)
+    XCTAssertEqual(OwnKeyPublish.action(hasRow: true, retired: false), .keep)
+    XCTAssertEqual(OwnKeyPublish.action(hasRow: true, retired: true), .replace)
+  }
+
+  func testMaxBytesStillFitInEightEnvelopes() throws {
+    let sender = ChatIdentity.generate()
+    let senderUser = UUID()
+    let targets = (0..<8).map { _ -> ChatTarget in
+      let key = ChatIdentity.generate()
+      return ChatTarget(keyId: key.id, userId: UUID(), publicKey: key.publicKey)
+    }
+    let envelopes = try ChatCrypto.seal(
+      text: String(repeating: "a", count: ChatText.maxBytes),
+      messageId: UUID(), senderUserId: senderUser, from: sender, to: targets
+    )
+    let wires = envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) }
+    let data = try JSONEncoder().encode(wires)
+    XCTAssertLessThanOrEqual(data.count, 65_536)
+  }
+
+  func testSignOutRetiresOnlyAfterTheTokenDelete() async {
+    var events: [String] = []
+    do {
+      try await ChatSignOut.perform(
+        deleteToken: { events.append("delete"); throw AppError.signOutBlocked },
+        retire: { events.append("retire") },
+        authSignOut: { events.append("auth") }
+      )
+      XCTFail("expected the token delete to stop sign-out")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .signOutBlocked)
+    } catch {
+      XCTFail("unexpected \(error)")
+    }
+    XCTAssertEqual(events, ["delete"])
+
+    events = []
+    try await ChatSignOut.perform(
+      deleteToken: { events.append("delete") },
+      retire: { events.append("retire") },
+      authSignOut: { events.append("auth") }
+    )
+    XCTAssertEqual(events, ["delete", "retire", "auth"])
+
+    events = []
+    try await ChatSignOut.perform(
+      deleteToken: { events.append("delete") },
+      retire: { events.append("retire"); throw AppError.sessionExpired },
+      authSignOut: { events.append("auth") }
+    )
+    XCTAssertEqual(events, ["delete", "retire", "auth"])
+
+    events = []
+    do {
+      try await ChatSignOut.perform(
+        deleteToken: { events.append("delete") },
+        retire: { events.append("retire"); throw AppError.offline },
+        authSignOut: { events.append("auth") }
+      )
+      XCTFail("expected a network failure to keep the session")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .offline)
+    }
+    XCTAssertEqual(events, ["delete", "retire"])
+    XCTAssertTrue(ChatSignOut.continues(after: AppError.notAuthenticated))
+    XCTAssertTrue(ChatSignOut.continues(after: AppError.server(code: "PGRST116")))
+    XCTAssertFalse(ChatSignOut.continues(after: AppError.offline))
   }
 
   func testChatWindowShowsTheNewestHundred() {

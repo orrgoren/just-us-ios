@@ -34,12 +34,64 @@ enum ChatCryptoError: Error {
 enum ChatText {
   /// Swift characters, so one emoji counts as one.
   static let maxCharacters = 1000
+  /// Plaintext UTF-8 that still fits eight sealed boxes inside the 64 KiB envelope cap.
+  static let maxBytes = 6000
 
   static func normalized(_ raw: String) throws -> String {
     let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     if text.isEmpty { throw AppError.invalid(.note) }
-    if text.count > maxCharacters { throw AppError.chatTooLong }
+    if text.count > maxCharacters || text.utf8.count > maxBytes { throw AppError.chatTooLong }
     return text
+  }
+}
+
+enum OwnKeyPublish {
+  enum Action: Equatable {
+    case keep
+    case insert
+    case replace
+  }
+
+  /// `hasRow` is this phone's current public key. A retired row cannot be revived.
+  static func action(hasRow: Bool, retired: Bool) -> Action {
+    if hasRow == false { return .insert }
+    if retired { return .replace }
+    return .keep
+  }
+}
+
+enum ChatSignOut {
+  /// The token delete runs first. A failure there leaves the key active and the session signed in.
+  static func perform(
+    deleteToken: () async throws -> Void,
+    retire: () async throws -> Void,
+    authSignOut: () async -> Void
+  ) async throws {
+    try await deleteToken()
+    do {
+      try await retire()
+    } catch {
+      if continues(after: error) == false { throw error }
+    }
+    await authSignOut()
+  }
+
+  /// An expired session or a missing account should still finish signing out.
+  static func continues(after error: Error) -> Bool {
+    let mapped = error as? AppError ?? ErrorMap.app(error)
+    switch mapped {
+    case .sessionExpired, .notAuthenticated, .linkExpired:
+      return true
+    case .server(let code):
+      return missing(code) || missing(String(describing: error))
+    default:
+      return missing(String(describing: error))
+    }
+  }
+
+  private static func missing(_ text: String) -> Bool {
+    let blob = text.lowercased()
+    return blob.contains("not found") || blob.contains("pgrst116") || blob.contains("404")
   }
 }
 
@@ -89,6 +141,8 @@ enum ChatRecipients {
 
 enum ChatWindow {
   static let limit = 100
+  /// Retired rows loaded with the visible page. Active keys are always included.
+  static let retiredKeys = 100
 
   /// Newest `limit` rows, oldest of that window first, so the screen reads downward to the latest.
   static func chronological(_ lines: [ChatLine]) -> [ChatLine] {

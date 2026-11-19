@@ -92,13 +92,20 @@ final class FakeBackend: DateBackend {
   var blockSignOut = false
 
   func signOut() async throws {
-    if blockSignOut { throw AppError.signOutBlocked }
-    if let id = store.world.sessionUserId {
-      for index in store.world.deviceKeys.indices where store.world.deviceKeys[index].userId == id {
-        store.world.deviceKeys[index].retiredAt = Date()
-      }
-    }
-    await dropExpiredSession()
+    let userId = store.world.sessionUserId
+    try await ChatSignOut.perform(
+      deleteToken: {
+        if self.blockSignOut { throw AppError.signOutBlocked }
+      },
+      retire: {
+        guard let userId else { return }
+        for index in self.store.world.deviceKeys.indices where self.store.world.deviceKeys[index].userId == userId {
+          self.store.world.deviceKeys[index].retiredAt = Date()
+        }
+        self.store.save()
+      },
+      authSignOut: { await self.dropExpiredSession() }
+    )
   }
 
   func dropExpiredSession() async {
@@ -424,15 +431,19 @@ final class FakeBackend: DateBackend {
   }
 
   private func ensureKey(userId: UUID) throws -> ChatIdentity {
-    if let existing = store.world.deviceKeys.first(where: { $0.userId == userId && $0.retiredAt == nil }) {
-      return try ChatIdentity.restored(id: existing.id, privateKey: existing.privateKey)
+    let held = store.world.deviceKeys.last { $0.userId == userId }
+    switch OwnKeyPublish.action(hasRow: held != nil, retired: held?.retiredAt != nil) {
+    case .keep:
+      guard let held else { throw ChatCryptoError.unreadable }
+      return try ChatIdentity.restored(id: held.id, privateKey: held.privateKey)
+    case .insert, .replace:
+      let created = ChatIdentity.generate()
+      store.world.deviceKeys.append(FakeDeviceKey(
+        id: created.id, userId: userId, publicKey: created.publicKey,
+        privateKey: created.privateKey.rawRepresentation, createdAt: Date()
+      ))
+      store.save()
+      return created
     }
-    let created = ChatIdentity.generate()
-    store.world.deviceKeys.append(FakeDeviceKey(
-      id: created.id, userId: userId, publicKey: created.publicKey,
-      privateKey: created.privateKey.rawRepresentation, createdAt: Date()
-    ))
-    store.save()
-    return created
   }
 }

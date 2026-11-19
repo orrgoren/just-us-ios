@@ -510,6 +510,77 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(blair.messages.last?.unreadable, false)
   }
 
+  func testABlockedSignOutLeavesTheKeyActive() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    _ = try await alex.backend.messages()
+    XCTAssertEqual(store.world.deviceKeys.filter { $0.userId == SeedID.alex }.count, 1)
+    backend.blockSignOut = true
+    await alex.signOut()
+    XCTAssertTrue(alex.signedIn)
+    XCTAssertNil(store.world.deviceKeys.first { $0.userId == SeedID.alex }?.retiredAt)
+    backend.blockSignOut = false
+    await alex.signOut()
+    XCTAssertFalse(alex.signedIn)
+    XCTAssertNotNil(store.world.deviceKeys.first { $0.userId == SeedID.alex }?.retiredAt)
+  }
+
+  func testARetiredOwnKeyIsReplacedAndThePartnerCanStillRead() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let blair = SessionModel(backend: backend)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    alex.chatDraft = "old-note"
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    let original = store.world.deviceKeys.last { $0.userId == SeedID.alex }
+    let originalId = try XCTUnwrap(original?.id)
+    for index in store.world.deviceKeys.indices where store.world.deviceKeys[index].id == originalId {
+      store.world.deviceKeys[index].retiredAt = Date()
+    }
+    alex.chatDraft = "new-note"
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    let mine = store.world.deviceKeys.filter { $0.userId == SeedID.alex }
+    XCTAssertEqual(mine.count, 2)
+    XCTAssertNotNil(mine.first { $0.id == originalId }?.retiredAt)
+    let fresh = try XCTUnwrap(mine.last { $0.retiredAt == nil })
+    XCTAssertNotEqual(fresh.id, originalId)
+    XCTAssertEqual(store.world.chats.last?.senderPublicKey, fresh.publicKey)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    await blair.refresh()
+    XCTAssertEqual(Set(blair.messages.map(\.text)), ["old-note", "new-note"])
+    XCTAssertTrue(blair.messages.allSatisfy { $0.unreadable == false })
+    blair.chatDraft = "got both"
+    await blair.sendChat()
+    XCTAssertNil(blair.errorMessage)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    await alex.refresh()
+    XCTAssertEqual(alex.messages.last?.text, "got both")
+    XCTAssertEqual(alex.messages.last?.unreadable, false)
+    XCTAssertTrue(alex.messages.contains { $0.text == "new-note" && $0.unreadable == false })
+  }
+
   func testChatLoadErrorsStayVisible() async throws {
     let store = FakeStore(inMemory: true)
     let backend = FakeBackend(store: store, cooldown: 0)

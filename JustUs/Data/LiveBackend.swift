@@ -99,25 +99,29 @@ final class LiveBackend: DateBackend {
   func signOut() async throws {
     watchTask?.cancel()
     chatWatch?.cancel()
-    try await retirePublishedKey()
-    try await deleteTokenThenSignOut()
+    try await ChatSignOut.perform(
+      deleteToken: { try await self.deleteTokenKeepingSession() },
+      retire: { try await self.retirePublishedKey() },
+      authSignOut: { await self.authSignOut() }
+    )
     wipeAfterSignOut()
+  }
+
+  /// Deletes the push row and leaves the auth session in place when that delete fails.
+  private func deleteTokenKeepingSession() async throws {
+    try await deleteOwnDeviceToken(authSignOut: {})
   }
 
   /// The server keeps the public key and marks it retired, so old messages still open.
   private func retirePublishedKey() async throws {
     guard let user = cachedUser, let identity = try? DeviceKeyStore.load(userId: user) else { return }
     let stamp = ISO8601DateFormatter().string(from: Date())
-    do {
-      try await run { client in
-        try await client.from("device_keys")
-          .update(DeviceKeyRetire(retiredAt: stamp))
-          .eq("id", value: identity.id.uuidString)
-          .eq("user_id", value: user.uuidString)
-          .execute()
-      }
-    } catch {
-      throw AppError.signOutBlocked
+    try await run { client in
+      try await client.from("device_keys")
+        .update(DeviceKeyRetire(retiredAt: stamp))
+        .eq("id", value: identity.id.uuidString)
+        .eq("user_id", value: user.uuidString)
+        .execute()
     }
   }
 
@@ -412,26 +416,20 @@ final class LiveBackend: DateBackend {
       return []
     }
     guard let context else { return [] }
-    let identity = try DeviceKeyStore.loadOrCreate(userId: context.userId)
-    try await publishDeviceKey(identity, userId: context.userId)
+    let identity = try await publishDeviceKey(
+      try DeviceKeyStore.loadOrCreate(userId: context.userId), userId: context.userId
+    )
     watchChat(coupleId: context.couple.id)
-    let keys = try await loadDeviceKeys(coupleId: context.couple.id)
+    let rows = try await chatRows(coupleId: context.couple.id)
+    let keys = try await loadDeviceKeys(
+      coupleId: context.couple.id, senderKeys: rows.map(\.senderPublicKey)
+    )
     let partnerKeys = keys
       .filter { $0.userId != context.userId && $0.retiredAt == nil }
       .map(\.publicKey)
       .sorted()
     if PartnerKeyMemory.remember(userId: context.userId, current: partnerKeys) {
       partnerKeyNoticeText = L10n.chatKeyChanged
-    }
-    let rows: [ChatMessageRow] = try await run { client in
-      let response: PostgrestResponse<[ChatMessageRow]> = try await client
-        .from("chat_messages")
-        .select()
-        .eq("couple_id", value: context.couple.id.uuidString)
-        .order("created_at", ascending: false)
-        .limit(ChatWindow.limit)
-        .execute()
-      return response.value
     }
     let lines = rows.map { row in
       let text = decrypted(row, identity: identity, userId: context.userId, keys: keys)
@@ -448,8 +446,9 @@ final class LiveBackend: DateBackend {
     let clear = try ChatText.normalized(text)
     guard let context = try await loadContext() else { throw AppError.saveFailed }
     guard context.members.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
-    let identity = try DeviceKeyStore.loadOrCreate(userId: context.userId)
-    try await publishDeviceKey(identity, userId: context.userId)
+    let identity = try await publishDeviceKey(
+      try DeviceKeyStore.loadOrCreate(userId: context.userId), userId: context.userId
+    )
     let keys = try await loadDeviceKeys(coupleId: context.couple.id)
     let targets = chatTargets(keys: keys.filter { $0.retiredAt == nil }, userId: context.userId, identity: identity)
     guard targets.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
@@ -496,7 +495,8 @@ final class LiveBackend: DateBackend {
     )
   }
 
-  private func publishDeviceKey(_ identity: ChatIdentity, userId: UUID) async throws {
+  /// Returns the key this phone should seal with. A retired row gets a fresh keypair.
+  private func publishDeviceKey(_ identity: ChatIdentity, userId: UUID) async throws -> ChatIdentity {
     let encoded = ChatCoding.text(identity.publicKey)
     let existing: [DeviceKeyRow] = try await run { client in
       let response: PostgrestResponse<[DeviceKeyRow]> = try await client
@@ -508,14 +508,44 @@ final class LiveBackend: DateBackend {
         .execute()
       return response.value
     }
-    if existing.isEmpty == false { return }
-    let row = DeviceKeyInsert(id: identity.id, userId: userId, publicKey: encoded)
+    let retired = existing.first?.retiredAt != nil
+    switch OwnKeyPublish.action(hasRow: existing.isEmpty == false, retired: retired) {
+    case .keep:
+      return identity
+    case .insert:
+      try await insertDeviceKey(identity, userId: userId)
+      return identity
+    case .replace:
+      let fresh = ChatIdentity.generate()
+      try DeviceKeyStore.replace(fresh, userId: userId)
+      try await insertDeviceKey(fresh, userId: userId)
+      return fresh
+    }
+  }
+
+  private func insertDeviceKey(_ identity: ChatIdentity, userId: UUID) async throws {
+    let row = DeviceKeyInsert(
+      id: identity.id, userId: userId, publicKey: ChatCoding.text(identity.publicKey)
+    )
     try await run { client in
       try await client.from("device_keys").insert(row).execute()
     }
   }
 
-  private func loadDeviceKeys(coupleId: UUID) async throws -> [DeviceKeyRow] {
+  private func chatRows(coupleId: UUID) async throws -> [ChatMessageRow] {
+    try await run { client in
+      let response: PostgrestResponse<[ChatMessageRow]> = try await client
+        .from("chat_messages")
+        .select()
+        .eq("couple_id", value: coupleId.uuidString)
+        .order("created_at", ascending: false)
+        .limit(ChatWindow.limit)
+        .execute()
+      return response.value
+    }
+  }
+
+  private func loadDeviceKeys(coupleId: UUID, senderKeys: [String] = []) async throws -> [DeviceKeyRow] {
     let members: [MemberIdRow] = try await run { client in
       let response: PostgrestResponse<[MemberIdRow]> = try await client
         .from("couple_members")
@@ -525,14 +555,33 @@ final class LiveBackend: DateBackend {
       return response.value
     }
     let ids = members.map(\.userId.uuidString)
-    return try await run { client in
+    if ids.isEmpty { return [] }
+    let active: [DeviceKeyRow] = try await run { client in
       let response: PostgrestResponse<[DeviceKeyRow]> = try await client
         .from("device_keys")
         .select()
         .in("user_id", values: ids.map { $0 as any PostgrestFilterValue })
+        .is("retired_at", value: nil)
+        .order("created_at", ascending: false)
         .execute()
       return response.value
     }
+    let known = Set(active.map(\.publicKey))
+    let missing = Array(Set(senderKeys).subtracting(known))
+    guard missing.isEmpty == false else { return active }
+    let retired: [DeviceKeyRow] = try await run { client in
+      let response: PostgrestResponse<[DeviceKeyRow]> = try await client
+        .from("device_keys")
+        .select()
+        .in("user_id", values: ids.map { $0 as any PostgrestFilterValue })
+        .in("public_key", values: missing.map { $0 as any PostgrestFilterValue })
+        .order("created_at", ascending: false)
+        .limit(ChatWindow.retiredKeys)
+        .execute()
+      return response.value
+    }
+    var seen = Set(active.map(\.id))
+    return active + retired.filter { seen.insert($0.id).inserted }
   }
 
   private func watchChat(coupleId: UUID) {

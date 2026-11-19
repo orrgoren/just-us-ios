@@ -23,6 +23,10 @@ enum DeviceKeyStore {
     return created
   }
 
+  static func replace(_ identity: ChatIdentity, userId: UUID) throws {
+    try save(identity, userId: userId)
+  }
+
   static func delete(userId: UUID) {
     SecItemDelete(baseQuery(userId: userId) as CFDictionary)
     SecItemDelete(legacyQuery() as CFDictionary)
