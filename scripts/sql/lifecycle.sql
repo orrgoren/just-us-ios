@@ -1054,3 +1054,351 @@ begin
   end;
   execute 'reset role';
 end $$;
+
+-- 015. Ciphertext chat is visible only inside the couple. A chat push skips
+-- the daily cap. Moving or rewriting a message is not granted.
+do $$
+declare
+  n int;
+  alex uuid := '15151515-1515-4151-8151-151515151515';
+  blair uuid := '16161616-1616-4161-8161-161616161616';
+  outsider uuid := '17171717-1717-4171-8171-171717171717';
+  couple uuid := '18181818-1818-4181-8181-181818181818';
+  message uuid := '19191919-1919-4191-8191-191919191919';
+  key_id uuid := '1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a';
+begin
+  insert into auth.users (id) values (alex), (blair), (outsider) on conflict do nothing;
+  insert into public.couples (
+    id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name
+  ) values (
+    couple, alex, 4, '20:30', 'Asia/Jerusalem', 90, 'Blair'
+  );
+  insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+    (couple, alex, 'Alex', 0),
+    (couple, blair, 'Blair', 1);
+
+  grant usage on schema auth to authenticated;
+  grant execute on function auth.uid() to authenticated;
+
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  insert into public.device_keys (id, user_id, public_key)
+  values (key_id, alex, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+  insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+  values (
+    message, couple, alex, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+    '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+  );
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'chat_messages' and column_name = 'plaintext'
+  ) then
+    raise exception 'chat_has_plaintext';
+  end if;
+  if not exists (
+    select 1
+    from pg_publication_rel as publication_table
+    join pg_publication as publication on publication.oid = publication_table.prpubid
+    join pg_class as relation on relation.oid = publication_table.prrelid
+    join pg_namespace as namespace on namespace.oid = relation.relnamespace
+    where publication.pubname = 'supabase_realtime'
+      and namespace.nspname = 'public'
+      and relation.relname = 'chat_messages'
+  ) then
+    raise exception 'chat_not_in_realtime';
+  end if;
+
+  begin
+    update public.chat_messages set sender_public_key = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB='
+    where id = message;
+    raise exception 'chat_was_updated';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.chat_messages where id = message) <> 1 then
+    raise exception 'partner_could_not_read_chat';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.chat_messages where id = message) <> 0 then
+    raise exception 'outsider_read_chat';
+  end if;
+  delete from public.chat_messages where id = message;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'outsider_deleted_chat';
+  end if;
+
+  execute 'reset role';
+  perform public.claim_push_delivery(blair, 'chatMessage', 'Asia/Jerusalem');
+  begin
+    perform public.claim_push_delivery(blair, 'chatMessage', 'Asia/Jerusalem');
+    raise exception 'second_chat_push_was_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'coalesced' then
+        raise;
+      end if;
+  end;
+  if (
+    select count(*) from public.push_deliveries
+    where recipient_user_id = blair and kind = 'chatMessage' and transactional
+  ) <> 1 then
+    raise exception 'chat_push_was_not_claimed';
+  end if;
+  perform public.claim_push_delivery(blair, 'partnerMood', 'Asia/Jerusalem');
+  begin
+    perform public.claim_push_delivery(blair, 'partnerMood', 'Asia/Jerusalem');
+    raise exception 'second_mood_was_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'deduped_6h' and sqlerrm is distinct from 'daily_non_transactional' then
+        raise;
+      end if;
+  end;
+end $$;
+
+-- 016. The sender key has to be one of theirs, the clock is the server's,
+-- a fourth device key retires the oldest, and leaving deletes the keys.
+do $$
+declare
+  n int;
+  alex uuid := '15151515-1515-4151-8151-151515151515';
+  blair uuid := '16161616-1616-4161-8161-161616161616';
+  outsider uuid := '17171717-1717-4171-8171-171717171717';
+  couple uuid := '18181818-1818-4181-8181-181818181818';
+  message uuid := '19191919-1919-4191-8191-191919191919';
+  key_id uuid := '1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a';
+  alex_key text := 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+  stamped timestamptz;
+  recent int;
+  i int;
+begin
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+
+  insert into public.chat_messages (
+    id, couple_id, sender_user_id, sender_public_key, created_at, envelopes
+  ) values (
+    '1b1b1b1b-1b1b-41b1-81b1-1b1b1b1b1b1b', couple, alex, alex_key, '2000-01-01+00',
+    '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+  );
+  select created_at into stamped
+  from public.chat_messages
+  where id = '1b1b1b1b-1b1b-41b1-81b1-1b1b1b1b1b1b';
+  if stamped < now() - interval '1 minute' then
+    raise exception 'created_at_was_client';
+  end if;
+
+  insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+  values (
+    '1c1c1c1c-1c1c-41c1-81c1-1c1c1c1c1c1c', couple, alex, alex_key,
+    jsonb_build_array(jsonb_build_object('key_id', key_id::text, 'box', repeat('a', 13000)))
+  );
+
+  begin
+    insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      '1d1d1d1d-1d1d-41d1-81d1-1d1d1d1d1d1d', couple, alex, alex_key,
+      jsonb_build_array(jsonb_build_object('key_id', key_id::text, 'box', repeat('b', 70000)))
+    );
+    raise exception 'oversized_envelope_inserted';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      '1e1e1e1e-1e1e-41e1-81e1-1e1e1e1e1e1e', couple, alex,
+      encode(set_byte(decode(repeat('00', 32), 'hex'), 0, 7), 'base64'),
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+    raise exception 'forged_sender_inserted';
+  exception
+    when others then
+      if sqlerrm is distinct from 'unknown_sender_key' then
+        raise;
+      end if;
+  end;
+
+  begin
+    insert into public.device_keys (id, user_id, public_key)
+    values (
+      '1f1f1f1f-1f1f-41f1-81f1-1f1f1f1f1f1f', alex, 'not-a-key'
+    );
+    raise exception 'bad_key_inserted';
+  exception
+    when others then
+      if sqlerrm is distinct from 'bad_key' then
+        raise;
+      end if;
+  end;
+
+  select count(*) into recent
+  from public.chat_messages
+  where sender_user_id = alex
+    and created_at > now() - interval '1 minute';
+  for i in 1..(30 - recent) loop
+    insert into public.chat_messages (couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+  end loop;
+  begin
+    insert into public.chat_messages (couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+    raise exception 'chat_rate_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'chat_rate' then
+        raise;
+      end if;
+  end;
+
+  delete from public.chat_messages where id = message;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'sender_could_not_unsend';
+  end if;
+
+  for i in 1..3 loop
+    insert into public.device_keys (id, user_id, public_key)
+    values (
+      gen_random_uuid(), alex,
+      encode(set_byte(decode(repeat('00', 32), 'hex'), 0, i), 'base64')
+    );
+  end loop;
+  if (select count(*) from public.device_keys where user_id = alex and retired_at is null) <> 3 then
+    raise exception 'device_key_cap';
+  end if;
+  if (select retired_at from public.device_keys where id = key_id) is null then
+    raise exception 'oldest_device_key_not_retired';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.device_keys where user_id = alex) <> 4 then
+    raise exception 'partner_could_not_read_device_keys';
+  end if;
+  begin
+    insert into public.chat_messages (couple_id, sender_user_id, sender_public_key, envelopes)
+    values (
+      couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+    );
+    raise exception 'spoofed_sender_inserted';
+  exception
+    when others then
+      if sqlerrm is distinct from 'not_authenticated' then
+        raise;
+      end if;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.device_keys where user_id = alex) <> 0 then
+    raise exception 'outsider_read_device_keys';
+  end if;
+  insert into public.device_keys (id, user_id, public_key)
+  values (
+    '20202020-2020-4020-8020-202020202020', outsider,
+    encode(set_byte(decode(repeat('00', 32), 'hex'), 0, 9), 'base64')
+  );
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  perform public.leave_couple();
+  execute 'reset role';
+  if exists (select 1 from public.device_keys where user_id in (alex, blair)) then
+    raise exception 'leave_kept_device_keys';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  perform public.delete_my_account();
+  execute 'reset role';
+  if exists (select 1 from public.device_keys where user_id = outsider) then
+    raise exception 'delete_account_kept_device_keys';
+  end if;
+end $$;
+
+-- 018. created_at is the server clock. Retiring a key keeps the row and the
+-- message. Rewriting the public key is rejected.
+do $$
+declare
+  alex uuid := '2a2a2a2a-2a2a-42a2-82a2-2a2a2a2a2a2a';
+  blair uuid := '2b2b2b2b-2b2b-42b2-82b2-2b2b2b2b2b2b';
+  couple uuid := '2c2c2c2c-2c2c-42c2-82c2-2c2c2c2c2c2c';
+  key_id uuid := '2d2d2d2d-2d2d-42d2-82d2-2d2d2d2d2d2d';
+  message uuid := '2e2e2e2e-2e2e-42e2-82e2-2e2e2e2e2e2e';
+  alex_key text := 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
+  stamped timestamptz;
+begin
+  insert into auth.users (id) values (alex), (blair) on conflict do nothing;
+  insert into public.couples (
+    id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name
+  ) values (
+    couple, alex, 4, '20:30', 'Asia/Jerusalem', 90, 'Blair'
+  );
+  insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+    (couple, alex, 'Alex', 0),
+    (couple, blair, 'Blair', 1);
+
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  insert into public.device_keys (id, user_id, public_key, created_at)
+  values (key_id, alex, alex_key, timestamptz '1999-01-01+00');
+  select created_at into stamped from public.device_keys where id = key_id;
+  if stamped < now() - interval '1 minute' then
+    raise exception 'device_key_created_at_was_client';
+  end if;
+
+  insert into public.chat_messages (id, couple_id, sender_user_id, sender_public_key, envelopes)
+  values (
+    message, couple, alex, alex_key,
+    '[{"key_id":"2d2d2d2d-2d2d-42d2-82d2-2d2d2d2d2d2d","box":"Y2lwaGVydGV4dA=="}]'::jsonb
+  );
+  update public.device_keys set retired_at = timestamptz '1999-01-01+00' where id = key_id;
+  select retired_at into stamped from public.device_keys where id = key_id;
+  if stamped is null or stamped < now() - interval '1 minute' then
+    raise exception 'retire_did_not_stamp_now';
+  end if;
+
+  begin
+    update public.device_keys set public_key = 'AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=' where id = key_id;
+    raise exception 'public_key_was_rewritten';
+  exception
+    when insufficient_privilege then
+      null;
+    when others then
+      if sqlerrm is distinct from 'not_editable' then
+        raise;
+      end if;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.chat_messages where id = message) <> 1 then
+    raise exception 'retired_key_hid_the_message';
+  end if;
+  if (select count(*) from public.device_keys where id = key_id) <> 1 then
+    raise exception 'retired_key_was_deleted';
+  end if;
+end $$;

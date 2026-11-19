@@ -40,6 +40,7 @@ final class PushRouter {
     case .reveal: name = "reveal"
     case .memories: name = "memories"
     case .settings: name = "settings"
+    case .chat: name = "chat"
     case .invite: name = "invite"
     }
     guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?

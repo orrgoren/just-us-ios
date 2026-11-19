@@ -12,6 +12,9 @@ final class FakeBackend: DateBackend {
   var clock: @MainActor () -> Date = { Date() }
   /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
   private(set) var codeVerifier: String?
+  var chatFailure: AppError?
+  private var seenPartnerKeys: [UUID: Set<Data>] = [:]
+  private var keyNotice: String?
 
   init(store: FakeStore? = nil, cooldown: TimeInterval? = nil, now: Date? = nil) {
     // Default arguments are nonisolated, so the MainActor store is built in the body.
@@ -89,8 +92,20 @@ final class FakeBackend: DateBackend {
   var blockSignOut = false
 
   func signOut() async throws {
-    if blockSignOut { throw AppError.signOutBlocked }
-    await dropExpiredSession()
+    let userId = store.world.sessionUserId
+    try await ChatSignOut.perform(
+      deleteToken: {
+        if self.blockSignOut { throw AppError.signOutBlocked }
+      },
+      retire: {
+        guard let userId else { return }
+        for index in self.store.world.deviceKeys.indices where self.store.world.deviceKeys[index].userId == userId {
+          self.store.world.deviceKeys[index].retiredAt = Date()
+        }
+        self.store.save()
+      },
+      authSignOut: { await self.dropExpiredSession() }
+    )
   }
 
   func dropExpiredSession() async {
@@ -322,6 +337,113 @@ final class FakeBackend: DateBackend {
       store.world.moods[index].mood = mood
     } else {
       store.world.moods.append(FakeMood(dateId: dateId, userId: userId, mood: mood))
+    }
+  }
+
+  func partnerKeyNotice() -> String? {
+    keyNotice
+  }
+
+  func messages() async throws -> [ChatLine] {
+    if let chatFailure { throw chatFailure }
+    guard let user = current(), let mine = member(user.id) else { return [] }
+    let identity = try ensureKey(userId: user.id)
+    let coupleKeys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
+    let published = coupleKeys.map { (userId: $0.userId, publicKey: $0.publicKey) }
+    let partnerKeys = coupleKeys.filter { $0.userId != user.id && $0.retiredAt == nil }.map(\.publicKey)
+    let previous = seenPartnerKeys[user.id] ?? []
+    if PartnerKeyMemory.changed(previous: previous, current: partnerKeys) {
+      keyNotice = L10n.chatKeyChanged
+    }
+    seenPartnerKeys[user.id] = Set(partnerKeys)
+    let lines = store.world.chats
+      .filter { $0.coupleId == mine.coupleId }
+      .map { row in
+        let envelopes = row.envelopes.map { ChatEnvelope(keyId: $0.keyId, box: $0.box) }
+        let text: String?
+        if SenderKey.trusted(sender: row.senderPublicKey, senderUserId: row.senderUserId, keys: published) {
+          text = try? ChatCrypto.open(
+            envelopes: envelopes, identity: identity, messageId: row.id,
+            senderUserId: row.senderUserId, recipientUserId: user.id, senderPublic: row.senderPublicKey
+          )
+        } else {
+          text = nil
+        }
+        return ChatLine(
+          id: row.id, senderUserId: row.senderUserId, text: text ?? L10n.chatUnreadable,
+          createdAt: row.createdAt, mine: row.senderUserId == user.id, unreadable: text == nil
+        )
+      }
+    return ChatWindow.chronological(lines)
+  }
+
+  func sendMessage(_ text: String) async throws {
+    try guardOnline()
+    let clear = try ChatText.normalized(text)
+    guard let user = current(), let mine = member(user.id) else { throw AppError.saveFailed }
+    let partner = store.world.members.contains { $0.coupleId == mine.coupleId && $0.userId != user.id }
+    guard partner else { throw AppError.partnerNotReady }
+    let identity = try ensureKey(userId: user.id)
+    let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
+    let targets = ChatRecipients.choose(
+      senderUserId: user.id, senderKeyId: identity.id,
+      keys: keys.map {
+        (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt, retired: $0.retiredAt != nil)
+      }
+    )
+    guard targets.contains(where: { $0.userId != user.id }) else { throw AppError.partnerNotReady }
+    let messageId = UUID()
+    let envelopes = try ChatCrypto.seal(
+      text: clear, messageId: messageId, senderUserId: user.id, from: identity, to: targets
+    )
+    store.world.chats.append(FakeChat(
+      id: messageId, coupleId: mine.coupleId, senderUserId: user.id, senderPublicKey: identity.publicKey,
+      createdAt: Date(), envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
+    ))
+    store.save()
+  }
+
+  func seedChatPreview() {
+    guard let alex = member(SeedID.alex), let blairKey = try? ensureKey(userId: SeedID.blair),
+          let alexKey = try? ensureKey(userId: SeedID.alex) else { return }
+    let lines = [
+      (SeedID.blair, blairKey, "I'll bring tea."),
+      (SeedID.alex, alexKey, "Thursday still works.")
+    ]
+    for (userId, key, text) in lines {
+      let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == alex.coupleId }
+      let targets = ChatRecipients.choose(
+        senderUserId: userId, senderKeyId: key.id,
+        keys: keys.map {
+          (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt, retired: $0.retiredAt != nil)
+        }
+      )
+      let messageId = UUID()
+      guard let envelopes = try? ChatCrypto.seal(
+        text: text, messageId: messageId, senderUserId: userId, from: key, to: targets
+      ) else { continue }
+      store.world.chats.append(FakeChat(
+        id: messageId, coupleId: alex.coupleId, senderUserId: userId, senderPublicKey: key.publicKey,
+        createdAt: Date(), envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
+      ))
+    }
+    store.save()
+  }
+
+  private func ensureKey(userId: UUID) throws -> ChatIdentity {
+    let held = store.world.deviceKeys.last { $0.userId == userId }
+    switch OwnKeyPublish.action(hasRow: held != nil, retired: held?.retiredAt != nil) {
+    case .keep:
+      guard let held else { throw ChatCryptoError.unreadable }
+      return try ChatIdentity.restored(id: held.id, privateKey: held.privateKey)
+    case .insert, .replace:
+      let created = ChatIdentity.generate()
+      store.world.deviceKeys.append(FakeDeviceKey(
+        id: created.id, userId: userId, publicKey: created.publicKey,
+        privateKey: created.privateKey.rawRepresentation, createdAt: Date()
+      ))
+      store.save()
+      return created
     }
   }
 }

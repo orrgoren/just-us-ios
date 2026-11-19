@@ -58,6 +58,41 @@ struct FakeNote: Codable, Equatable {
   var note: String
 }
 
+struct FakeDeviceKey: Codable, Equatable {
+  var id: UUID
+  var userId: UUID
+  var publicKey: Data
+  var privateKey: Data
+  var createdAt: Date
+  var retiredAt: Date?
+
+  init(
+    id: UUID, userId: UUID, publicKey: Data, privateKey: Data,
+    createdAt: Date = Date(), retiredAt: Date? = nil
+  ) {
+    self.id = id
+    self.userId = userId
+    self.publicKey = publicKey
+    self.privateKey = privateKey
+    self.createdAt = createdAt
+    self.retiredAt = retiredAt
+  }
+}
+
+struct FakeEnvelope: Codable, Equatable {
+  var keyId: UUID
+  var box: Data
+}
+
+struct FakeChat: Codable, Equatable {
+  var id: UUID
+  var coupleId: UUID
+  var senderUserId: UUID
+  var senderPublicKey: Data
+  var createdAt: Date
+  var envelopes: [FakeEnvelope]
+}
+
 struct FakeInvite: Codable, Equatable {
   var token: String
   var coupleId: UUID
@@ -75,6 +110,8 @@ struct FakeWorld: Codable, Equatable {
   var moods: [FakeMood]
   var notes: [FakeNote]
   var invites: [FakeInvite]
+  var deviceKeys: [FakeDeviceKey]
+  var chats: [FakeChat]
   var preferences: [String: PushPreferences]
   var sessionUserId: UUID?
   var otpSentAt: [String: Date]
@@ -83,7 +120,7 @@ struct FakeWorld: Codable, Equatable {
   static func seed(now: Date = Date()) -> FakeWorld {
     var world = FakeWorld(
       users: [], couples: [], members: [], dates: [], moods: [], notes: [],
-      invites: [], preferences: [:], sessionUserId: nil, otpSentAt: [:], offline: false
+      invites: [], deviceKeys: [], chats: [], preferences: [:], sessionUserId: nil, otpSentAt: [:], offline: false
     )
     SeedBuilder.build(&world, now: now)
     return world

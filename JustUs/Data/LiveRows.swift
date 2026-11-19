@@ -202,3 +202,78 @@ struct PhotoPathParams: Encodable {
     case pPath = "p_path"
   }
 }
+
+struct MemberIdRow: Decodable {
+  var userId: UUID
+  enum CodingKeys: String, CodingKey { case userId = "user_id" }
+}
+
+struct DeviceKeyRow: Decodable {
+  var id: UUID
+  var userId: UUID
+  var publicKey: String
+  var createdAt: String
+  var retiredAt: String?
+  enum CodingKeys: String, CodingKey {
+    case id
+    case userId = "user_id"
+    case publicKey = "public_key"
+    case createdAt = "created_at"
+    case retiredAt = "retired_at"
+  }
+}
+
+struct DeviceKeyRetire: Encodable {
+  var retiredAt: String
+  enum CodingKeys: String, CodingKey { case retiredAt = "retired_at" }
+}
+
+struct DeviceKeyInsert: Encodable {
+  var id: UUID
+  var userId: UUID
+  var publicKey: String
+  enum CodingKeys: String, CodingKey {
+    case id
+    case userId = "user_id"
+    case publicKey = "public_key"
+  }
+}
+
+struct EnvelopeWire: Codable {
+  var keyId: UUID
+  var box: String
+  enum CodingKeys: String, CodingKey {
+    case keyId = "key_id"
+    case box
+  }
+}
+
+struct ChatMessageRow: Decodable {
+  var id: UUID
+  var senderUserId: UUID
+  var senderPublicKey: String
+  var createdAt: String
+  var envelopes: [EnvelopeWire]
+  enum CodingKeys: String, CodingKey {
+    case id
+    case senderUserId = "sender_user_id"
+    case senderPublicKey = "sender_public_key"
+    case createdAt = "created_at"
+    case envelopes
+  }
+}
+
+struct ChatInsert: Encodable {
+  var id: UUID
+  var coupleId: UUID
+  var senderUserId: UUID
+  var senderPublicKey: String
+  var envelopes: [EnvelopeWire]
+  enum CodingKeys: String, CodingKey {
+    case id
+    case coupleId = "couple_id"
+    case senderUserId = "sender_user_id"
+    case senderPublicKey = "sender_public_key"
+    case envelopes
+  }
+}

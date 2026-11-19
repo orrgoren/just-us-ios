@@ -40,6 +40,18 @@ extension SessionModel {
     } catch {
       await applyFailure(error, retry: nil)
     }
+    await loadMessages()
+  }
+
+  func loadMessages() async {
+    do {
+      messages = try await backend.messages()
+      if let notice = backend.partnerKeyNotice() {
+        chatKeyNotice = notice
+      }
+    } catch {
+      errorMessage = L10n.message(for: ErrorMap.app(error))
+    }
   }
 
   func choose(mood: MoodKey) async {
@@ -176,6 +188,24 @@ extension SessionModel {
     }
   }
 
+  func sendChat() async {
+    activity = .sendChat
+    busy = true
+    defer {
+      busy = false
+      activity = nil
+    }
+    do {
+      try await backend.sendMessage(chatDraft)
+      chatDraft = ""
+      chatKeyNotice = nil
+      errorMessage = nil
+      await loadMessages()
+    } catch {
+      errorMessage = L10n.message(for: ErrorMap.app(error))
+    }
+  }
+
   func toggle(_ kind: PushKind, on: Bool) async {
     guard var settings else { return }
     switch kind {
@@ -183,6 +213,7 @@ extension SessionModel {
     case .planReady: settings.preferences.planReady = on
     case .inviteAccepted: settings.preferences.inviteAccepted = on
     case .weeklyReminder, .inviteNudge: settings.preferences.weeklyReminder = on
+    case .chatMessage: break
     }
     self.settings = settings
     await backend.savePreferences(settings.preferences)
@@ -295,6 +326,12 @@ extension SessionModel {
     case "settings":
       await signedIn("alex@couple-a.test")
       tab = .settings
+      screen = .main
+    case "chat":
+      await signedIn("alex@couple-a.test")
+      (backend as? FakeBackend)?.seedChatPreview()
+      await loadMessages()
+      tab = .chat
       screen = .main
     case "deleteAccount":
       await signedIn("alex@couple-a.test")

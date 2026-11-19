@@ -129,6 +129,14 @@ final class DomainTests: XCTestCase {
       PushPolicy.decide(kind: .planReady, now: noon.addingTimeInterval(60), timeZone: zone, history: [prior], preferences: .allOn),
       .suppress("daily_non_transactional")
     )
+    XCTAssertEqual(
+      PushPolicy.decide(kind: .chatMessage, now: late, timeZone: zone, history: [prior], preferences: .allOn),
+      .send
+    )
+    let secret = "The tea is in the blue tin"
+    let body = PushPolicy.body(kind: .chatMessage, partnerName: "Blair")
+    XCTAssertEqual(body, "Blair sent a message.")
+    XCTAssertTrue(PushPolicy.forbiddenFragments(in: body, secrets: [secret]).isEmpty)
     let recentMood = PushRecord(kind: .partnerMood, sentAt: noon, transactional: false)
     XCTAssertEqual(
       PushPolicy.decide(kind: .partnerMood, now: noon.addingTimeInterval(3600), timeZone: zone, history: [recentMood], preferences: .allOn),
@@ -149,6 +157,237 @@ final class DomainTests: XCTestCase {
     XCTAssertEqual(
       PushPolicy.decide(kind: .inviteNudge, now: noon, timeZone: zone, history: [], preferences: .allOn, inviteAgeHours: 24),
       .send
+    )
+  }
+
+  func testChatRoundTripHidesTheText() throws {
+    let aliceUser = UUID()
+    let blairUser = UUID()
+    let alice = ChatIdentity.generate()
+    let blair = ChatIdentity.generate()
+    let messageId = UUID()
+    let secret = "xylophone-harbor"
+    let envelopes = try sealed(secret, messageId: messageId, alice: alice, aliceUser: aliceUser, blair: blair, blairUser: blairUser)
+    let stored = envelopes.map(\.box).reduce(into: Data()) { $0.append($1) }
+    XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(secret))
+    XCTAssertEqual(try open(envelopes, messageId: messageId, identity: blair, sender: alice, senderUser: aliceUser, recipientUser: blairUser), secret)
+    XCTAssertEqual(try open(envelopes, messageId: messageId, identity: alice, sender: alice, senderUser: aliceUser, recipientUser: aliceUser), secret)
+    let stranger = ChatIdentity.generate()
+    XCTAssertThrowsError(try open(envelopes, messageId: messageId, identity: stranger, sender: alice, senderUser: aliceUser, recipientUser: blairUser))
+  }
+
+  func testChatRejectsTamperForgeryReflectionAndReplay() throws {
+    let aliceUser = UUID()
+    let blairUser = UUID()
+    let alice = ChatIdentity.generate()
+    let blair = ChatIdentity.generate()
+    let messageId = UUID()
+    let envelopes = try sealed("tea", messageId: messageId, alice: alice, aliceUser: aliceUser, blair: blair, blairUser: blairUser)
+    var tampered = envelopes
+    tampered[0].box[tampered[0].box.count - 1] ^= 0xff
+    XCTAssertThrowsError(try open(tampered, messageId: messageId, identity: blair, sender: alice, senderUser: aliceUser, recipientUser: blairUser))
+
+    let forged = ChatIdentity.generate()
+    XCTAssertThrowsError(try open(envelopes, messageId: messageId, identity: blair, sender: forged, senderUser: aliceUser, recipientUser: blairUser))
+    XCTAssertFalse(SenderKey.trusted(
+      sender: forged.publicKey, senderUserId: aliceUser,
+      keys: [(userId: aliceUser, publicKey: alice.publicKey)]
+    ))
+    XCTAssertTrue(SenderKey.trusted(
+      sender: alice.publicKey, senderUserId: aliceUser,
+      keys: [(userId: aliceUser, publicKey: alice.publicKey)]
+    ))
+
+    XCTAssertThrowsError(try open(envelopes, messageId: messageId, identity: blair, sender: alice, senderUser: blairUser, recipientUser: aliceUser))
+    let reflected = [ChatEnvelope(keyId: alice.id, box: envelopes.first { $0.keyId == blair.id }?.box ?? Data())]
+    XCTAssertThrowsError(try open(reflected, messageId: messageId, identity: alice, sender: blair, senderUser: blairUser, recipientUser: aliceUser))
+
+    XCTAssertThrowsError(try open(envelopes, messageId: UUID(), identity: blair, sender: alice, senderUser: aliceUser, recipientUser: blairUser))
+  }
+
+  func testChatLengthIsByteAccurate() throws {
+    XCTAssertThrowsError(try ChatText.normalized("   ")) { error in
+      XCTAssertEqual(error as? AppError, .invalid(.note))
+    }
+    XCTAssertEqual(try ChatText.normalized(String(repeating: "a", count: 1000)).count, 1000)
+    XCTAssertEqual(try ChatText.normalized(String(repeating: "🙂", count: 1000)).count, 1000)
+    XCTAssertThrowsError(try ChatText.normalized(String(repeating: "a", count: 1001))) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
+    let family = String(repeating: "👨‍👩‍👧‍👦", count: 1000)
+    XCTAssertEqual(family.count, 1000)
+    XCTAssertGreaterThan(family.utf8.count, ChatText.maxBytes)
+    XCTAssertThrowsError(try ChatText.normalized(family)) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
+    let heavy = "e" + String(repeating: "\u{0301}", count: ChatText.maxBytes)
+    XCTAssertEqual(heavy.count, 1)
+    XCTAssertGreaterThan(heavy.utf8.count, ChatText.maxBytes)
+    XCTAssertThrowsError(try ChatText.normalized(heavy)) { error in
+      XCTAssertEqual(error as? AppError, .chatTooLong)
+    }
+    XCTAssertEqual(L10n.message(for: .chatTooLong), L10n.chatTooLong)
+    XCTAssertTrue(L10n.chatTooLong.contains("1,000"))
+    XCTAssertTrue(L10n.chatTooLong.contains("5,600"))
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.ink, Palette.canvas), 4.5)
+    XCTAssertGreaterThanOrEqual(Palette.contrast(Palette.inkDark, Palette.canvasDark), 4.5)
+  }
+
+  func testChatKeepsTheCurrentKeyAndTheNewestPartnerKeys() {
+    let sender = UUID()
+    let partner = UUID()
+    let current = UUID()
+    let older = Date(timeIntervalSince1970: 1)
+    let keys = (0..<5).map { index in
+      (
+        id: UUID(), userId: sender, publicKey: Data([UInt8(index)]),
+        createdAt: older.addingTimeInterval(TimeInterval(index)), retired: false
+      )
+    }
+    let currentKey = (id: current, userId: sender, publicKey: Data([9]), createdAt: older, retired: false)
+    let partnerKeys = (0..<4).map { index in
+      (
+        id: UUID(), userId: partner, publicKey: Data([UInt8(20 + index)]),
+        createdAt: older.addingTimeInterval(TimeInterval(index)), retired: false
+      )
+    }
+    let retiredPartner = (
+      id: UUID(), userId: partner, publicKey: Data([99]),
+      createdAt: older.addingTimeInterval(50), retired: true
+    )
+    let chosen = ChatRecipients.choose(
+      senderUserId: sender, senderKeyId: current, keys: [currentKey, retiredPartner] + keys + partnerKeys
+    )
+    let own = chosen.filter { $0.userId == sender }
+    XCTAssertEqual(own.count, 3)
+    XCTAssertEqual(own.first?.keyId, current)
+    XCTAssertEqual(chosen.filter { $0.userId == partner }.count, 3)
+    XCTAssertFalse(chosen.contains { $0.keyId == retiredPartner.id })
+  }
+
+  func testARetiredOwnKeyIsReplacedInsteadOfReused() {
+    XCTAssertEqual(OwnKeyPublish.action(hasRow: false, retired: false), .insert)
+    XCTAssertEqual(OwnKeyPublish.action(hasRow: true, retired: false), .keep)
+    XCTAssertEqual(OwnKeyPublish.action(hasRow: true, retired: true), .replace)
+  }
+
+  func testMaxBytesStillFitInEightEnvelopes() throws {
+    let sender = ChatIdentity.generate()
+    let senderUser = UUID()
+    let targets = (0..<8).map { _ -> ChatTarget in
+      let key = ChatIdentity.generate()
+      return ChatTarget(keyId: key.id, userId: UUID(), publicKey: key.publicKey)
+    }
+    let envelopes = try ChatCrypto.seal(
+      text: String(repeating: "a", count: ChatText.maxBytes),
+      messageId: UUID(), senderUserId: senderUser, from: sender, to: targets
+    )
+    let wires = envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) }
+    let data = try JSONEncoder().encode(wires)
+    XCTAssertLessThanOrEqual(data.count, 65_536)
+  }
+
+  func testSignOutRetiresOnlyAfterTheTokenDelete() async throws {
+    var events: [String] = []
+    do {
+      try await ChatSignOut.perform(
+        deleteToken: { events.append("delete"); throw AppError.signOutBlocked },
+        retire: { events.append("retire") },
+        authSignOut: { events.append("auth") }
+      )
+      XCTFail("expected the token delete to stop sign-out")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .signOutBlocked)
+    } catch {
+      XCTFail("unexpected \(error)")
+    }
+    XCTAssertEqual(events, ["delete"])
+
+    events = []
+    try await ChatSignOut.perform(
+      deleteToken: { events.append("delete") },
+      retire: { events.append("retire") },
+      authSignOut: { events.append("auth") }
+    )
+    XCTAssertEqual(events, ["delete", "retire", "auth"])
+
+    events = []
+    try await ChatSignOut.perform(
+      deleteToken: { events.append("delete") },
+      retire: { events.append("retire"); throw AppError.sessionExpired },
+      authSignOut: { events.append("auth") }
+    )
+    XCTAssertEqual(events, ["delete", "retire", "auth"])
+
+    events = []
+    do {
+      try await ChatSignOut.perform(
+        deleteToken: { events.append("delete") },
+        retire: { events.append("retire"); throw AppError.offline },
+        authSignOut: { events.append("auth") }
+      )
+      XCTFail("expected a network failure to keep the session")
+    } catch let error as AppError {
+      XCTAssertEqual(error, .offline)
+    } catch {
+      XCTFail("unexpected \(error)")
+    }
+    XCTAssertEqual(events, ["delete", "retire"])
+    XCTAssertTrue(ChatSignOut.continues(after: AppError.notAuthenticated))
+    XCTAssertTrue(ChatSignOut.continues(after: AppError.server(code: "PGRST116")))
+    XCTAssertFalse(ChatSignOut.continues(after: AppError.offline))
+  }
+
+  func testChatWindowShowsTheNewestHundred() {
+    let lines = (0..<105).map { index in
+      ChatLine(
+        id: UUID(), senderUserId: UUID(), text: "\(index)",
+        createdAt: Date(timeIntervalSince1970: TimeInterval(index)), mine: false, unreadable: false
+      )
+    }
+    let shown = ChatWindow.chronological(lines)
+    XCTAssertEqual(shown.count, 100)
+    XCTAssertEqual(shown.first?.text, "5")
+    XCTAssertEqual(shown.last?.text, "104")
+  }
+
+  func testAPartnerKeyChangeIsNotTheFirstSighting() {
+    let first = ["a"]
+    XCTAssertFalse(PartnerKeyMemory.changed(previous: [String](), current: first))
+    XCTAssertFalse(PartnerKeyMemory.changed(previous: first, current: first))
+    XCTAssertTrue(PartnerKeyMemory.changed(previous: first, current: ["a", "b"]))
+  }
+
+  func testNotifyFailureIsVisibleToTests() {
+    final class Notes: @unchecked Sendable {
+      var values: [String] = []
+    }
+    let notes = Notes()
+    PushFailureLog.handler = { notes.values.append($0) }
+    defer { PushFailureLog.handler = nil }
+    PushFailureLog.record(AppError.saveFailed)
+    XCTAssertEqual(notes.values, ["send-push failed"])
+  }
+
+  private func sealed(
+    _ text: String, messageId: UUID, alice: ChatIdentity, aliceUser: UUID, blair: ChatIdentity, blairUser: UUID
+  ) throws -> [ChatEnvelope] {
+    try ChatCrypto.seal(
+      text: text, messageId: messageId, senderUserId: aliceUser, from: alice,
+      to: [
+        ChatTarget(keyId: blair.id, userId: blairUser, publicKey: blair.publicKey),
+        ChatTarget(keyId: alice.id, userId: aliceUser, publicKey: alice.publicKey)
+      ]
+    )
+  }
+
+  private func open(
+    _ envelopes: [ChatEnvelope], messageId: UUID, identity: ChatIdentity, sender: ChatIdentity,
+    senderUser: UUID, recipientUser: UUID
+  ) throws -> String {
+    try ChatCrypto.open(
+      envelopes: envelopes, identity: identity, messageId: messageId,
+      senderUserId: senderUser, recipientUserId: recipientUser, senderPublic: sender.publicKey
     )
   }
 

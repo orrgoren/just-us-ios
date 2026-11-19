@@ -5,7 +5,7 @@ final class ScreenshotUITests: XCTestCase {
     let screens = [
       "login", "code", "setup", "inviteShare", "softPrompt", "inviteRedeem",
       "inviteReplace", "inviteBlocked", "homeSolo", "homePlanner", "homePartner",
-      "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount", "offline",
+      "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount", "offline", "chat",
       "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan", "editHint",
       "errorBanner", "unlinkConfirm", "postDeletion", "spaceClosed", "notificationTap", "signOut"
     ]

@@ -9,10 +9,13 @@ import {
   flushDue,
   freshApnsToken,
   isServiceCaller,
+  chatPushDecision,
+  CHAT_PUSH_WINDOW_MS,
   orderedDue,
   providerTokenRejected,
   retryableApns,
   safeErrorMessage,
+  skipsDailyCap,
 } from "./push.mjs";
 
 function jwt(header, claims) {
@@ -224,4 +227,15 @@ test("an APNs token is reused for 50 minutes", () => {
   assert.equal(freshApnsToken(cached, mintedAt + APNS_JWT_TTL_MS), null);
   assert.equal(freshApnsToken(null, mintedAt), null);
   assert.equal(freshApnsToken({ token: "", mintedAt }, mintedAt), null);
+});
+
+test("a chat push needs a recent message, coalesces for 60s, and skips the daily cap", () => {
+  assert.equal(CHAT_PUSH_WINDOW_MS, 60 * 1000);
+  const now = 1_000_000;
+  assert.equal(chatPushDecision({ recentMessage: false, lastPushAt: null, now }), "no_message");
+  assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: null, now }), "send");
+  assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - 30_000, now }), "coalesced");
+  assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - CHAT_PUSH_WINDOW_MS, now }), "send");
+  assert.equal(skipsDailyCap("chatMessage"), true);
+  assert.equal(skipsDailyCap("partnerMood"), false);
 });

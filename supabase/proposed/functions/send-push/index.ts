@@ -1,12 +1,17 @@
 // Live send-push is v6, deployed on 2026-11-16 from 5013075 (the same
 // content as 7872d1e) with verify_jwt on. a12f1d1 is v3 and is the rollback
-// source. 002, 006, and 007 are already applied. Do not re-apply them.
+// source. This file adds chatMessage on top of that v6 source. 002, 006, and
+// 007 are already applied. Do not re-apply them.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,
 // and the nudge index are never taken from the client. The recipient's tokens
 // are loaded with the service role after the caller's JWT is confirmed to be
 // a user. The daily cap, the six-hour dedupe, and the invite nudge windows
 // match JustUs/Domain/PushPolicy.swift. A push is not held for 22:00–08:00.
+// chatMessage still skips the daily cap and the six-hour dedupe. It is sent
+// only when the caller inserted a chat_messages row in the last 60 seconds.
+// The one-per-recipient window is checked and claimed together inside
+// claim_push_delivery, under its advisory lock.
 //
 // A flush is { "kind": "flush" } from the justus-push-flush cron. The bearer
 // is the legacy service_role JWT in the justus_service_role vault secret.
@@ -25,11 +30,11 @@
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
-import { apnsAttemptLog, dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage } from "./push.mjs";
+import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, skipsDailyCap } from "./push.mjs";
 
 const DEDUPE_MS = 6 * 60 * 60 * 1000;
 const INVITE_TTL_HOURS = 7 * 24;
-const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge"] as const;
+const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge", "chatMessage"] as const;
 type Kind = (typeof KINDS)[number];
 
 const CLIENT_FIELDS = ["token", "partnerName", "localHour", "nudgeIndex", "devices"];
@@ -155,12 +160,19 @@ async function deliver(
   };
   if (!allows(kind, preferences)) return { status: 200, body: { decision: "suppress", reason: "preference" } };
 
+  if (kind === "chatMessage") {
+    const since = new Date(Date.now() - CHAT_PUSH_WINDOW_MS).toISOString();
+    const notes = await db.select<{ id: string }[]>(
+      `chat_messages?couple_id=eq.${caller.couple_id}&sender_user_id=eq.${callerId}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`,
+    );
+    if (!notes[0]) return { status: 200, body: { decision: "suppress", reason: "no_message" } };
+  }
+
   try {
     localParts(new Date(), couple.timezone);
   } catch {
     return { status: 200, body: { decision: "suppress", reason: "invalid_timezone" } };
   }
-
   const since = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
   // planReady uses the same daily cap and six-hour dedupe as the other kinds.
   const history = await db.select<{ kind: Kind; transactional: boolean; sent_at: string }[]>(
@@ -233,6 +245,7 @@ async function deliver(
 }
 
 function allows(kind: Kind, preferences: Record<string, boolean>): boolean {
+  if (kind === "chatMessage") return true;
   if (kind === "partnerMood") return preferences.partner_mood !== false;
   if (kind === "planReady") return preferences.plan_ready !== false;
   if (kind === "inviteAccepted") return preferences.invite_accepted !== false;
@@ -245,6 +258,7 @@ function decide(
   inviteAge: number | null,
   timeZone: string,
 ): "send" | string {
+  if (skipsDailyCap(kind)) return "send";
   const now = Date.now();
   if (kind === "partnerMood" || kind === "inviteAccepted" || kind === "planReady") {
     const recent = history.some((row) => row.kind === kind && now - Date.parse(row.sent_at) < DEDUPE_MS);
@@ -280,6 +294,7 @@ async function inviteAgeHours(db: Db, coupleId: string): Promise<number | null> 
 }
 
 function message(kind: Kind, name: string, nudge: number): string {
+  if (kind === "chatMessage") return `${name} sent a message.`;
   if (kind === "planReady") return "Your date is ready to reveal.";
   if (kind === "partnerMood") return `${name} picked a mood for your night.`;
   if (kind === "inviteAccepted") return `${name} is in. This night is officially both of yours.`;
@@ -344,6 +359,7 @@ class Db {
       const body = await response.text();
       if (body.includes("deduped_6h")) return { ok: false, reason: "deduped_6h" };
       if (body.includes("daily_non_transactional")) return { ok: false, reason: "daily_non_transactional" };
+      if (body.includes("coalesced")) return { ok: false, reason: "coalesced" };
       throw new Error("db");
     }
     const id = await response.json() as string;

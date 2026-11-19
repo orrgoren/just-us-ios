@@ -443,6 +443,172 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(model.ritual?.moods.first { $0.userId == SeedID.alex }?.mood, .fun)
   }
 
+  func testChatIsCiphertextAndThePartnerCanReadIt() async throws {
+    let store = FakeStore(inMemory: true)
+    let blair = SessionModel(backend: FakeBackend(store: store, cooldown: 0))
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: FakeBackend(store: store, cooldown: 0))
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    let secret = "xylophone-harbor"
+    alex.chatDraft = secret
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    XCTAssertEqual(alex.messages.last?.text, secret)
+    let stored = store.world.chats.flatMap(\.envelopes).map(\.box).reduce(into: Data()) { $0.append($1) }
+    XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(secret))
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    XCTAssertEqual(blair.messages.last?.text, secret)
+    XCTAssertEqual(blair.messages.last?.mine, false)
+    XCTAssertNil(blair.chatKeyNotice)
+    let replacement = ChatIdentity.generate()
+    store.world.deviceKeys.append(FakeDeviceKey(
+      id: replacement.id, userId: SeedID.alex, publicKey: replacement.publicKey,
+      privateKey: replacement.privateKey.rawRepresentation, createdAt: Date().addingTimeInterval(10)
+    ))
+    await blair.refresh()
+    XCTAssertEqual(blair.chatKeyNotice, L10n.chatKeyChanged)
+  }
+
+  func testMessageFromARetiredKeyStaysReadable() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let blair = SessionModel(backend: backend)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    let secret = "still-readable"
+    alex.chatDraft = secret
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    await alex.signOut()
+    let retired = store.world.deviceKeys.filter { $0.userId == SeedID.alex }
+    XCTAssertEqual(retired.count, 1)
+    XCTAssertNotNil(retired.first?.retiredAt)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    await blair.refresh()
+    XCTAssertEqual(blair.messages.last?.text, secret)
+    XCTAssertEqual(blair.messages.last?.unreadable, false)
+  }
+
+  func testABlockedSignOutLeavesTheKeyActive() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    _ = try await alex.backend.messages()
+    XCTAssertEqual(store.world.deviceKeys.filter { $0.userId == SeedID.alex }.count, 1)
+    backend.blockSignOut = true
+    await alex.signOut()
+    XCTAssertTrue(alex.signedIn)
+    XCTAssertNil(store.world.deviceKeys.first { $0.userId == SeedID.alex }?.retiredAt)
+    backend.blockSignOut = false
+    await alex.signOut()
+    XCTAssertFalse(alex.signedIn)
+    XCTAssertNotNil(store.world.deviceKeys.first { $0.userId == SeedID.alex }?.retiredAt)
+  }
+
+  func testARetiredOwnKeyIsReplacedAndThePartnerCanStillRead() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let blair = SessionModel(backend: backend)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    alex.chatDraft = "old-note"
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    let original = store.world.deviceKeys.last { $0.userId == SeedID.alex }
+    let originalId = try XCTUnwrap(original?.id)
+    for index in store.world.deviceKeys.indices where store.world.deviceKeys[index].id == originalId {
+      store.world.deviceKeys[index].retiredAt = Date()
+    }
+    alex.chatDraft = "new-note"
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    let mine = store.world.deviceKeys.filter { $0.userId == SeedID.alex }
+    XCTAssertEqual(mine.count, 2)
+    XCTAssertNotNil(mine.first { $0.id == originalId }?.retiredAt)
+    let fresh = try XCTUnwrap(mine.last { $0.retiredAt == nil })
+    XCTAssertNotEqual(fresh.id, originalId)
+    XCTAssertEqual(store.world.chats.last?.senderPublicKey, fresh.publicKey)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    await blair.refresh()
+    XCTAssertEqual(Set(blair.messages.map(\.text)), ["old-note", "new-note"])
+    XCTAssertTrue(blair.messages.allSatisfy { $0.unreadable == false })
+    blair.chatDraft = "got both"
+    await blair.sendChat()
+    XCTAssertNil(blair.errorMessage)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    await alex.refresh()
+    XCTAssertEqual(alex.messages.last?.text, "got both")
+    XCTAssertEqual(alex.messages.last?.unreadable, false)
+    XCTAssertTrue(alex.messages.contains { $0.text == "new-note" && $0.unreadable == false })
+  }
+
+  func testChatLoadErrorsStayVisible() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let blair = SessionModel(backend: backend)
+    blair.email = "blair@couple-a.test"
+    await blair.sendCode()
+    blair.code = "000000"
+    await blair.verify()
+    _ = try await blair.backend.messages()
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    alex.chatDraft = "hello"
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    XCTAssertEqual(alex.messages.count, 1)
+    backend.chatFailure = .server(code: "chat")
+    await alex.refresh()
+    XCTAssertEqual(alex.errorMessage, L10n.message(for: .server(code: "chat")))
+    XCTAssertEqual(alex.messages.count, 1)
+    alex.chatDraft = String(repeating: "a", count: 1001)
+    backend.chatFailure = nil
+    await alex.sendChat()
+    XCTAssertEqual(alex.errorMessage, L10n.message(for: .chatTooLong))
+  }
+
   func testHintSaveRejectsAnUpdateThatTouchesNoRows() {
     XCTAssertNoThrow(try HintEdit.requireUpdated(dateRows: 1, planRows: 1))
     for (dates, plans) in [(0, 1), (1, 0), (0, 0)] {

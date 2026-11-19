@@ -83,9 +83,22 @@ enum L10n {
   static var softNo: String { text("push.no", "Not now") }
   static var pushDenied: String { text("push.denied", "Notifications stay off. You can turn them on in Settings.") }
   static var tabWeek: String { text("tab.week", "This week") }
+  static var tabChat: String { text("tab.chat", "Chat") }
   static var tabMemories: String { text("tab.memories", "Memories") }
   static var tabUs: String { text("tab.us", "Us") }
   static var homeTitle: String { text("home.title", "This week, just us") }
+  static var chatTitle: String { text("chat.title", "A note, just for them") }
+  static var chatHelp: String { text("chat.help", "Only the two of you can read these. A notification says a message arrived, not what it says.") }
+  static var chatWaiting: String { text("chat.waiting", "Chat opens once you're both here.") }
+  static var chatEmpty: String { text("chat.empty", "Nothing here yet.") }
+  static var chatField: String { text("chat.field", "Message") }
+  static var chatSend: String { text("chat.send", "Send") }
+  static var chatTooLong: String {
+    text("chat.tooLong", "A message can be at most 1,000 characters, or 5,600 bytes.")
+  }
+  static var chatKeyChanged: String { text("chat.keyChanged", "Your partner's key changed.") }
+  static var chatUnreadable: String { text("chat.unreadable", "This phone can't read that message.") }
+  static var chatPartner: String { text("chat.partner", "Their phone needs to open the app once before a message can be locked to them.") }
   static var homeBody: String { text("home.body", "Pick a mood. Whoever is planning keeps the surprise.") }
   static var datesTogether: String { text("home.dates", "Dates together") }
   static var rhythm: String { text("home.rhythm", "Three in, one out") }
@@ -304,6 +317,8 @@ enum L10n {
     case .unsyncedChanges: return text("err.unsynced", "You still have changes that aren't saved. Try again when you're online, or discard them.")
     case .signOutBlocked: return text("err.signOut", "This phone is still on the account, so you're still signed in. Try again.")
     case .accountDeleteBlocked: return text("err.deleteAccount", "This phone is still on the account, so the account was not deleted. Try again.")
+    case .partnerNotReady: return chatPartner
+    case .chatTooLong: return chatTooLong
     case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
     }
   }

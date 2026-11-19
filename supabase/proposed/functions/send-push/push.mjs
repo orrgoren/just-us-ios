@@ -1,6 +1,6 @@
 // Pure helpers for send-push. node --test push.test.mjs covers the flush
-// bearer, which queued rows are deleted, the retry cap, due-row order, and
-// which APNs responses drop a device token.
+// bearer, which queued rows are deleted, the retry cap, due-row order,
+// which APNs responses drop a device token, and the chatMessage gate.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
 
@@ -13,6 +13,22 @@ export const APNS_JWT_TTL_MS = 50 * 60 * 1000;
 // A retryable APNs failure keeps the row this many claims, then drops it
 // so one broken device cannot sit at the front of the queue forever.
 export const MAX_FLUSH_ATTEMPTS = 5;
+
+// One chat notification per recipient in this window. The daily cap does not apply.
+// The live check is inside claim_push_delivery, in the same transaction as the insert.
+export const CHAT_PUSH_WINDOW_MS = 60 * 1000;
+
+export function skipsDailyCap(kind) {
+  return kind === "chatMessage";
+}
+
+export function chatPushDecision({ recentMessage, lastPushAt, now }) {
+  if (!recentMessage) return "no_message";
+  if (typeof lastPushAt === "number" && Number.isFinite(lastPushAt) && now - lastPushAt < CHAT_PUSH_WINDOW_MS) {
+    return "coalesced";
+  }
+  return "send";
+}
 
 export function freshApnsToken(cached, now) {
   if (!cached || typeof cached.token !== "string" || cached.token.length === 0) return null;

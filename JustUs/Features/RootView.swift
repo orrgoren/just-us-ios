@@ -196,7 +196,7 @@ struct CodeScreen: View {
 }
 
 enum FieldNeed {
-  case required, optional
+  case required, optional, labelOnly
 }
 
 private struct ScrollFieldKey: EnvironmentKey {
@@ -277,9 +277,11 @@ struct LabeledField: View {
     VStack(alignment: .leading, spacing: Theme.Space.field) {
       HStack(spacing: 8) {
         Text(title).font(Theme.caption)
-        Text(need == .required ? L10n.required : L10n.optional)
-          .font(Theme.caption)
-          .foregroundStyle(Theme.muted(scheme))
+        if need != .labelOnly {
+          Text(need == .required ? L10n.required : L10n.optional)
+            .font(Theme.caption)
+            .foregroundStyle(Theme.muted(scheme))
+        }
       }
       TextField(title, text: $text, prompt: Text(title).foregroundStyle(Theme.muted))
         .focused($focused)
