@@ -287,7 +287,7 @@ final class DomainTests: XCTestCase {
     XCTAssertLessThanOrEqual(data.count, 65_536)
   }
 
-  func testSignOutRetiresOnlyAfterTheTokenDelete() async {
+  func testSignOutRetiresOnlyAfterTheTokenDelete() async throws {
     var events: [String] = []
     do {
       try await ChatSignOut.perform(
@@ -329,6 +329,8 @@ final class DomainTests: XCTestCase {
       XCTFail("expected a network failure to keep the session")
     } catch let error as AppError {
       XCTAssertEqual(error, .offline)
+    } catch {
+      XCTFail("unexpected \(error)")
     }
     XCTAssertEqual(events, ["delete", "retire"])
     XCTAssertTrue(ChatSignOut.continues(after: AppError.notAuthenticated))
