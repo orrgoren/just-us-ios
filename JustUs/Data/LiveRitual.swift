@@ -7,7 +7,7 @@ extension LiveBackend {
     let history = try await dateHistory(context)
     let active = try await activeDate(context)
     if let active {
-      watchMoods(dateId: active.id)
+      await watchMoods(dateId: active.id)
     }
     return try await makeRitual(
       context: context, completed: history.completed, active: active, nights: history.nights
@@ -406,23 +406,6 @@ extension LiveBackend {
       publicTeaser: active.publicTeaser, outfitHint: active.outfitHint,
       revealed: active.revealedAt != nil, plannerUserId: active.plannerUserId, plannerName: planner
     )
-  }
-
-  private func watchMoods(dateId: UUID) {
-    watchTask?.cancel()
-    guard let client else { return }
-    watchTask = Task { [weak self] in
-      let channel = client.channel("mood-\(dateId.uuidString)")
-      let stream = channel.postgresChange(
-        AnyAction.self, schema: "public", table: "mood_votes",
-        filter: .eq("date_id", value: dateId.uuidString)
-      )
-      do { try await channel.subscribeWithError() } catch { return }
-      for await _ in stream {
-        if Task.isCancelled { break }
-        await self?.onRemoteChange?()
-      }
-    }
   }
 
   private func catalogTitle(_ row: MemoryDateRow) -> String {
