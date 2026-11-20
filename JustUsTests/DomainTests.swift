@@ -373,10 +373,10 @@ final class DomainTests: XCTestCase {
 
   func testSignOutUsesTheStatusOrCodeRatherThanTheMessage() throws {
     XCTAssertTrue(ChatSignOut.continues(after: PostgrestError(
-      message: "JSON object requested, multiple (or no) rows returned", code: "PGRST116"
+      code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned"
     )))
     XCTAssertFalse(ChatSignOut.continues(after: PostgrestError(
-      message: "room 404 was not found and the client saw a 401", code: "23514"
+      code: "23514", message: "room 404 was not found and the client saw a 401"
     )))
     XCTAssertTrue(ChatSignOut.continues(after: AppError.server(code: "PGRST301")))
     let url = try XCTUnwrap(URL(string: "https://example.test/rest"))
