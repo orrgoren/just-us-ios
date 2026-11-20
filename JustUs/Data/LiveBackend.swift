@@ -11,6 +11,7 @@ final class LiveBackend: DateBackend {
   private var cachedUser: UUID?
   private var deviceToken: String?
   private var partnerKeyNoticeText: String?
+  private let publishGate = KeyPublishGate()
 
   init() {
     deviceToken = DeviceTokenStore.load().token
@@ -102,14 +103,16 @@ final class LiveBackend: DateBackend {
     try await ChatSignOut.perform(
       deleteToken: { try await self.deleteTokenKeepingSession() },
       retire: { try await self.retirePublishedKey() },
-      authSignOut: { await self.authSignOut() }
+      authSignOut: { await self.authSignOut() },
+      recoverToken: { await self.uploadDeviceToken() }
     )
     wipeAfterSignOut()
   }
 
   /// Deletes the push row and leaves the auth session in place when that delete fails.
+  /// A dead session is rethrown so sign-out can finish on this phone.
   private func deleteTokenKeepingSession() async throws {
-    try await deleteOwnDeviceToken(authSignOut: {})
+    try await deleteOwnDeviceToken(authSignOut: {}, passThroughDeadSession: true)
   }
 
   /// The server keeps the public key and marks it retired, so old messages still open.
@@ -142,7 +145,8 @@ final class LiveBackend: DateBackend {
 
   private func deleteOwnDeviceToken(
     authSignOut: @escaping () async -> Void = {},
-    blocked: AppError = .signOutBlocked
+    blocked: AppError = .signOutBlocked,
+    passThroughDeadSession: Bool = false
   ) async throws {
     DeviceTokenStore.clearDelete()
     if deviceToken?.isEmpty != false {
@@ -171,6 +175,9 @@ final class LiveBackend: DateBackend {
       )
     } catch {
       PushLog.deleteFailed(error)
+      if passThroughDeadSession, ChatSignOut.continues(after: error) {
+        throw error
+      }
       throw blocked
     }
     deviceToken = nil
@@ -416,9 +423,7 @@ final class LiveBackend: DateBackend {
       return []
     }
     guard let context else { return [] }
-    let identity = try await publishDeviceKey(
-      try DeviceKeyStore.loadOrCreate(userId: context.userId), userId: context.userId
-    )
+    let identity = try await publishDeviceKey(userId: context.userId, reason: .refresh)
     watchChat(coupleId: context.couple.id)
     let rows = try await chatRows(coupleId: context.couple.id)
     let keys = try await loadDeviceKeys(
@@ -431,8 +436,9 @@ final class LiveBackend: DateBackend {
     if PartnerKeyMemory.remember(userId: context.userId, current: partnerKeys) {
       partnerKeyNoticeText = L10n.chatKeyChanged
     }
+    let retired = DeviceKeyStore.retired(userId: context.userId)
     let lines = rows.map { row in
-      let text = decrypted(row, identity: identity, userId: context.userId, keys: keys)
+      let text = decrypted(row, identity: identity, retired: retired, userId: context.userId, keys: keys)
       return ChatLine(
         id: row.id, senderUserId: row.senderUserId, text: text ?? L10n.chatUnreadable,
         createdAt: APIDate.parse(row.createdAt) ?? Date(), mine: row.senderUserId == context.userId,
@@ -446,9 +452,7 @@ final class LiveBackend: DateBackend {
     let clear = try ChatText.normalized(text)
     guard let context = try await loadContext() else { throw AppError.saveFailed }
     guard context.members.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
-    let identity = try await publishDeviceKey(
-      try DeviceKeyStore.loadOrCreate(userId: context.userId), userId: context.userId
-    )
+    let identity = try await publishDeviceKey(userId: context.userId, reason: .send)
     let keys = try await loadDeviceKeys(coupleId: context.couple.id)
     let targets = chatTargets(keys: keys.filter { $0.retiredAt == nil }, userId: context.userId, identity: identity)
     guard targets.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
@@ -477,7 +481,7 @@ final class LiveBackend: DateBackend {
   }
 
   private func decrypted(
-    _ row: ChatMessageRow, identity: ChatIdentity, userId: UUID, keys: [DeviceKeyRow]
+    _ row: ChatMessageRow, identity: ChatIdentity, retired: [ChatIdentity], userId: UUID, keys: [DeviceKeyRow]
   ) -> String? {
     let published = keys.compactMap { key -> (userId: UUID, publicKey: Data)? in
       guard let raw = ChatCoding.data(key.publicKey) else { return nil }
@@ -489,38 +493,72 @@ final class LiveBackend: DateBackend {
       guard let box = ChatCoding.data(wire.box) else { return nil }
       return ChatEnvelope(keyId: wire.keyId, box: box)
     }
-    return try? ChatCrypto.open(
-      envelopes: envelopes, identity: identity, messageId: row.id,
+    return ChatHistory.open(
+      envelopes: envelopes, current: identity, retired: retired, messageId: row.id,
       senderUserId: row.senderUserId, recipientUserId: userId, senderPublic: sender
     )
   }
 
-  /// Returns the key this phone should seal with. A retired row gets a fresh keypair.
-  private func publishDeviceKey(_ identity: ChatIdentity, userId: UUID) async throws -> ChatIdentity {
+  /// Reloads the keychain inside the gate, so a call that waited cannot publish the key the previous call just replaced.
+  private func publishDeviceKey(userId: UUID, reason: KeyRotation.Reason) async throws -> ChatIdentity {
+    try await publishGate.run { @MainActor in
+      try await self.publishDeviceKeyOnce(userId: userId, reason: reason)
+    }
+  }
+
+  private func publishDeviceKeyOnce(userId: UUID, reason: KeyRotation.Reason) async throws -> ChatIdentity {
+    let identity = try DeviceKeyStore.loadOrCreate(userId: userId)
     let encoded = ChatCoding.text(identity.publicKey)
-    let existing: [DeviceKeyRow] = try await run { client in
+    let existing = try await ownDeviceKey(userId: userId, publicKey: encoded)
+    let hasRow = existing != nil
+    let retired = existing?.retiredAt != nil
+    let activeCount = (hasRow && retired == false) ? 0 : try await activeKeyCount(userId: userId)
+    let now = Date()
+    let decision = try KeyRotation.enforce(KeyRotation.step(
+      hasRow: hasRow, retired: retired, activeCount: activeCount,
+      retiredAt: APIDate.parse(existing?.retiredAt), now: now, reason: reason
+    ), reason: reason)
+    switch decision {
+    case .keep, .hold:
+      return identity
+    case .publish:
+      let fresh = (hasRow && retired) ? ChatIdentity.generate() : identity
+      try await KeyPublish.stage(
+        insert: { try await self.insertDeviceKey(fresh, userId: userId) },
+        commit: {
+          guard fresh.id != identity.id else { return }
+          try DeviceKeyStore.commit(current: fresh, retiring: identity, userId: userId)
+        }
+      )
+      return fresh
+    }
+  }
+
+  private func ownDeviceKey(userId: UUID, publicKey: String) async throws -> DeviceKeyRow? {
+    let rows: [DeviceKeyRow] = try await run { client in
       let response: PostgrestResponse<[DeviceKeyRow]> = try await client
         .from("device_keys")
         .select()
         .eq("user_id", value: userId.uuidString)
-        .eq("public_key", value: encoded)
+        .eq("public_key", value: publicKey)
         .limit(1)
         .execute()
       return response.value
     }
-    let retired = existing.first?.retiredAt != nil
-    switch OwnKeyPublish.action(hasRow: existing.isEmpty == false, retired: retired) {
-    case .keep:
-      return identity
-    case .insert:
-      try await insertDeviceKey(identity, userId: userId)
-      return identity
-    case .replace:
-      let fresh = ChatIdentity.generate()
-      try DeviceKeyStore.replace(fresh, userId: userId)
-      try await insertDeviceKey(fresh, userId: userId)
-      return fresh
+    return rows.first
+  }
+
+  private func activeKeyCount(userId: UUID) async throws -> Int {
+    let rows: [DeviceKeyRow] = try await run { client in
+      let response: PostgrestResponse<[DeviceKeyRow]> = try await client
+        .from("device_keys")
+        .select()
+        .eq("user_id", value: userId.uuidString)
+        .is("retired_at", value: nil)
+        .execute()
+      return response.value
     }
+    return rows.count
   }
 
   private func insertDeviceKey(_ identity: ChatIdentity, userId: UUID) async throws {

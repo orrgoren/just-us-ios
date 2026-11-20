@@ -58,6 +58,8 @@ targets:
         buildPhase: resources
     dependencies:
       - target: JustUs
+      - package: supabase-swift
+        product: Supabase
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.orrgoren.justus.tests

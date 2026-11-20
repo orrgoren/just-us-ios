@@ -265,12 +265,6 @@ final class DomainTests: XCTestCase {
     XCTAssertFalse(chosen.contains { $0.keyId == retiredPartner.id })
   }
 
-  func testARetiredOwnKeyIsReplacedInsteadOfReused() {
-    XCTAssertEqual(OwnKeyPublish.action(hasRow: false, retired: false), .insert)
-    XCTAssertEqual(OwnKeyPublish.action(hasRow: true, retired: false), .keep)
-    XCTAssertEqual(OwnKeyPublish.action(hasRow: true, retired: true), .replace)
-  }
-
   func testMaxBytesStillFitInEightEnvelopes() throws {
     let sender = ChatIdentity.generate()
     let senderUser = UUID()
@@ -336,6 +330,7 @@ final class DomainTests: XCTestCase {
     XCTAssertTrue(ChatSignOut.continues(after: AppError.notAuthenticated))
     XCTAssertTrue(ChatSignOut.continues(after: AppError.server(code: "PGRST116")))
     XCTAssertFalse(ChatSignOut.continues(after: AppError.offline))
+    XCTAssertFalse(ChatSignOut.continues(after: AppError.server(code: "14042")))
   }
 
   func testChatWindowShowsTheNewestHundred() {

@@ -579,6 +579,86 @@ final class FakeFlowTests: XCTestCase {
     XCTAssertEqual(alex.messages.last?.text, "got both")
     XCTAssertEqual(alex.messages.last?.unreadable, false)
     XCTAssertTrue(alex.messages.contains { $0.text == "new-note" && $0.unreadable == false })
+    XCTAssertTrue(alex.messages.contains { $0.text == "old-note" && $0.unreadable == false })
+  }
+
+  func testRefreshDoesNotEvictAnotherPhoneWhenTheCapIsFull() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    _ = try await alex.backend.messages()
+    let mine = try XCTUnwrap(store.world.deviceKeys.last { $0.userId == SeedID.alex })
+    for index in store.world.deviceKeys.indices where store.world.deviceKeys[index].id == mine.id {
+      store.world.deviceKeys[index].retiredAt = Date()
+    }
+    for offset in 1...3 {
+      let other = ChatIdentity.generate()
+      store.world.deviceKeys.append(FakeDeviceKey(
+        id: other.id, userId: SeedID.alex, publicKey: other.publicKey,
+        privateKey: other.privateKey.rawRepresentation,
+        createdAt: Date().addingTimeInterval(TimeInterval(-30 * offset))
+      ))
+    }
+    let blair = ChatIdentity.generate()
+    store.world.deviceKeys.append(FakeDeviceKey(
+      id: blair.id, userId: SeedID.blair, publicKey: blair.publicKey,
+      privateKey: blair.privateKey.rawRepresentation
+    ))
+    for _ in 0..<20 {
+      _ = try await alex.backend.messages()
+    }
+    let keys = store.world.deviceKeys.filter { $0.userId == SeedID.alex }
+    XCTAssertEqual(keys.count, 4)
+    XCTAssertEqual(keys.filter { $0.retiredAt == nil }.count, 3)
+    alex.chatDraft = "too-soon"
+    await alex.sendChat()
+    XCTAssertEqual(alex.errorMessage, L10n.message(for: .rateLimited))
+    XCTAssertEqual(store.world.deviceKeys.filter { $0.userId == SeedID.alex }.count, 4)
+    for index in store.world.deviceKeys.indices where store.world.deviceKeys[index].id == mine.id {
+      store.world.deviceKeys[index].retiredAt = Date().addingTimeInterval(-(KeyRotation.backoff + 5))
+    }
+    alex.chatDraft = "after-wait"
+    await alex.sendChat()
+    XCTAssertNil(alex.errorMessage)
+    let after = store.world.deviceKeys.filter { $0.userId == SeedID.alex }
+    XCTAssertEqual(after.count, 5)
+    XCTAssertEqual(after.filter { $0.retiredAt == nil }.count, 3)
+  }
+
+  func testADeadTokenDeleteSignsOutLocally() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    _ = try await alex.backend.messages()
+    backend.deleteFailure = AppError.sessionExpired
+    await alex.signOut()
+    XCTAssertFalse(alex.signedIn)
+    XCTAssertNil(store.world.deviceKeys.first { $0.userId == SeedID.alex }?.retiredAt)
+    XCTAssertEqual(backend.tokenRecoveries, 0)
+  }
+
+  func testAFailedRetireKeepsTheSessionAndRetriesTheToken() async throws {
+    let store = FakeStore(inMemory: true)
+    let backend = FakeBackend(store: store, cooldown: 0)
+    let alex = SessionModel(backend: backend)
+    alex.email = "alex@couple-a.test"
+    await alex.sendCode()
+    alex.code = "000000"
+    await alex.verify()
+    _ = try await alex.backend.messages()
+    backend.retireFailure = AppError.offline
+    await alex.signOut()
+    XCTAssertTrue(alex.signedIn)
+    XCTAssertEqual(backend.tokenRecoveries, 1)
+    XCTAssertNil(store.world.deviceKeys.first { $0.userId == SeedID.alex }?.retiredAt)
   }
 
   func testChatLoadErrorsStayVisible() async throws {
