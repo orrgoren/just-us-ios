@@ -188,25 +188,71 @@ final class ChatKeyTests: XCTestCase {
     XCTAssertNil(lost)
   }
 
+  func testARetiredPrivateKeyStaysOnTheRingAndOpens() throws {
+    let box = MemoryDeviceKeychain()
+    let user = UUID()
+    let original = try DeviceKeyStore.loadOrCreate(userId: user, keychain: box)
+    let fresh = ChatIdentity.generate()
+    try DeviceKeyStore.commit(current: fresh, retiring: original, userId: user, keychain: box)
+    XCTAssertEqual(try DeviceKeyStore.load(userId: user, keychain: box)?.id, fresh.id)
+    let retired = DeviceKeyStore.retired(userId: user, keychain: box)
+    XCTAssertEqual(retired.map(\.id), [original.id])
+    XCTAssertEqual(try opened("kept", to: original, current: fresh, retired: retired, user: user), "kept")
+    XCTAssertNil(try opened("lost", to: original, current: fresh, retired: [], user: user))
+  }
+
+  func testTheRingKeepsTheLatestFortyPrivateKeys() throws {
+    let box = MemoryDeviceKeychain()
+    let user = UUID()
+    var current = try DeviceKeyStore.loadOrCreate(userId: user, keychain: box)
+    let dropped = current
+    var oldestKept: ChatIdentity?
+    for index in 0..<41 {
+      let next = ChatIdentity.generate()
+      if index == 1 { oldestKept = current }
+      try DeviceKeyStore.commit(current: next, retiring: current, userId: user, keychain: box)
+      current = next
+    }
+    let kept = try XCTUnwrap(oldestKept)
+    let retired = DeviceKeyStore.retired(userId: user, keychain: box)
+    XCTAssertEqual(retired.count, 40)
+    XCTAssertFalse(retired.contains { $0.id == dropped.id })
+    XCTAssertTrue(retired.contains { $0.id == kept.id })
+    XCTAssertEqual(try DeviceKeyStore.load(userId: user, keychain: box)?.id, current.id)
+    XCTAssertEqual(try opened("still", to: kept, current: current, retired: retired, user: user), "still")
+    XCTAssertNil(try opened("gone", to: dropped, current: current, retired: retired, user: user))
+  }
+
   func testTheKeychainKeepsARetiredPrivateKey() throws {
     let user = UUID()
     defer { DeviceKeyStore.delete(userId: user) }
-    let original = try DeviceKeyStore.loadOrCreate(userId: user)
+    let original: ChatIdentity
+    do {
+      original = try DeviceKeyStore.loadOrCreate(userId: user)
+    } catch ChatCryptoError.unreadable {
+      throw XCTSkip("The simulator test host has no usable Keychain")
+    }
     let fresh = ChatIdentity.generate()
     try DeviceKeyStore.commit(current: fresh, retiring: original, userId: user)
     XCTAssertEqual(try DeviceKeyStore.load(userId: user)?.id, fresh.id)
-    XCTAssertEqual(DeviceKeyStore.retired(userId: user).map(\.id), [original.id])
+    let retired = DeviceKeyStore.retired(userId: user)
+    XCTAssertEqual(retired.map(\.id), [original.id])
+    XCTAssertEqual(try opened("kept", to: original, current: fresh, retired: retired, user: user), "kept")
+  }
+
+  private func opened(
+    _ text: String, to key: ChatIdentity, current: ChatIdentity, retired: [ChatIdentity], user: UUID
+  ) throws -> String? {
     let sender = ChatIdentity.generate()
     let messageId = UUID()
     let envelopes = try ChatCrypto.seal(
-      text: "kept", messageId: messageId, senderUserId: sender.id, from: sender,
-      to: [ChatTarget(keyId: original.id, userId: user, publicKey: original.publicKey)]
+      text: text, messageId: messageId, senderUserId: sender.id, from: sender,
+      to: [ChatTarget(keyId: key.id, userId: user, publicKey: key.publicKey)]
     )
-    let opened = ChatHistory.open(
-      envelopes: envelopes, current: fresh, retired: DeviceKeyStore.retired(userId: user),
-      messageId: messageId, senderUserId: sender.id, recipientUserId: user, senderPublic: sender.publicKey
+    return ChatHistory.open(
+      envelopes: envelopes, current: current, retired: retired, messageId: messageId,
+      senderUserId: sender.id, recipientUserId: user, senderPublic: sender.publicKey
     )
-    XCTAssertEqual(opened, "kept")
   }
 
   func testAFailedKeyInsertDoesNotCommitTheNewKey() async throws {
@@ -263,5 +309,28 @@ final class ChatKeyTests: XCTestCase {
     try await first.value
     try await second.value
     XCTAssertEqual(log.snapshot(), ["first-start", "first-end", "second"])
+  }
+}
+
+private final class MemoryDeviceKeychain: DeviceKeychain, @unchecked Sendable {
+  private let lock = NSLock()
+  private var items: [String: Data] = [:]
+
+  func load(account: String) throws -> Data? {
+    lock.lock()
+    defer { lock.unlock() }
+    return items[account]
+  }
+
+  func save(account: String, data: Data) throws {
+    lock.lock()
+    defer { lock.unlock() }
+    items[account] = data
+  }
+
+  func remove(account: String) {
+    lock.lock()
+    defer { lock.unlock() }
+    items[account] = nil
   }
 }

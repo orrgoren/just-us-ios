@@ -603,6 +603,11 @@ final class FakeFlowTests: XCTestCase {
         createdAt: Date().addingTimeInterval(TimeInterval(-30 * offset))
       ))
     }
+    let blair = ChatIdentity.generate()
+    store.world.deviceKeys.append(FakeDeviceKey(
+      id: blair.id, userId: SeedID.blair, publicKey: blair.publicKey,
+      privateKey: blair.privateKey.rawRepresentation
+    ))
     for _ in 0..<20 {
       _ = try await alex.backend.messages()
     }
