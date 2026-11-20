@@ -6,8 +6,8 @@ import Supabase
 final class LiveBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
   let client: SupabaseClient?
-  var watchTask: Task<Void, Never>?
-  var chatWatch: Task<Void, Never>?
+  let chatSocket = LiveWatch()
+  let moodSocket = LiveWatch()
   private var cachedUser: UUID?
   private var deviceToken: String?
   private var partnerKeyNoticeText: String?
@@ -19,6 +19,9 @@ final class LiveBackend: DateBackend {
       client = nil
       return
     }
+    // Default options copy the session access token onto Realtime for
+    // initialSession, signedIn, and tokenRefreshed. A custom auth.accessToken
+    // closure would skip that, and chat_messages RLS would drop the events.
     client = SupabaseClient(supabaseURL: url, supabaseKey: AppConfig.anonKey)
   }
 
@@ -98,8 +101,7 @@ final class LiveBackend: DateBackend {
   }
 
   func signOut() async throws {
-    watchTask?.cancel()
-    chatWatch?.cancel()
+    await stopSockets()
     try await ChatSignOut.perform(
       deleteToken: { try await self.deleteTokenKeepingSession() },
       retire: { try await self.retirePublishedKey() },
@@ -129,7 +131,7 @@ final class LiveBackend: DateBackend {
   }
 
   func dropExpiredSession() async {
-    watchTask?.cancel()
+    await stopSockets()
     DeviceTokenStore.clearDelete()
     await authSignOut()
     wipeAfterSignOut()
@@ -381,7 +383,7 @@ final class LiveBackend: DateBackend {
   }
 
   func deleteAccount() async throws {
-    watchTask?.cancel()
+    await stopSockets()
     // The row has to go before delete_my_account, while this login still matches device_tokens_own.
     try await deleteOwnDeviceToken(blocked: .accountDeleteBlocked)
     _ = try await run { client in
@@ -424,7 +426,7 @@ final class LiveBackend: DateBackend {
     }
     guard let context else { return [] }
     let identity = try await publishDeviceKey(userId: context.userId, reason: .refresh)
-    watchChat(coupleId: context.couple.id)
+    await watchChat(coupleId: context.couple.id)
     let rows = try await chatRows(coupleId: context.couple.id)
     let keys = try await loadDeviceKeys(
       coupleId: context.couple.id, senderKeys: rows.map(\.senderPublicKey)
@@ -620,25 +622,6 @@ final class LiveBackend: DateBackend {
     }
     var seen = Set(active.map(\.id))
     return active + retired.filter { seen.insert($0.id).inserted }
-  }
-
-  private func watchChat(coupleId: UUID) {
-    chatWatch?.cancel()
-    guard let client else { return }
-    chatWatch = Task { [weak self] in
-      let channel = client.channel("chat-\(coupleId.uuidString)")
-      // A Realtime DELETE carries the row id only. Reload the couple's messages
-      // instead of trying to read a payload that is not there.
-      let stream = channel.postgresChange(
-        AnyAction.self, schema: "public", table: "chat_messages",
-        filter: .eq("couple_id", value: coupleId.uuidString)
-      )
-      do { try await channel.subscribeWithError() } catch { return }
-      for await _ in stream {
-        if Task.isCancelled { break }
-        await self?.onRemoteChange?()
-      }
-    }
   }
 
   private func deleteCouplePhotos(_ coupleIds: [UUID]) async throws {
