@@ -139,6 +139,31 @@ enum ErrorMap {
     return .server(code: error.code ?? "postgrest")
   }
 
+  /// The code and status a sign-out can trust. Message text is ignored, including a "404" inside it.
+  static func httpFailure(_ error: Error) -> (code: String?, status: Int?) {
+    if let postgrest = error as? PostgrestError {
+      return (postgrest.code, nil)
+    }
+    if let http = error as? HTTPError {
+      return (nil, http.response.statusCode)
+    }
+    if let auth = error as? AuthError {
+      return authFailure(auth)
+    }
+    return (nil, nil)
+  }
+
+  private static func authFailure(_ error: AuthError) -> (code: String?, status: Int?) {
+    switch error {
+    case .api(_, _, _, let response):
+      return (error.errorCode.rawValue, response.statusCode)
+    case .sessionMissing, .jwtVerificationFailed:
+      return (error.errorCode.rawValue, nil)
+    default:
+      return (nil, nil)
+    }
+  }
+
   /// A mood replay that the database rejects is not editable. 42501 is the
   /// privilege error PostgREST returns when the row no longer matches the
   /// policy, which happens after reveal. Other calls keep that code.

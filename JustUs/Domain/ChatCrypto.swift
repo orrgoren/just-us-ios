@@ -45,53 +45,198 @@ enum ChatText {
   }
 }
 
-enum OwnKeyPublish {
-  enum Action: Equatable {
-    case keep
-    case insert
-    case replace
+enum KeyRotation {
+  static let activeCap = 3
+  /// A key the cap just retired does not take someone else's slot until this passes.
+  static let backoff: TimeInterval = 15 * 60
+
+  enum Reason: Equatable {
+    case refresh
+    case send
   }
 
-  /// `hasRow` is this phone's current public key. A retired row cannot be revived.
-  static func action(hasRow: Bool, retired: Bool) -> Action {
-    if hasRow == false { return .insert }
-    if retired { return .replace }
-    return .keep
+  enum Step: Equatable {
+    case keep
+    case publish
+    case hold
+  }
+
+  /// Opening the chat never publishes into a full set. A send may, after the backoff
+  /// measured from when this phone's key was retired.
+  static func step(
+    hasRow: Bool,
+    retired: Bool,
+    activeCount: Int,
+    retiredAt: Date?,
+    now: Date,
+    reason: Reason
+  ) -> Step {
+    if hasRow, retired == false { return .keep }
+    if hasRow == false || activeCount < activeCap { return .publish }
+    if reason == .refresh { return .hold }
+    let since = retiredAt.map { now.timeIntervalSince($0) } ?? 0
+    if since < backoff { return .hold }
+    return .publish
+  }
+
+  /// A held send tells the person to wait. A held refresh keeps the key the phone already has.
+  static func enforce(_ step: Step, reason: Reason) throws -> Step {
+    if step == .hold, reason == .send { throw AppError.rateLimited }
+    return step
+  }
+}
+
+enum KeyCap {
+  /// Same order as the database cap: newest `KeyRotation.activeCap` stay active.
+  static func excessIds(_ active: [(id: UUID, createdAt: Date)]) -> [UUID] {
+    let sorted = active.sorted { lhs, rhs in
+      if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+      return lhs.id.uuidString > rhs.id.uuidString
+    }
+    return Array(sorted.dropFirst(KeyRotation.activeCap).map(\.id))
+  }
+}
+
+enum ChatHistory {
+  /// The current key goes first. Retired private keys still open what they sealed.
+  static func open(
+    envelopes: [ChatEnvelope],
+    current: ChatIdentity,
+    retired: [ChatIdentity],
+    messageId: UUID,
+    senderUserId: UUID,
+    recipientUserId: UUID,
+    senderPublic: Data
+  ) -> String? {
+    var seen: Set<UUID> = []
+    for identity in [current] + retired where seen.insert(identity.id).inserted {
+      guard envelopes.contains(where: { $0.keyId == identity.id }) else { continue }
+      if let text = try? ChatCrypto.open(
+        envelopes: envelopes, identity: identity, messageId: messageId,
+        senderUserId: senderUserId, recipientUserId: recipientUserId, senderPublic: senderPublic
+      ) {
+        return text
+      }
+    }
+    return nil
+  }
+}
+
+/// The server insert finishes before the keychain changes. A failed insert keeps the old key.
+enum KeyPublish {
+  static func stage(
+    insert: () async throws -> Void,
+    commit: () throws -> Void
+  ) async throws {
+    try await insert()
+    try commit()
+  }
+}
+
+/// One publish at a time. The body stays on the caller's actor, so a second call sees the key the first one stored.
+final class KeyPublishGate: @unchecked Sendable {
+  private let lock = NSLock()
+  private var busy = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func run<T>(_ body: () async throws -> T) async throws -> T {
+    await acquire()
+    do {
+      let value = try await body()
+      release()
+      return value
+    } catch {
+      release()
+      throw error
+    }
+  }
+
+  private func acquire() async {
+    if take() { return }
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      lock.lock()
+      if busy == false {
+        busy = true
+        lock.unlock()
+        continuation.resume()
+      } else {
+        waiters.append(continuation)
+        lock.unlock()
+      }
+    }
+  }
+
+  private func take() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    if busy { return false }
+    busy = true
+    return true
+  }
+
+  private func release() {
+    lock.lock()
+    let next: CheckedContinuation<Void, Never>? = waiters.isEmpty ? nil : waiters.removeFirst()
+    if next == nil { busy = false }
+    lock.unlock()
+    next?.resume()
   }
 }
 
 enum ChatSignOut {
-  /// The token delete runs first. A failure there leaves the key active and the session signed in.
+  /// A dead session at the token delete still signs out on this phone.
+  /// A network failure while retiring puts the token back, then keeps the session.
   static func perform(
     deleteToken: () async throws -> Void,
     retire: () async throws -> Void,
-    authSignOut: () async -> Void
+    authSignOut: () async -> Void,
+    recoverToken: () async -> Void = {}
   ) async throws {
-    try await deleteToken()
+    do {
+      try await deleteToken()
+    } catch {
+      if continues(after: error) {
+        await authSignOut()
+        return
+      }
+      throw error
+    }
     do {
       try await retire()
     } catch {
-      if continues(after: error) == false { throw error }
+      if continues(after: error) == false {
+        await recoverToken()
+        throw error
+      }
     }
     await authSignOut()
   }
 
-  /// An expired session or a missing account should still finish signing out.
+  /// Status and error code only. A message that happens to contain "404" does not count.
   static func continues(after error: Error) -> Bool {
-    let mapped = error as? AppError ?? ErrorMap.app(error)
-    switch mapped {
-    case .sessionExpired, .notAuthenticated, .linkExpired:
-      return true
-    case .server(let code):
-      return missing(code) || missing(String(describing: error))
-    default:
-      return missing(String(describing: error))
+    if let app = error as? AppError {
+      switch app {
+      case .sessionExpired, .notAuthenticated, .linkExpired:
+        return true
+      case .server(let code):
+        return isGone(code: code, status: nil)
+      default:
+        return false
+      }
     }
+    let failure = ErrorMap.httpFailure(error)
+    return isGone(code: failure.code, status: failure.status)
   }
 
-  private static func missing(_ text: String) -> Bool {
-    let blob = text.lowercased()
-    return blob.contains("not found") || blob.contains("pgrst116") || blob.contains("404")
+  static func isGone(code: String?, status: Int?) -> Bool {
+    if status == 401 || status == 404 { return true }
+    guard let code else { return false }
+    let allowed = [
+      "pgrst116", "pgrst301", "401", "404", "user_not_found", "session_not_found",
+      "session_expired", "not_authenticated", "bad_jwt", "invalid_jwt",
+      "refresh_token_not_found", "refresh_token_already_used"
+    ]
+    return allowed.contains(code.lowercased())
   }
 }
 

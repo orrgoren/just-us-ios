@@ -13,7 +13,13 @@ final class FakeBackend: DateBackend {
   /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
   private(set) var codeVerifier: String?
   var chatFailure: AppError?
+  /// The token delete throws this instead of succeeding. A dead session signs out locally.
+  var deleteFailure: Error?
+  /// The key retire throws this after the token delete. The session stays, and the token is put back.
+  var retireFailure: Error?
+  private(set) var tokenRecoveries = 0
   private var seenPartnerKeys: [UUID: Set<Data>] = [:]
+  private var phoneKeys: [UUID: UUID] = [:]
   private var keyNotice: String?
 
   init(store: FakeStore? = nil, cooldown: TimeInterval? = nil, now: Date? = nil) {
@@ -95,16 +101,19 @@ final class FakeBackend: DateBackend {
     let userId = store.world.sessionUserId
     try await ChatSignOut.perform(
       deleteToken: {
+        if let deleteFailure = self.deleteFailure { throw deleteFailure }
         if self.blockSignOut { throw AppError.signOutBlocked }
       },
       retire: {
+        if let retireFailure = self.retireFailure { throw retireFailure }
         guard let userId else { return }
         for index in self.store.world.deviceKeys.indices where self.store.world.deviceKeys[index].userId == userId {
           self.store.world.deviceKeys[index].retiredAt = Date()
         }
         self.store.save()
       },
-      authSignOut: { await self.dropExpiredSession() }
+      authSignOut: { await self.dropExpiredSession() },
+      recoverToken: { self.tokenRecoveries += 1 }
     )
   }
 
@@ -347,7 +356,7 @@ final class FakeBackend: DateBackend {
   func messages() async throws -> [ChatLine] {
     if let chatFailure { throw chatFailure }
     guard let user = current(), let mine = member(user.id) else { return [] }
-    let identity = try ensureKey(userId: user.id)
+    let identity = try ensureKey(userId: user.id, reason: .refresh)
     let coupleKeys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
     let published = coupleKeys.map { (userId: $0.userId, publicKey: $0.publicKey) }
     let partnerKeys = coupleKeys.filter { $0.userId != user.id && $0.retiredAt == nil }.map(\.publicKey)
@@ -362,9 +371,10 @@ final class FakeBackend: DateBackend {
         let envelopes = row.envelopes.map { ChatEnvelope(keyId: $0.keyId, box: $0.box) }
         let text: String?
         if SenderKey.trusted(sender: row.senderPublicKey, senderUserId: row.senderUserId, keys: published) {
-          text = try? ChatCrypto.open(
-            envelopes: envelopes, identity: identity, messageId: row.id,
-            senderUserId: row.senderUserId, recipientUserId: user.id, senderPublic: row.senderPublicKey
+          text = ChatHistory.open(
+            envelopes: envelopes, current: identity, retired: retiredIdentities(userId: user.id, current: identity.id),
+            messageId: row.id, senderUserId: row.senderUserId, recipientUserId: user.id,
+            senderPublic: row.senderPublicKey
           )
         } else {
           text = nil
@@ -383,7 +393,7 @@ final class FakeBackend: DateBackend {
     guard let user = current(), let mine = member(user.id) else { throw AppError.saveFailed }
     let partner = store.world.members.contains { $0.coupleId == mine.coupleId && $0.userId != user.id }
     guard partner else { throw AppError.partnerNotReady }
-    let identity = try ensureKey(userId: user.id)
+    let identity = try ensureKey(userId: user.id, reason: .send)
     let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
     let targets = ChatRecipients.choose(
       senderUserId: user.id, senderKeyId: identity.id,
@@ -430,20 +440,63 @@ final class FakeBackend: DateBackend {
     store.save()
   }
 
-  private func ensureKey(userId: UUID) throws -> ChatIdentity {
-    let held = store.world.deviceKeys.last { $0.userId == userId }
-    switch OwnKeyPublish.action(hasRow: held != nil, retired: held?.retiredAt != nil) {
-    case .keep:
+  private func ensureKey(userId: UUID, reason: KeyRotation.Reason = .refresh) throws -> ChatIdentity {
+    let held = heldKey(userId: userId)
+    let activeCount = store.world.deviceKeys.filter { $0.userId == userId && $0.retiredAt == nil }.count
+    let decision = try KeyRotation.enforce(KeyRotation.step(
+      hasRow: held != nil, retired: held?.retiredAt != nil, activeCount: activeCount,
+      retiredAt: held?.retiredAt, now: clock(), reason: reason
+    ), reason: reason)
+    switch decision {
+    case .keep, .hold:
       guard let held else { throw ChatCryptoError.unreadable }
       return try ChatIdentity.restored(id: held.id, privateKey: held.privateKey)
-    case .insert, .replace:
+    case .publish:
       let created = ChatIdentity.generate()
       store.world.deviceKeys.append(FakeDeviceKey(
         id: created.id, userId: userId, publicKey: created.publicKey,
-        privateKey: created.privateKey.rawRepresentation, createdAt: Date()
+        privateKey: created.privateKey.rawRepresentation, createdAt: clock()
       ))
+      phoneKeys[userId] = created.id
+      capActiveKeys(userId: userId)
       store.save()
       return created
+    }
+  }
+
+  /// This phone's key. A new process adopts the key it already saved instead of minting another.
+  private func heldKey(userId: UUID) -> FakeDeviceKey? {
+    if let id = phoneKeys[userId], let key = store.world.deviceKeys.first(where: { $0.id == id }) {
+      return key
+    }
+    let mine = store.world.deviceKeys.filter { $0.userId == userId }
+    let active = mine.filter { $0.retiredAt == nil }
+    let pool = active.isEmpty ? mine : active
+    let adopted = pool.max { lhs, rhs in
+      if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+      return lhs.id.uuidString < rhs.id.uuidString
+    }
+    if let adopted { phoneKeys[userId] = adopted.id }
+    return adopted
+  }
+
+  private func capActiveKeys(userId: UUID) {
+    let active = store.world.deviceKeys.filter { $0.userId == userId && $0.retiredAt == nil }
+    let excess = Set(KeyCap.excessIds(active.map { ($0.id, $0.createdAt) }))
+    guard excess.isEmpty == false else { return }
+    let now = clock()
+    for index in store.world.deviceKeys.indices {
+      let key = store.world.deviceKeys[index]
+      if key.userId == userId, excess.contains(key.id) {
+        store.world.deviceKeys[index].retiredAt = now
+      }
+    }
+  }
+
+  private func retiredIdentities(userId: UUID, current: UUID) -> [ChatIdentity] {
+    store.world.deviceKeys.compactMap { key in
+      guard key.userId == userId, key.id != current else { return nil }
+      return try? ChatIdentity.restored(id: key.id, privateKey: key.privateKey)
     }
   }
 }
