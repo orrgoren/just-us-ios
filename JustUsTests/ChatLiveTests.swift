@@ -262,8 +262,8 @@ final class ChatLiveTests: XCTestCase {
 
   func testKeyRingNoticesANewDevice() {
     let id = UUID()
-    XCTAssertTrue(KeyRing.matches(cached: [id], fresh: [id]))
-    XCTAssertFalse(KeyRing.matches(cached: [id], fresh: [id, UUID()]))
+    XCTAssertTrue(ChatKeyRing.matches(cached: [id], fresh: [id]))
+    XCTAssertFalse(ChatKeyRing.matches(cached: [id], fresh: [id, UUID()]))
   }
 
   func testAnAlreadyStoredInsertCountsAsSent() {

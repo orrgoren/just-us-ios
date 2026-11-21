@@ -214,7 +214,7 @@ extension LiveBackend {
       }
       let fresh = Set(rows.compactMap { $0.retiredAt == nil ? $0.id : nil })
       let cached = Set(materials.keys.compactMap { $0.retiredAt == nil ? $0.id : nil })
-      return KeyRing.matches(cached: cached, fresh: fresh)
+      return ChatKeyRing.matches(cached: cached, fresh: fresh)
     } catch {
       return false
     }

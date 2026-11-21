@@ -128,7 +128,7 @@ enum ChatSendRecovery {
 }
 
 /// The active device-key ids. A different set means the cached ring is stale.
-enum KeyRing {
+enum ChatKeyRing {
   static func matches(cached: Set<UUID>, fresh: Set<UUID>) -> Bool {
     cached == fresh
   }

@@ -410,6 +410,13 @@ final class FakeBackend: DateBackend {
     consumeHold = nil
   }
 
+  func pauseSendIfNeeded() async {
+    guard holdSend else { return }
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      sendHold = continuation
+    }
+  }
+
   func pauseConsumeIfNeeded() async {
     guard holdConsume else { return }
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in

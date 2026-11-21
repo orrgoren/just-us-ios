@@ -48,11 +48,7 @@ extension FakeBackend {
   }
 
   func sendPhoto(_ jpeg: Data, retention: ChatRetention, id messageId: UUID) async throws -> ChatLine {
-    if holdSend {
-      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        sendHold = continuation
-      }
-    }
+    await pauseSendIfNeeded()
     if let photoKeyFailure {
       let error = photoKeyFailure
       self.photoKeyFailure = nil
