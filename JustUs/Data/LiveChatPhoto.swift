@@ -35,7 +35,7 @@ extension LiveBackend {
     }
   }
 
-  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws {
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine {
     guard ChatPhoto.fits(jpeg) else { throw AppError.chatPhotoTooBig }
     let prepared = try await preparedSend()
     let messageId = UUID()
@@ -69,7 +69,22 @@ extension LiveBackend {
       }
       throw ErrorMap.app(error)
     }
-    await notify("chatMessage")
+    nudgeChat()
+    return sentPhotoLine(id: messageId, prepared: prepared, retention: retention, path: path, jpeg: jpeg)
+  }
+
+  private func sentPhotoLine(
+    id: UUID, prepared: PreparedSend, retention: ChatRetention, path: String, jpeg: Data
+  ) -> ChatLine {
+    let expires = retention == .viewOnce ? Date().addingTimeInterval(ChatPhoto.lifetime) : nil
+    let photo = ChatPhoto.state(
+      kind: "photo", retention: retention.rawValue, hasObject: true, opened: false, expiresAt: expires, now: Date()
+    )
+    return ChatLine(
+      id: id, senderUserId: prepared.context.userId, text: photo.map(ChatTranscript.label) ?? L10n.chatPhotoTap,
+      createdAt: Date(), mine: true, unreadable: false, photo: photo,
+      previewJPEG: photo == .kept ? jpeg : nil, photoPath: path, delivery: .sent
+    )
   }
 
   func chatPhoto(_ id: UUID) async throws -> Data {
@@ -119,20 +134,34 @@ extension LiveBackend {
     try await insertText(ChatNotice.screenshot(name), kind: "notice", prepared: prepared)
   }
 
-  private struct PreparedSend {
+  struct PreparedSend {
     var context: LiveContext
     var identity: ChatIdentity
     var targets: [ChatTarget]
   }
 
-  private func preparedSend() async throws -> PreparedSend {
+  func preparedSend() async throws -> PreparedSend {
+    if let cached = cachedPreparedSend() { return cached }
     guard let context = try await loadContext() else { throw AppError.saveFailed }
     guard context.members.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
     let identity = try await publishDeviceKey(userId: context.userId, reason: .send)
     let keys = try await loadDeviceKeys(coupleId: context.couple.id)
     let targets = chatTargets(keys: keys.filter { $0.retiredAt == nil }, userId: context.userId, identity: identity)
     guard targets.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
+    chatMaterials = ChatMaterials(context: context, identity: identity, keys: keys)
     return PreparedSend(context: context, identity: identity, targets: targets)
+  }
+
+  private func cachedPreparedSend() -> PreparedSend? {
+    guard let materials = chatMaterials else { return nil }
+    let targets = chatTargets(
+      keys: materials.keys.filter { $0.retiredAt == nil }, userId: materials.context.userId, identity: materials.identity
+    )
+    guard targets.contains(where: { $0.userId != materials.context.userId }) else {
+      chatMaterials = nil
+      return nil
+    }
+    return PreparedSend(context: materials.context, identity: materials.identity, targets: targets)
   }
 
   private func insertText(_ text: String, kind: String, prepared: PreparedSend) async throws {

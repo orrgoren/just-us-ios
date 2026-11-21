@@ -12,44 +12,20 @@ struct RootView: View {
     keyboardOverlap > 0 && model.screen == .invite && model.pendingReplace
   }
 
+  private var chatting: Bool { model.screen == .main && model.tab == .chat }
+
   var body: some View {
     JustScreen {
       ScrollViewReader { proxy in
-      ScrollView {
-        VStack(alignment: .leading, spacing: Theme.Space.section) {
-        Wordmark()
-        if let celebration = model.celebration {
-          CelebrationBanner(kind: celebration)
+      Group {
+        if chatting {
+          page.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        } else {
+          ScrollView { page }
+            .scrollDismissesKeyboard(.immediately)
         }
-        if model.offline {
-          StatusBanner(message: L10n.offline, identifier: A11y.offline)
-          WineButton(title: L10n.retry, identifier: A11y.retry, busy: model.activity == .generic && model.busy) {
-            Task { await model.retry() }
-          }
-        }
-        if let message = model.errorMessage {
-          StatusBanner(message: message, identifier: A11y.errorBanner)
-          if model.retryKind != nil {
-            WineButton(title: L10n.retry, identifier: A11y.actionRetry, busy: model.busy) {
-              Task { await model.retryLast() }
-            }
-          }
-          if model.outbox.isEmpty == false {
-            WineButton(title: L10n.discard, identifier: A11y.discard) { Task { await model.discardAndSignOut() } }
-          }
-        }
-        if model.pushDenied {
-          StatusBanner(message: L10n.pushDenied, identifier: A11y.softNo)
-        }
-        content
-          .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.screen)
-        }
-        .padding(Theme.Space.screen)
-        .padding(.bottom, pinReplace ? 0 : keyboardOverlap)
-        .id("screenTop")
       }
       .ignoresSafeArea(.keyboard, edges: .bottom)
-      .scrollDismissesKeyboard(.immediately)
       .accessibilityIdentifier(A11y.content)
       .safeAreaInset(edge: .bottom, spacing: 0) {
         if pinReplace {
@@ -96,6 +72,40 @@ struct RootView: View {
         if model.celebration == value { model.celebration = nil }
       }
     }
+  }
+
+  private var page: some View {
+    VStack(alignment: .leading, spacing: Theme.Space.section) {
+      Wordmark()
+      if let celebration = model.celebration {
+        CelebrationBanner(kind: celebration)
+      }
+      if model.offline {
+        StatusBanner(message: L10n.offline, identifier: A11y.offline)
+        WineButton(title: L10n.retry, identifier: A11y.retry, busy: model.activity == .generic && model.busy) {
+          Task { await model.retry() }
+        }
+      }
+      if let message = model.errorMessage {
+        StatusBanner(message: message, identifier: A11y.errorBanner)
+        if model.retryKind != nil {
+          WineButton(title: L10n.retry, identifier: A11y.actionRetry, busy: model.busy) {
+            Task { await model.retryLast() }
+          }
+        }
+        if model.outbox.isEmpty == false {
+          WineButton(title: L10n.discard, identifier: A11y.discard) { Task { await model.discardAndSignOut() } }
+        }
+      }
+      if model.pushDenied {
+        StatusBanner(message: L10n.pushDenied, identifier: A11y.softNo)
+      }
+      content
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.screen)
+    }
+    .padding(Theme.Space.screen)
+    .padding(.bottom, pinReplace ? 0 : keyboardOverlap)
+    .id("screenTop")
   }
 
   @ViewBuilder private var content: some View {
@@ -272,6 +282,8 @@ struct LabeledField: View {
   @Binding var text: String
   var identifier: String
   var need: FieldNeed = .required
+  var focusToken: Int = 0
+  var submit: (() -> Void)? = nil
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.field) {
@@ -285,6 +297,8 @@ struct LabeledField: View {
       }
       TextField(title, text: $text, prompt: Text(title).foregroundStyle(Theme.muted))
         .focused($focused)
+        .submitLabel(submit == nil ? .done : .send)
+        .onSubmit { submit?() }
         .textFieldStyle(.plain)
         .foregroundStyle(Theme.ink)
         .padding(12)
@@ -301,6 +315,10 @@ struct LabeledField: View {
       reveal()
     }
     .onChange(of: keyboardDismiss) { _, _ in focused = false }
+    .onChange(of: focusToken) { _, token in
+      guard token > 0 else { return }
+      focused = true
+    }
   }
 
   private func reveal() {

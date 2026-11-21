@@ -16,21 +16,24 @@ final class LiveWatch {
   /// Status can still say `.unsubscribed` for that beat, and a second
   /// `ensure` must not tear the join down.
   private var awaitingAck = false
-  private var onChange: (@MainActor () -> Void)?
+  private var onChange: (@MainActor (AnyAction) -> Void)?
+  private var onReconnect: (@MainActor () -> Void)?
+  private var statusJob: Task<Void, Never>?
 
   func ensure(
     id: UUID,
     client: SupabaseClient,
     topic: String,
     changes: @escaping (RealtimeChannelV2) -> AsyncStream<AnyAction>,
-    onChange: @escaping @MainActor () -> Void
+    onChange: @escaping @MainActor (AnyAction) -> Void,
+    onReconnect: (@MainActor () -> Void)? = nil
   ) async {
     let token = generation
     guard stopping == 0 else { return }
     await enqueue { [weak self] in
       guard let self, self.generation == token, self.stopping == 0 else { return }
       await self.open(
-        id: id, client: client, topic: topic, changes: changes, onChange: onChange
+        id: id, client: client, topic: topic, changes: changes, onChange: onChange, onReconnect: onReconnect
       )
     }
   }
@@ -61,13 +64,14 @@ final class LiveWatch {
     client: SupabaseClient,
     topic: String,
     changes: @escaping (RealtimeChannelV2) -> AsyncStream<AnyAction>,
-    onChange: @escaping @MainActor () -> Void
+    onChange: @escaping @MainActor (AnyAction) -> Void,
+    onReconnect: (@MainActor () -> Void)? = nil
   ) async {
     let plan = RealtimeWatch.plan(current: watched, requested: id, presence: presence())
     guard plan.subscribe else { return }
     await join(
       id: id, client: client, topic: topic, changes: changes, onChange: onChange,
-      removeCurrent: plan.removeCurrent
+      onReconnect: onReconnect, removeCurrent: plan.removeCurrent
     )
   }
 
@@ -76,7 +80,8 @@ final class LiveWatch {
     client: SupabaseClient,
     topic: String,
     changes: @escaping (RealtimeChannelV2) -> AsyncStream<AnyAction>,
-    onChange: @escaping @MainActor () -> Void,
+    onChange: @escaping @MainActor (AnyAction) -> Void,
+    onReconnect: (@MainActor () -> Void)?,
     removeCurrent: Bool
   ) async {
     let token = generation
@@ -99,12 +104,14 @@ final class LiveWatch {
     watched = id
     awaitingAck = true
     self.onChange = onChange
+    self.onReconnect = onReconnect
     listen = Task { @MainActor [weak self] in
-      for await _ in stream {
+      for await action in stream {
         if Task.isCancelled { break }
-        self?.emit()
+        self?.emit(action)
       }
     }
+    watchStatus(next, token: token)
     subscribeJob = Task { @MainActor [weak self] in
       await self?.finish(next, client: client, token: token)
     }
@@ -134,18 +141,35 @@ final class LiveWatch {
     subscribeJob = nil
     listen?.cancel()
     listen = nil
+    statusJob?.cancel()
+    statusJob = nil
     let old = channel
     channel = nil
     watched = nil
     awaitingAck = false
     onChange = nil
+    onReconnect = nil
     if let client, let old {
       await client.removeChannel(old)
     }
   }
 
-  private func emit() {
-    onChange?()
+  private func watchStatus(_ joined: RealtimeChannelV2, token: Int) {
+    statusJob?.cancel()
+    statusJob = Task { @MainActor [weak self] in
+      var presence = ChatPresence()
+      for await status in joined.statusChange {
+        if Task.isCancelled { break }
+        guard let self, self.generation == token else { break }
+        if presence.receive(subscribed: status == .subscribed) {
+          self.onReconnect?()
+        }
+      }
+    }
+  }
+
+  private func emit(_ action: AnyAction) {
+    onChange?(action)
   }
 
   private func presence() -> RealtimeWatch.Presence {
@@ -218,7 +242,17 @@ extension LiveBackend {
           filter: .eq(column, value: id.uuidString)
         )
       },
-      onChange: { [weak self] in self?.onRemoteChange?() }
+      onChange: { [weak self] action in
+        if table == "chat_messages" {
+          self?.deliverChat(action)
+        } else {
+          self?.onRemoteChange?()
+        }
+      },
+      onReconnect: { [weak self] in
+        guard table == "chat_messages" else { return }
+        self?.reloadChat(.reconnect)
+      }
     )
   }
 }

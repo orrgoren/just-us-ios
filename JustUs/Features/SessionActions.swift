@@ -190,22 +190,95 @@ extension SessionModel {
   }
 
   func sendChat() async {
-    activity = .sendChat
-    busy = true
-    defer {
-      busy = false
-      activity = nil
-    }
+    let clear: String
     do {
-      try await backend.sendMessage(chatDraft)
-      chatDraft = ""
-      chatKeyNotice = nil
-      errorMessage = nil
-      retryKind = nil
-      await loadMessages()
+      clear = try ChatText.normalized(chatDraft)
     } catch {
       noteChatFailure(error)
+      return
     }
+    let id = UUID()
+    messages.append(outgoingLine(id: id, text: clear))
+    chatDraft = ""
+    chatKeyNotice = nil
+    errorMessage = nil
+    retryKind = nil
+    await finishSend(id: id, text: clear)
+  }
+
+  func retryChatLine(_ id: UUID) async {
+    guard let line = messages.first(where: { $0.id == id }), line.delivery == .failed, line.photo == nil else { return }
+    setDelivery(id, .sending)
+    errorMessage = nil
+    await finishSend(id: id, text: line.text)
+  }
+
+  func showIncoming(_ line: ChatLine) {
+    let known = messages.contains { $0.id == line.id }
+    messages = ChatThread.merge(messages, line)
+    guard known == false else { return }
+    if ChatPush.showsBanner(chat: true, chatVisible: tab == .chat) {
+      chatBanner = L10n.chatArrived
+    }
+  }
+
+  func appendIncoming(_ row: ChatMessageRow) async {
+    guard let line = await backend.incomingLine(row) else {
+      await loadMessages()
+      return
+    }
+    showIncoming(line)
+  }
+
+  func noteForegroundChat() {
+    guard ChatPush.showsBanner(chat: true, chatVisible: tab == .chat) else {
+      chatBanner = nil
+      return
+    }
+    chatBanner = L10n.chatArrived
+  }
+
+  private func finishSend(id: UUID, text: String) async {
+    do {
+      let saved = try await backend.sendMessage(text, id: id)
+      messages = ChatThread.merge(messages, saved)
+      errorMessage = nil
+      retryKind = nil
+    } catch {
+      failSend(id: id, text: text, error: error)
+    }
+  }
+
+  private func failSend(id: UUID, text: String, error: Error) {
+    let mapped = ErrorMap.app(error)
+    if keepsFailedBubble(mapped) {
+      setDelivery(id, .failed)
+    } else {
+      messages.removeAll { $0.id == id }
+      if chatDraft.isEmpty { chatDraft = text }
+    }
+    noteChatFailure(error)
+  }
+
+  private func keepsFailedBubble(_ error: AppError) -> Bool {
+    switch error {
+    case .rateLimited, .sessionExpired, .notAuthenticated, .chatTooLong, .chatPhotoTooBig, .partnerNotReady, .invalid:
+      return false
+    default:
+      return true
+    }
+  }
+
+  private func outgoingLine(id: UUID, text: String) -> ChatLine {
+    ChatLine(
+      id: id, senderUserId: ritual?.selfMember.userId ?? UUID(), text: text, createdAt: Date(),
+      mine: true, unreadable: false, delivery: .sending
+    )
+  }
+
+  private func setDelivery(_ id: UUID, _ delivery: ChatDelivery) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    messages[index].delivery = delivery
   }
 
   func stageChatPhoto(_ data: Data) {
@@ -220,18 +293,12 @@ extension SessionModel {
 
   func sendStagedPhoto() async {
     guard let jpeg = stagedChatJPEG else { return }
-    activity = .sendChat
-    busy = true
-    defer {
-      busy = false
-      activity = nil
-    }
     do {
-      try await backend.sendPhoto(jpeg, retention: chatRetention)
+      let saved = try await backend.sendPhoto(jpeg, retention: chatRetention)
       stagedChatJPEG = nil
+      messages = ChatThread.merge(messages, saved)
       errorMessage = nil
       retryKind = nil
-      await loadMessages()
     } catch {
       noteChatFailure(error)
     }
@@ -240,6 +307,8 @@ extension SessionModel {
   func retryChat() async {
     if stagedChatJPEG != nil {
       await sendStagedPhoto()
+    } else if let failed = messages.last(where: { $0.delivery == .failed && $0.photo == nil }) {
+      await retryChatLine(failed.id)
     } else {
       await sendChat()
     }

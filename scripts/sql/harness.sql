@@ -56,6 +56,11 @@ create table if not exists storage.objects (
   name text not null
 );
 
+-- 021 does not enable row level security. Hosted storage.objects already
+-- has it, and the migration role is not the owner. This database owns the
+-- table, so the chat-photo policies need it turned on here.
+alter table storage.objects enable row level security;
+
 -- Live storage.protect_delete, from pg_get_functiondef on 2026-11-14.
 -- A direct delete raises 42501. Returning null would skip the row even when
 -- the storage GUC is set, so SQL never removes the file bytes.

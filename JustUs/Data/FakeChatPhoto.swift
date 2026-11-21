@@ -47,7 +47,7 @@ extension FakeBackend {
     }
   }
 
-  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws {
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine {
     try guardOnline()
     guard ChatPhoto.fits(jpeg) else { throw AppError.chatPhotoTooBig }
     let prepared = try preparedSend()
@@ -57,15 +57,22 @@ extension FakeBackend {
       jpeg: jpeg, messageId: messageId, coupleId: prepared.coupleId, retention: retention,
       senderUserId: prepared.userId, from: prepared.identity, to: prepared.targets
     )
-    store.world.chats.append(FakeChat(
+    let row = FakeChat(
       id: messageId, coupleId: prepared.coupleId, senderUserId: prepared.userId,
       senderPublicKey: prepared.identity.publicKey, createdAt: clock(),
       envelopes: packed.envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) },
       kind: "photo", retention: retention.rawValue, objectBytes: packed.object,
       openedAt: nil, expiresAt: retention == .viewOnce ? clock().addingTimeInterval(ChatPhoto.lifetime) : nil,
       photoPath: path
-    ))
+    )
+    store.world.chats.append(row)
     store.save()
+    let published = store.world.deviceKeys.filter { member($0.userId)?.coupleId == prepared.coupleId }
+      .map { (userId: $0.userId, publicKey: $0.publicKey) }
+    var line = presentChat(row, identity: prepared.identity, userId: prepared.userId, published: published)
+    line.delivery = .sent
+    if line.photo == .kept { line.previewJPEG = jpeg }
+    return line
   }
 
   func chatPhoto(_ id: UUID) async throws -> Data {

@@ -78,10 +78,14 @@ final class JustUsDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification
   ) async -> UNNotificationPresentationOptions {
-    return [.banner, .sound]
+    let info = notification.request.content.userInfo
+    guard ChatPush.isChat(info) else { return [.banner, .sound] }
+    NotificationCenter.default.post(name: .justUsForegroundChat, object: nil)
+    return ChatPush.presentation(info)
   }
 }
 
 extension Notification.Name {
   static let justUsDeviceToken = Notification.Name("justus.deviceToken")
+  static let justUsForegroundChat = Notification.Name("justus.foregroundChat")
 }

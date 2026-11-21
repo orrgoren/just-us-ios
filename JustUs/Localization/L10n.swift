@@ -114,6 +114,8 @@ enum L10n {
   static var chatOpened: String { text("chat.opened", "Opened") }
   static var chatExpired: String { text("chat.expired", "This photo expired") }
   static var chatSendFailed: String { text("chat.sendFailed", "Couldn't send, tap to retry") }
+  static var chatSending: String { text("chat.sending", "Sending") }
+  static var chatArrived: String { text("chat.arrived", "New message") }
   static var chatOpenFailed: String { text("chat.openFailed", "Couldn't open that photo.") }
   static var chatPhotoTooBig: String { text("chat.photoTooBig", "That photo is too large.") }
   static var chatPhotoHidden: String { text("chat.photoHidden", "The photo is hidden while the screen is captured.") }

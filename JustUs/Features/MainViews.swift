@@ -14,6 +14,14 @@ struct MainScreen: View {
         Text(L10n.tabUs).tag(AppTab.settings)
       }
       .pickerStyle(.segmented)
+      if let banner = model.chatBanner, model.tab != .chat {
+        Button(banner) {
+          model.chatBanner = nil
+          model.tab = .chat
+        }
+        .buttonStyle(JustButtonStyle(kind: .secondary))
+        .accessibilityIdentifier(A11y.chatBanner)
+      }
       if !coupleIsLinked {
         ActionButton(title: L10n.haveInvite, identifier: A11y.haveInvite, kind: .link) {
           model.screen = .invite
@@ -30,6 +38,7 @@ struct MainScreen: View {
         SettingsScreen(model: model)
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
   private var coupleIsLinked: Bool {

@@ -62,6 +62,7 @@ final class SessionModel {
   var planTime = ""
   var momentDraft = ""
   var chatDraft = ""
+  var chatBanner: String?
   var stagedChatJPEG: Data?
   var chatRetention: ChatRetention = .viewOnce
   var openChatPhoto: UUID?
@@ -87,6 +88,17 @@ final class SessionModel {
     Telemetry.analytics.record(.appOpened)
     backend.onRemoteChange = { [weak self] in
       Task { await self?.refresh() }
+    }
+    backend.onChatInsert = { [weak self] row in
+      Task { await self?.appendIncoming(row) }
+    }
+    backend.onChatReload = { [weak self] in
+      Task { await self?.loadMessages() }
+    }
+    NotificationCenter.default.addObserver(
+      forName: .justUsForegroundChat, object: nil, queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in self?.noteForegroundChat() }
     }
     if let name = Launch.screenshot {
       await applyScreenshot(name)

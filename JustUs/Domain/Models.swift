@@ -246,6 +246,12 @@ enum AppTab: String, Equatable, Hashable, Sendable {
   case week, chat, memories, settings
 }
 
+enum ChatDelivery: String, Equatable, Sendable {
+  case sending
+  case sent
+  case failed
+}
+
 struct ChatLine: Identifiable, Equatable, Sendable {
   var id: UUID
   var senderUserId: UUID
@@ -257,6 +263,7 @@ struct ChatLine: Identifiable, Equatable, Sendable {
   var previewJPEG: Data? = nil
   var photoPath: String? = nil
   var notice: Bool = false
+  var delivery: ChatDelivery = .sent
 }
 
 enum AppRoute: Equatable, Sendable {

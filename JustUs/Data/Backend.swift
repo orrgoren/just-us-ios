@@ -5,6 +5,8 @@ import Supabase
 @MainActor
 protocol DateBackend: AnyObject {
   var onRemoteChange: (@MainActor () -> Void)? { get set }
+  var onChatInsert: (@MainActor (ChatMessageRow) -> Void)? { get set }
+  var onChatReload: (@MainActor () -> Void)? { get set }
   func sendCode(email: String) async throws
   func verify(email: String, code: String) async throws -> SessionUser
   func session(from url: URL) async throws -> SessionUser
@@ -45,8 +47,10 @@ protocol DateBackend: AnyObject {
   func preferences() -> PushPreferences
   func savePreferences(_ preferences: PushPreferences) async
   func messages() async throws -> [ChatLine]
-  func sendMessage(_ text: String) async throws
-  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws
+  func sendMessage(_ text: String, id: UUID) async throws -> ChatLine
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine
+  func incomingLine(_ row: ChatMessageRow) async -> ChatLine?
+  func invalidateChatCache()
   func chatPhoto(_ id: UUID) async throws -> Data
   func consumeViewOnce(_ id: UUID) async throws
   func deleteChatPhoto(_ id: UUID) async throws
@@ -123,6 +127,7 @@ enum ErrorMap {
     if blob.contains("pgrst202") || blob.contains("42883") || blob.contains("could not find the function") {
       return .unavailable
     }
+    if blob.contains("unknown_sender_key") { return .server(code: "unknown_sender_key") }
     let codes: [(String, AppError)] = [
       ("already_in_couple", .alreadyInCouple),
       ("solo_not_empty", .soloNotEmpty),
