@@ -352,6 +352,12 @@ extension SessionModel {
   }
 
   func applyScreenshot(_ name: String) async {
+    if await applyEntryScreenshot(name) { return }
+    if await applyHomeScreenshot(name) { return }
+    await applyLaterScreenshot(name)
+  }
+
+  private func applyEntryScreenshot(_ name: String) async -> Bool {
     switch name {
     case "login": screen = .login
     case "code":
@@ -375,6 +381,14 @@ extension SessionModel {
       signedIn = true
       blocked = true
       screen = .invite
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func applyHomeScreenshot(_ name: String) async -> Bool {
+    switch name {
     case "homeSolo":
       await signedIn("sam@solo.test")
       screen = .main
@@ -401,12 +415,20 @@ extension SessionModel {
       await signedIn("sam@solo.test")
       tab = .memories
       screen = .main
+    case "chat", "chatPhoto", "chatPhotoChoice":
+      await chatScreenshot(name)
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func applyLaterScreenshot(_ name: String) async {
+    switch name {
     case "settings":
       await signedIn("alex@couple-a.test")
       tab = .settings
       screen = .main
-    case "chat", "chatPhoto", "chatPhotoChoice":
-      await chatScreenshot(name)
     case "deleteAccount":
       await signedIn("alex@couple-a.test")
       tab = .settings
