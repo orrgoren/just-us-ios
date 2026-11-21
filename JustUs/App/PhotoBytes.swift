@@ -25,7 +25,9 @@ enum PhotoBytes {
     let longest = max(image.size.width, image.size.height)
     let scale = longest > 0 ? min(1, maxEdge / longest) : 1
     let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-    let renderer = UIGraphicsImageRenderer(size: size)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    let renderer = UIGraphicsImageRenderer(size: size, format: format)
     let rendered = renderer.image { _ in
       image.draw(in: CGRect(origin: .zero, size: size))
     }

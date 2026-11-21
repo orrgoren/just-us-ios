@@ -275,7 +275,7 @@ extension SessionModel {
 
   private func noteChatFailure(_ error: Error) {
     let mapped = ErrorMap.app(error)
-    if mapped == .sessionExpired || mapped == .notAuthenticated {
+    if mapped == .sessionExpired || mapped == .notAuthenticated || mapped == .chatTooLong || mapped == .chatPhotoTooBig || mapped == .rateLimited {
       errorMessage = L10n.message(for: mapped)
       retryKind = nil
       return
