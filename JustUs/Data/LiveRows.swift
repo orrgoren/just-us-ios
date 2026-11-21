@@ -254,12 +254,59 @@ struct ChatMessageRow: Decodable {
   var senderPublicKey: String
   var createdAt: String
   var envelopes: [EnvelopeWire]
+  var kind: String
+  var retention: String?
+  var photoPath: String?
+  var openedAt: String?
+  var expiresAt: String?
+
   enum CodingKeys: String, CodingKey {
     case id
     case senderUserId = "sender_user_id"
     case senderPublicKey = "sender_public_key"
     case createdAt = "created_at"
     case envelopes
+    case kind
+    case retention
+    case photoPath = "photo_path"
+    case openedAt = "opened_at"
+    case expiresAt = "expires_at"
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(UUID.self, forKey: .id)
+    senderUserId = try container.decode(UUID.self, forKey: .senderUserId)
+    senderPublicKey = try container.decode(String.self, forKey: .senderPublicKey)
+    createdAt = try container.decode(String.self, forKey: .createdAt)
+    envelopes = try container.decode([EnvelopeWire].self, forKey: .envelopes)
+    kind = try container.decodeIfPresent(String.self, forKey: .kind) ?? "text"
+    retention = try container.decodeIfPresent(String.self, forKey: .retention)
+    photoPath = try container.decodeIfPresent(String.self, forKey: .photoPath)
+    openedAt = try container.decodeIfPresent(String.self, forKey: .openedAt)
+    expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt)
+  }
+}
+
+struct ChatPhotoInsert: Encodable {
+  var id: UUID
+  var coupleId: UUID
+  var senderUserId: UUID
+  var senderPublicKey: String
+  var envelopes: [EnvelopeWire]
+  var kind: String
+  var retention: String?
+  var photoPath: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case coupleId = "couple_id"
+    case senderUserId = "sender_user_id"
+    case senderPublicKey = "sender_public_key"
+    case envelopes
+    case kind
+    case retention
+    case photoPath = "photo_path"
   }
 }
 

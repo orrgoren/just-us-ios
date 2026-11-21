@@ -31,7 +31,7 @@
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
-import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, dropDeviceToken, flushDue, freshApnsToken, keepsSixHourDedupe, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, SIX_HOUR_DEDUPE_MS, skipsDailyCap } from "./push.mjs";
+import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, chatPushBody, dropDeviceToken, flushDue, freshApnsToken, keepsSixHourDedupe, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, SIX_HOUR_DEDUPE_MS, skipsDailyCap } from "./push.mjs";
 
 const INVITE_TTL_HOURS = 7 * 24;
 const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge", "chatMessage"] as const;
@@ -294,7 +294,7 @@ async function inviteAgeHours(db: Db, coupleId: string): Promise<number | null> 
 }
 
 function message(kind: Kind, name: string, nudge: number): string {
-  if (kind === "chatMessage") return `${name} sent a message.`;
+  if (kind === "chatMessage") return chatPushBody();
   if (kind === "planReady") return "Your date is ready to reveal.";
   if (kind === "partnerMood") return `${name} picked a mood for your night.`;
   if (kind === "inviteAccepted") return `${name} is in. This night is officially both of yours.`;

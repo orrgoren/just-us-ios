@@ -64,7 +64,7 @@ enum PushPolicy {
     case .weeklyReminder:
       return "Tonight is yours, \(partnerName)."
     case .chatMessage:
-      return "\(partnerName) sent a message."
+      return ChatPushCopy.body
     case .inviteNudge:
       if nudgeIndex >= 2 {
         return "We'll leave the invite here for \(partnerName). No more reminders."

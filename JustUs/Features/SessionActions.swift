@@ -201,10 +201,87 @@ extension SessionModel {
       chatDraft = ""
       chatKeyNotice = nil
       errorMessage = nil
+      retryKind = nil
       await loadMessages()
     } catch {
-      errorMessage = L10n.message(for: ErrorMap.app(error))
+      noteChatFailure(error)
     }
+  }
+
+  func stageChatPhoto(_ data: Data) {
+    guard let jpeg = PhotoBytes.jpeg(from: data, maxEdge: ChatPhoto.maxEdge, quality: 0.72), ChatPhoto.fits(jpeg) else {
+      errorMessage = L10n.chatPhotoTooBig
+      return
+    }
+    stagedChatJPEG = jpeg
+    chatRetention = .viewOnce
+    errorMessage = nil
+  }
+
+  func sendStagedPhoto() async {
+    guard let jpeg = stagedChatJPEG else { return }
+    activity = .sendChat
+    busy = true
+    defer {
+      busy = false
+      activity = nil
+    }
+    do {
+      try await backend.sendPhoto(jpeg, retention: chatRetention)
+      stagedChatJPEG = nil
+      errorMessage = nil
+      retryKind = nil
+      await loadMessages()
+    } catch {
+      noteChatFailure(error)
+    }
+  }
+
+  func retryChat() async {
+    if stagedChatJPEG != nil {
+      await sendStagedPhoto()
+    } else {
+      await sendChat()
+    }
+  }
+
+  func finishViewOnce(_ id: UUID) async {
+    openChatPhoto = nil
+    guard let line = messages.first(where: { $0.id == id }), line.mine == false, line.photo == .viewOnce else { return }
+    do {
+      try await backend.consumeViewOnce(id)
+      await loadMessages()
+    } catch {
+      errorMessage = L10n.chatSendFailed
+      retryKind = nil
+    }
+  }
+
+  func deleteChatPhoto(_ id: UUID) async {
+    do {
+      try await backend.deleteChatPhoto(id)
+      await loadMessages()
+    } catch {
+      errorMessage = L10n.chatSendFailed
+    }
+  }
+
+  func noteScreenshot() async {
+    guard openChatPhoto != nil else { return }
+    guard let line = messages.first(where: { $0.id == openChatPhoto }), line.mine == false, line.photo == .viewOnce else { return }
+    try? await backend.sendScreenshotNotice()
+    await loadMessages()
+  }
+
+  private func noteChatFailure(_ error: Error) {
+    let mapped = ErrorMap.app(error)
+    if mapped == .sessionExpired || mapped == .notAuthenticated || mapped == .chatTooLong || mapped == .chatPhotoTooBig || mapped == .rateLimited {
+      errorMessage = L10n.message(for: mapped)
+      retryKind = nil
+      return
+    }
+    errorMessage = L10n.chatSendFailed
+    retryKind = .chat
   }
 
   func toggle(_ kind: PushKind, on: Bool) async {
@@ -275,6 +352,12 @@ extension SessionModel {
   }
 
   func applyScreenshot(_ name: String) async {
+    if await applyEntryScreenshot(name) { return }
+    if await applyHomeScreenshot(name) { return }
+    await applyLaterScreenshot(name)
+  }
+
+  private func applyEntryScreenshot(_ name: String) async -> Bool {
     switch name {
     case "login": screen = .login
     case "code":
@@ -298,6 +381,14 @@ extension SessionModel {
       signedIn = true
       blocked = true
       screen = .invite
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func applyHomeScreenshot(_ name: String) async -> Bool {
+    switch name {
     case "homeSolo":
       await signedIn("sam@solo.test")
       screen = .main
@@ -324,15 +415,19 @@ extension SessionModel {
       await signedIn("sam@solo.test")
       tab = .memories
       screen = .main
+    case "chat", "chatPhoto", "chatPhotoChoice":
+      await chatScreenshot(name)
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func applyLaterScreenshot(_ name: String) async {
+    switch name {
     case "settings":
       await signedIn("alex@couple-a.test")
       tab = .settings
-      screen = .main
-    case "chat":
-      await signedIn("alex@couple-a.test")
-      (backend as? FakeBackend)?.seedChatPreview()
-      await loadMessages()
-      tab = .chat
       screen = .main
     case "deleteAccount":
       await signedIn("alex@couple-a.test")
@@ -383,6 +478,21 @@ extension SessionModel {
     default:
       screen = .login
     }
+  }
+
+  private func chatScreenshot(_ name: String) async {
+    await signedIn("alex@couple-a.test")
+    if name == "chat" {
+      (backend as? FakeBackend)?.seedChatPreview()
+      await loadMessages()
+    } else if name == "chatPhoto" {
+      (backend as? FakeBackend)?.seedChatPhotoPreview()
+      await loadMessages()
+    } else {
+      stageChatPhoto(PhotoBytes.sample())
+    }
+    tab = .chat
+    screen = .main
   }
 
   private func signedIn(_ email: String) async {

@@ -185,6 +185,7 @@ enum AppError: Error, Equatable, Sendable {
   case accountDeleteBlocked
   case partnerNotReady
   case chatTooLong
+  case chatPhotoTooBig
   case server(code: String)
 }
 
@@ -252,6 +253,10 @@ struct ChatLine: Identifiable, Equatable, Sendable {
   var createdAt: Date
   var mine: Bool
   var unreadable: Bool
+  var photo: ChatPhotoState? = nil
+  var previewJPEG: Data? = nil
+  var photoPath: String? = nil
+  var notice: Bool = false
 }
 
 enum AppRoute: Equatable, Sendable {

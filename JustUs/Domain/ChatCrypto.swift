@@ -120,6 +120,29 @@ enum ChatHistory {
     }
     return nil
   }
+
+  /// Same key walk as `open`, for a photo's content key. The bytes are not text.
+  static func openData(
+    envelopes: [ChatEnvelope],
+    current: ChatIdentity,
+    retired: [ChatIdentity],
+    messageId: UUID,
+    senderUserId: UUID,
+    recipientUserId: UUID,
+    senderPublic: Data
+  ) -> Data? {
+    var seen: Set<UUID> = []
+    for identity in [current] + retired where seen.insert(identity.id).inserted {
+      guard envelopes.contains(where: { $0.keyId == identity.id }) else { continue }
+      if let data = try? ChatCrypto.openData(
+        envelopes: envelopes, identity: identity, messageId: messageId,
+        senderUserId: senderUserId, recipientUserId: recipientUserId, senderPublic: senderPublic
+      ) {
+        return data
+      }
+    }
+    return nil
+  }
 }
 
 /// The server insert finishes before the keychain changes. A failed insert keeps the old key.
@@ -334,6 +357,17 @@ enum ChatCrypto {
     from sender: ChatIdentity,
     to targets: [ChatTarget]
   ) throws -> [ChatEnvelope] {
+    try sealData(Data(text.utf8), messageId: messageId, senderUserId: senderUserId, from: sender, to: targets)
+  }
+
+  /// One sealed box per device key. Text and a photo's content key use this same envelope.
+  static func sealData(
+    _ clear: Data,
+    messageId: UUID,
+    senderUserId: UUID,
+    from sender: ChatIdentity,
+    to targets: [ChatTarget]
+  ) throws -> [ChatEnvelope] {
     try targets.map { target in
       let publicKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: target.publicKey)
       let secret = try sender.privateKey.sharedSecretFromKeyAgreement(with: publicKey)
@@ -344,7 +378,7 @@ enum ChatCrypto {
         messageId: messageId, senderUserId: senderUserId, recipientUserId: target.userId,
         senderKey: sender.publicKey, recipientKey: target.publicKey
       )
-      let sealed = try ChaChaPoly.seal(Data(text.utf8), using: key, authenticating: aad)
+      let sealed = try ChaChaPoly.seal(clear, using: key, authenticating: aad)
       return ChatEnvelope(keyId: target.keyId, box: sealed.combined)
     }
   }
@@ -358,6 +392,22 @@ enum ChatCrypto {
     recipientUserId: UUID,
     senderPublic: Data
   ) throws -> String {
+    let clear = try openData(
+      envelopes: envelopes, identity: identity, messageId: messageId,
+      senderUserId: senderUserId, recipientUserId: recipientUserId, senderPublic: senderPublic
+    )
+    guard let text = String(data: clear, encoding: .utf8) else { throw ChatCryptoError.unreadable }
+    return text
+  }
+
+  static func openData(
+    envelopes: [ChatEnvelope],
+    identity: ChatIdentity,
+    messageId: UUID,
+    senderUserId: UUID,
+    recipientUserId: UUID,
+    senderPublic: Data
+  ) throws -> Data {
     guard let mine = envelopes.first(where: { $0.keyId == identity.id }) else { throw ChatCryptoError.unreadable }
     let sender = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: senderPublic)
     let secret = try identity.privateKey.sharedSecretFromKeyAgreement(with: sender)
@@ -369,9 +419,7 @@ enum ChatCrypto {
       senderKey: senderPublic, recipientKey: identity.publicKey
     )
     let box = try ChaChaPoly.SealedBox(combined: mine.box)
-    let clear = try ChaChaPoly.open(box, using: key, authenticating: aad)
-    guard let text = String(data: clear, encoding: .utf8) else { throw ChatCryptoError.unreadable }
-    return text
+    return try ChaChaPoly.open(box, using: key, authenticating: aad)
   }
 
   static func associatedData(

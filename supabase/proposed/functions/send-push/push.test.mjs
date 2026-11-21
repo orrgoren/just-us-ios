@@ -9,6 +9,7 @@ import {
   flushDue,
   freshApnsToken,
   isServiceCaller,
+  chatPushBody,
   chatPushDecision,
   CHAT_PUSH_WINDOW_MS,
   keepsSixHourDedupe,
@@ -239,6 +240,8 @@ test("a chat push needs a recent message, coalesces for 60s, and skips the daily
   assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - 30_000, now }), "coalesced");
   assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - CHAT_PUSH_WINDOW_MS, now }), "send");
   assert.equal(skipsDailyCap("chatMessage"), true);
+  assert.equal(chatPushBody(), "New message");
+  assert.equal(chatPushBody().toLowerCase().includes("photo"), false);
   assert.equal(skipsDailyCap("partnerMood"), true);
   assert.equal(skipsDailyCap("planReady"), false);
 });

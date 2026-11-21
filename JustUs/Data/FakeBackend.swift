@@ -13,6 +13,8 @@ final class FakeBackend: DateBackend {
   /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
   private(set) var codeVerifier: String?
   var chatFailure: AppError?
+  /// When set, deleting a chat photo object fails and the row keeps its path.
+  var photoRemoveError: Error?
   /// The token delete throws this instead of succeeding. A dead session signs out locally.
   var deleteFailure: Error?
   /// The key retire throws this after the token delete. The session stays, and the token is put back.
@@ -259,7 +261,7 @@ final class FakeBackend: DateBackend {
     return created
   }
 
-  private func current() -> FakeUser? {
+  func current() -> FakeUser? {
     guard let id = store.world.sessionUserId else { return nil }
     return store.world.users.first { $0.id == id }
   }
@@ -268,13 +270,13 @@ final class FakeBackend: DateBackend {
     store.world.members.first { $0.userId == userId }
   }
 
-  private func display(_ userId: UUID) -> String {
+  func display(_ userId: UUID) -> String {
     store.world.members.first { $0.userId == userId }?.displayName
       ?? store.world.users.first { $0.id == userId }?.email
       ?? ""
   }
 
-  private func guardOnline() throws {
+  func guardOnline() throws {
     if store.world.offline { throw AppError.offline }
   }
 
@@ -365,24 +367,11 @@ final class FakeBackend: DateBackend {
       keyNotice = L10n.chatKeyChanged
     }
     seenPartnerKeys[user.id] = Set(partnerKeys)
+    sweepExpiredChats(now: clock())
     let lines = store.world.chats
       .filter { $0.coupleId == mine.coupleId }
       .map { row in
-        let envelopes = row.envelopes.map { ChatEnvelope(keyId: $0.keyId, box: $0.box) }
-        let text: String?
-        if SenderKey.trusted(sender: row.senderPublicKey, senderUserId: row.senderUserId, keys: published) {
-          text = ChatHistory.open(
-            envelopes: envelopes, current: identity, retired: retiredIdentities(userId: user.id, current: identity.id),
-            messageId: row.id, senderUserId: row.senderUserId, recipientUserId: user.id,
-            senderPublic: row.senderPublicKey
-          )
-        } else {
-          text = nil
-        }
-        return ChatLine(
-          id: row.id, senderUserId: row.senderUserId, text: text ?? L10n.chatUnreadable,
-          createdAt: row.createdAt, mine: row.senderUserId == user.id, unreadable: text == nil
-        )
+        presentChat(row, identity: identity, userId: user.id, published: published)
       }
     return ChatWindow.chronological(lines)
   }
@@ -440,7 +429,7 @@ final class FakeBackend: DateBackend {
     store.save()
   }
 
-  private func ensureKey(userId: UUID, reason: KeyRotation.Reason = .refresh) throws -> ChatIdentity {
+  func ensureKey(userId: UUID, reason: KeyRotation.Reason = .refresh) throws -> ChatIdentity {
     let held = heldKey(userId: userId)
     let activeCount = store.world.deviceKeys.filter { $0.userId == userId && $0.retiredAt == nil }.count
     let decision = try KeyRotation.enforce(KeyRotation.step(
@@ -493,7 +482,7 @@ final class FakeBackend: DateBackend {
     }
   }
 
-  private func retiredIdentities(userId: UUID, current: UUID) -> [ChatIdentity] {
+  func retiredIdentities(userId: UUID, current: UUID) -> [ChatIdentity] {
     store.world.deviceKeys.compactMap { key in
       guard key.userId == userId, key.id != current else { return nil }
       return try? ChatIdentity.restored(id: key.id, privateKey: key.privateKey)

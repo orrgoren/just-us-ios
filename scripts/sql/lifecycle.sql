@@ -1469,3 +1469,157 @@ begin
     raise exception 'retired_key_was_deleted';
   end if;
 end $$;
+
+-- 021. A chat photo is ciphertext for the couple only. View once is consumed
+-- by the other person. An expired one loses its path so the phone can delete
+-- the object. SQL itself cannot remove storage.objects.
+do $$
+declare
+  n int;
+  alex uuid := 'c6c6c6c6-c6c6-46c6-86c6-c6c6c6c6c6c6';
+  blair uuid := 'c7c7c7c7-c7c7-47c7-87c7-c7c7c7c7c7c7';
+  outsider uuid := 'c8c8c8c8-c8c8-48c8-88c8-c8c8c8c8c8c8';
+  couple uuid := 'c9c9c9c9-c9c9-49c9-89c9-c9c9c9c9c9c9';
+  photo uuid := 'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4';
+  kept uuid := 'c5c5c5c5-c5c5-45c5-85c5-c5c5c5c5c5c5';
+  alex_key text := 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+  active_key text := 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
+  path text := couple::text || '/' || photo::text || '.bin';
+  kept_path text := couple::text || '/' || kept::text || '.bin';
+  stamped timestamptz;
+begin
+  if (select public from storage.buckets where id = 'chat-photos') is distinct from false then
+    raise exception 'chat_photos_bucket_not_private';
+  end if;
+
+  insert into auth.users (id) values (alex), (blair), (outsider);
+  insert into public.couples (
+    id, created_by, weekday, local_time, timezone, default_duration_minutes, invitee_display_name
+  ) values (
+    couple, alex, 4, '20:30', 'Asia/Jerusalem', 90, 'Blair'
+  );
+  insert into public.couple_members (couple_id, user_id, display_name, member_index) values
+    (couple, alex, 'Alex', 0),
+    (couple, blair, 'Blair', 1);
+
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  insert into public.device_keys (id, user_id, public_key)
+  values ('d0d0d0d0-d0d0-40d0-80d0-d0d0d0d0d0d0', alex, alex_key);
+  update public.device_keys
+  set retired_at = now()
+  where id = 'd0d0d0d0-d0d0-40d0-80d0-d0d0d0d0d0d0';
+  begin
+    insert into public.chat_messages (
+      id, couple_id, sender_user_id, sender_public_key, envelopes, kind, retention, photo_path
+    ) values (
+      photo, couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
+      'photo', 'view_once', path
+    );
+    raise exception 'retired_key_sent_a_photo';
+  exception
+    when others then
+      if sqlerrm is distinct from 'unknown_sender_key' then
+        raise;
+      end if;
+  end;
+  insert into public.device_keys (id, user_id, public_key)
+  values ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1', alex, active_key);
+  insert into public.chat_messages (
+    id, couple_id, sender_user_id, sender_public_key, envelopes, kind, retention, photo_path
+  ) values (
+    photo, couple, alex, active_key,
+    '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
+    'photo', 'view_once', path
+  );
+  select expires_at into stamped from public.chat_messages where id = photo;
+  if stamped < now() + interval '6 days' then
+    raise exception 'view_once_expiry_was_not_seven_days';
+  end if;
+  insert into public.chat_messages (
+    id, couple_id, sender_user_id, sender_public_key, envelopes, kind, retention, photo_path
+  ) values (
+    kept, couple, alex, active_key,
+    '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
+    'photo', 'keep', kept_path
+  );
+
+  execute 'reset role';
+  insert into storage.objects (bucket_id, name) values
+    ('chat-photos', path),
+    ('chat-photos', kept_path);
+  grant usage on schema storage to authenticated;
+  grant select, insert, delete on storage.objects to authenticated;
+
+  perform set_config('request.jwt.claim.sub', outsider::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.chat_messages where id in (photo, kept)) <> 0 then
+    raise exception 'outsider_read_chat_photo';
+  end if;
+  if (select count(*) from storage.objects where bucket_id = 'chat-photos') <> 0 then
+    raise exception 'outsider_read_chat_photo_object';
+  end if;
+  begin
+    insert into storage.objects (bucket_id, name) values ('chat-photos', path);
+    raise exception 'outsider_inserted_chat_photo_object';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+  delete from public.chat_messages where id = photo;
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'outsider_deleted_chat_photo';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  if (select count(*) from public.chat_messages where id = photo) <> 1 then
+    raise exception 'partner_could_not_read_chat_photo';
+  end if;
+  if (select count(*) from storage.objects where name = path) <> 1 then
+    raise exception 'partner_could_not_read_chat_photo_object';
+  end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', alex::text, true);
+  execute 'set local role authenticated';
+  begin
+    perform public.consume_chat_photo(photo);
+    raise exception 'sender_consumed_view_once';
+  exception
+    when others then
+      if sqlerrm is distinct from 'sender_cannot_consume' then
+        raise;
+      end if;
+  end;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  perform public.consume_chat_photo(photo);
+  if (
+    select photo_path is null and opened_at is not null
+    from public.chat_messages where id = photo
+  ) is distinct from true then
+    raise exception 'view_once_was_not_consumed';
+  end if;
+  delete from public.chat_messages where id = photo;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'partner_could_not_delete_photo';
+  end if;
+
+  execute 'reset role';
+  update public.chat_messages
+  set expires_at = now() - interval '1 minute', photo_path = kept_path, opened_at = null, retention = 'view_once'
+  where id = kept;
+  perform set_config('request.jwt.claim.sub', blair::text, true);
+  execute 'set local role authenticated';
+  perform public.expire_chat_photos();
+  if (select photo_path from public.chat_messages where id = kept) is not null then
+    raise exception 'expired_view_once_kept_its_path';
+  end if;
+end $$;

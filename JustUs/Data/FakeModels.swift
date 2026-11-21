@@ -91,6 +91,12 @@ struct FakeChat: Codable, Equatable {
   var senderPublicKey: Data
   var createdAt: Date
   var envelopes: [FakeEnvelope]
+  var kind: String = "text"
+  var retention: String?
+  var objectBytes: Data?
+  var openedAt: Date?
+  var expiresAt: Date?
+  var photoPath: String?
 }
 
 struct FakeInvite: Codable, Equatable {

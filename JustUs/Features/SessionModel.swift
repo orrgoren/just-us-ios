@@ -19,7 +19,7 @@ final class SessionModel {
   }
 
   enum RetryKind: Equatable {
-    case sendCode, verify, create, redeem(Bool), saveDate, saveHint, reveal, finish, moment, settings, openWeek, surprise, signOut
+    case sendCode, verify, create, redeem(Bool), saveDate, saveHint, reveal, finish, moment, settings, openWeek, surprise, signOut, chat
   }
 
   var screen: Screen = .loading
@@ -62,6 +62,9 @@ final class SessionModel {
   var planTime = ""
   var momentDraft = ""
   var chatDraft = ""
+  var stagedChatJPEG: Data?
+  var chatRetention: ChatRetention = .viewOnce
+  var openChatPhoto: UUID?
   var messages: [ChatLine] = []
   var chatKeyNotice: String?
   var focusReveal = false
@@ -244,6 +247,7 @@ final class SessionModel {
     case .openWeek: await openNextWeek()
     case .surprise: await surprise()
     case .signOut: await signOut()
+    case .chat: await retryChat()
     }
   }
 

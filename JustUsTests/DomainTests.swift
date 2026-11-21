@@ -135,7 +135,9 @@ final class DomainTests: XCTestCase {
     )
     let secret = "The tea is in the blue tin"
     let body = PushPolicy.body(kind: .chatMessage, partnerName: "Blair")
-    XCTAssertEqual(body, "Blair sent a message.")
+    XCTAssertEqual(body, "New message")
+    XCTAssertTrue(ChatPushCopy.isQuiet(body))
+    XCTAssertFalse(body.localizedCaseInsensitiveContains("Blair"))
     XCTAssertTrue(PushPolicy.forbiddenFragments(in: body, secrets: [secret]).isEmpty)
     let recentMood = PushRecord(kind: .partnerMood, sentAt: noon, transactional: false)
     XCTAssertEqual(
