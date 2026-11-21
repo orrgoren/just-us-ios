@@ -98,6 +98,28 @@ enum L10n {
   }
   static var chatKeyChanged: String { text("chat.keyChanged", "Your partner's key changed.") }
   static var chatUnreadable: String { text("chat.unreadable", "This phone can't read that message.") }
+  static var chatPhoto: String { text("chat.photo", "Photo") }
+  static var chatCamera: String { text("chat.camera", "Camera") }
+  static var chatLibrary: String { text("chat.library", "Photo library") }
+  static var chatViewOnce: String { text("chat.viewOnce", "View once") }
+  static var chatKeep: String { text("chat.keep", "Keep") }
+  static var chatPhotoChoice: String { text("chat.photoChoice", "How should this photo be kept?") }
+  static var chatViewOnceHelp: String {
+    text("chat.viewOnceHelp", "They can open it once. It isn't saved to the camera roll.")
+  }
+  static var chatKeepHelp: String {
+    text("chat.keepHelp", "It stays in this chat until either of you deletes it. It isn't saved to the camera roll.")
+  }
+  static var chatPhotoTap: String { text("chat.photoTap", "Photo, tap to view") }
+  static var chatOpened: String { text("chat.opened", "Opened") }
+  static var chatExpired: String { text("chat.expired", "This photo expired") }
+  static var chatSendFailed: String { text("chat.sendFailed", "Couldn't send, tap to retry") }
+  static var chatOpenFailed: String { text("chat.openFailed", "Couldn't open that photo.") }
+  static var chatPhotoTooBig: String { text("chat.photoTooBig", "That photo is too large.") }
+  static var chatPhotoHidden: String { text("chat.photoHidden", "The photo is hidden while the screen is captured.") }
+  static var chatDeletePhoto: String { text("chat.deletePhoto", "Delete photo") }
+  static var chatClose: String { text("chat.close", "Close") }
+  static var chatSamplePhoto: String { text("chat.samplePhoto", "Send a sample photo") }
   static var chatPartner: String { text("chat.partner", "Their phone needs to open the app once before a message can be locked to them.") }
   static var homeBody: String { text("home.body", "Pick a mood. Whoever is planning keeps the surprise.") }
   static var datesTogether: String { text("home.dates", "Dates together") }
@@ -319,6 +341,7 @@ enum L10n {
     case .accountDeleteBlocked: return text("err.deleteAccount", "This phone is still on the account, so the account was not deleted. Try again.")
     case .partnerNotReady: return chatPartner
     case .chatTooLong: return chatTooLong
+    case .chatPhotoTooBig: return chatPhotoTooBig
     case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
     }
   }

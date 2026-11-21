@@ -46,6 +46,11 @@ protocol DateBackend: AnyObject {
   func savePreferences(_ preferences: PushPreferences) async
   func messages() async throws -> [ChatLine]
   func sendMessage(_ text: String) async throws
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws
+  func chatPhoto(_ id: UUID) async throws -> Data
+  func consumeViewOnce(_ id: UUID) async throws
+  func deleteChatPhoto(_ id: UUID) async throws
+  func sendScreenshotNotice() async throws
   func partnerKeyNotice() -> String?
 }
 

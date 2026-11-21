@@ -15,7 +15,7 @@ struct PickedImage: Transferable {
 }
 
 enum PhotoBytes {
-  static func jpeg(from data: Data, maxEdge: CGFloat = 1600) -> Data? {
+  static func jpeg(from data: Data, maxEdge: CGFloat = 1600, quality: CGFloat = 0.72) -> Data? {
     guard let image = UIImage(data: data) else { return nil }
     let longest = max(image.size.width, image.size.height)
     let scale = longest > 0 ? min(1, maxEdge / longest) : 1
@@ -24,7 +24,7 @@ enum PhotoBytes {
     let rendered = renderer.image { _ in
       image.draw(in: CGRect(origin: .zero, size: size))
     }
-    return rendered.jpegData(compressionQuality: 0.72)
+    return rendered.jpegData(compressionQuality: quality)
   }
 
   static func sample() -> Data {

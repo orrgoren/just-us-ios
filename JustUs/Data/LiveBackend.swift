@@ -438,14 +438,11 @@ final class LiveBackend: DateBackend {
     if PartnerKeyMemory.remember(userId: context.userId, current: partnerKeys) {
       partnerKeyNoticeText = L10n.chatKeyChanged
     }
+    await sweepChatPhotos()
+    let fresh = (try? await chatRows(coupleId: context.couple.id)) ?? rows
     let retired = DeviceKeyStore.retired(userId: context.userId)
-    let lines = rows.map { row in
-      let text = decrypted(row, identity: identity, retired: retired, userId: context.userId, keys: keys)
-      return ChatLine(
-        id: row.id, senderUserId: row.senderUserId, text: text ?? L10n.chatUnreadable,
-        createdAt: APIDate.parse(row.createdAt) ?? Date(), mine: row.senderUserId == context.userId,
-        unreadable: text == nil
-      )
+    let lines = fresh.map { row in
+      chatLine(row, identity: identity, retired: retired, userId: context.userId, keys: keys)
     }
     return ChatWindow.chronological(lines)
   }
@@ -474,7 +471,7 @@ final class LiveBackend: DateBackend {
     await notify("chatMessage")
   }
 
-  private func chatTargets(keys: [DeviceKeyRow], userId: UUID, identity: ChatIdentity) -> [ChatTarget] {
+  func chatTargets(keys: [DeviceKeyRow], userId: UUID, identity: ChatIdentity) -> [ChatTarget] {
     let parsed: [(id: UUID, userId: UUID, publicKey: Data, createdAt: Date, retired: Bool)] = keys.compactMap { key in
       guard let raw = ChatCoding.data(key.publicKey), raw.count == 32 else { return nil }
       return (key.id, key.userId, raw, APIDate.parse(key.createdAt) ?? .distantPast, key.retiredAt != nil)
@@ -482,7 +479,7 @@ final class LiveBackend: DateBackend {
     return ChatRecipients.choose(senderUserId: userId, senderKeyId: identity.id, keys: parsed)
   }
 
-  private func decrypted(
+  func decrypted(
     _ row: ChatMessageRow, identity: ChatIdentity, retired: [ChatIdentity], userId: UUID, keys: [DeviceKeyRow]
   ) -> String? {
     let published = keys.compactMap { key -> (userId: UUID, publicKey: Data)? in
@@ -502,7 +499,7 @@ final class LiveBackend: DateBackend {
   }
 
   /// Reloads the keychain inside the gate, so a call that waited cannot publish the key the previous call just replaced.
-  private func publishDeviceKey(userId: UUID, reason: KeyRotation.Reason) async throws -> ChatIdentity {
+  func publishDeviceKey(userId: UUID, reason: KeyRotation.Reason) async throws -> ChatIdentity {
     try await publishGate.run { @MainActor in
       try await self.publishDeviceKeyOnce(userId: userId, reason: reason)
     }
@@ -572,7 +569,7 @@ final class LiveBackend: DateBackend {
     }
   }
 
-  private func chatRows(coupleId: UUID) async throws -> [ChatMessageRow] {
+  func chatRows(coupleId: UUID) async throws -> [ChatMessageRow] {
     try await run { client in
       let response: PostgrestResponse<[ChatMessageRow]> = try await client
         .from("chat_messages")
@@ -585,7 +582,7 @@ final class LiveBackend: DateBackend {
     }
   }
 
-  private func loadDeviceKeys(coupleId: UUID, senderKeys: [String] = []) async throws -> [DeviceKeyRow] {
+  func loadDeviceKeys(coupleId: UUID, senderKeys: [String] = []) async throws -> [DeviceKeyRow] {
     let members: [MemberIdRow] = try await run { client in
       let response: PostgrestResponse<[MemberIdRow]> = try await client
         .from("couple_members")
@@ -634,7 +631,7 @@ final class LiveBackend: DateBackend {
     }
   }
 
-  private func run<T>(_ body: (SupabaseClient) async throws -> T) async throws -> T {
+  func run<T>(_ body: (SupabaseClient) async throws -> T) async throws -> T {
     guard let client else { throw AppError.unavailable }
     do {
       return try await body(client)

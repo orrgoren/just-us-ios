@@ -31,6 +31,11 @@ export function skipsDailyCap(kind) {
   return kind === "chatMessage" || kind === "partnerMood";
 }
 
+// Chat and photo alerts share this body. It does not quote the chat or say that a photo was sent.
+export function chatPushBody() {
+  return "New message";
+}
+
 export function chatPushDecision({ recentMessage, lastPushAt, now }) {
   if (!recentMessage) return "no_message";
   if (typeof lastPushAt === "number" && Number.isFinite(lastPushAt) && now - lastPushAt < CHAT_PUSH_WINDOW_MS) {

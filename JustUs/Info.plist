@@ -35,6 +35,10 @@
   <false/>
   <key>LSRequiresIPhoneOS</key>
   <true/>
+  <key>NSCameraUsageDescription</key>
+  <string>Just Us uses the camera so you can send a photo in your private chat.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>Just Us uses a photo you choose so you can send it in your private chat.</string>
   <key>NSCalendarsFullAccessUsageDescription</key>
   <string>Just Us adds your planned evening to the calendar without the surprise itself.</string>
   <key>UIBackgroundModes</key>
