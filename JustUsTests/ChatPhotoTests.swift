@@ -8,6 +8,7 @@ final class ChatPhotoTests: XCTestCase {
     let alice = ChatIdentity.generate()
     let blair = ChatIdentity.generate()
     let messageId = UUID()
+    let coupleId = UUID()
     let aliceUser = UUID()
     let blairUser = UUID()
     let targets = [
@@ -15,17 +16,62 @@ final class ChatPhotoTests: XCTestCase {
       ChatTarget(keyId: blair.id, userId: blairUser, publicKey: blair.publicKey)
     ]
     let packed = try ChatPhotoCipher.package(
-      jpeg: jpeg, messageId: messageId, senderUserId: aliceUser, from: alice, to: targets
+      jpeg: jpeg, messageId: messageId, coupleId: coupleId, retention: .viewOnce,
+      senderUserId: aliceUser, from: alice, to: targets
     )
     let opened = try ChatPhotoCipher.jpeg(
       object: packed.object, envelopes: packed.envelopes, current: blair, retired: [],
-      messageId: messageId, senderUserId: aliceUser, recipientUserId: blairUser, senderPublic: alice.publicKey
+      messageId: messageId, coupleId: coupleId, retention: .viewOnce,
+      senderUserId: aliceUser, recipientUserId: blairUser, senderPublic: alice.publicKey
     )
     XCTAssertEqual(opened, jpeg)
     XCTAssertNotEqual(packed.object, jpeg)
+    XCTAssertThrowsError(try ChatPhotoCipher.jpeg(
+      object: packed.object, envelopes: packed.envelopes, current: blair, retired: [],
+      messageId: messageId, coupleId: coupleId, retention: .keep,
+      senderUserId: aliceUser, recipientUserId: blairUser, senderPublic: alice.publicKey
+    ))
     XCTAssertFalse(ChatPhoto.fits(Data(count: ChatPhoto.byteLimit + 1)))
     XCTAssertEqual(ChatNotice.screenshot("Blair"), "Blair took a screenshot")
     XCTAssertTrue(ChatPushCopy.isQuiet(ChatPushCopy.body))
+  }
+
+  func testRetiredKeyStillOpensThePhoto() throws {
+    let jpeg = PhotoBytes.sample()
+    let sender = ChatIdentity.generate()
+    let retired = ChatIdentity.generate()
+    let later = ChatIdentity.generate()
+    let messageId = UUID()
+    let coupleId = UUID()
+    let senderUser = UUID()
+    let recipientUser = UUID()
+    let targets = [
+      ChatTarget(keyId: retired.id, userId: recipientUser, publicKey: retired.publicKey),
+      ChatTarget(keyId: sender.id, userId: senderUser, publicKey: sender.publicKey)
+    ]
+    let packed = try ChatPhotoCipher.package(
+      jpeg: jpeg, messageId: messageId, coupleId: coupleId, retention: .keep,
+      senderUserId: senderUser, from: sender, to: targets
+    )
+    let raw = ChatHistory.openData(
+      envelopes: packed.envelopes, current: later, retired: [retired], messageId: messageId,
+      senderUserId: senderUser, recipientUserId: recipientUser, senderPublic: sender.publicKey
+    )
+    XCTAssertEqual(try XCTUnwrap(raw).count, 32)
+    let opened = try ChatPhotoCipher.jpeg(
+      object: packed.object, envelopes: packed.envelopes, current: later, retired: [retired],
+      messageId: messageId, coupleId: coupleId, retention: .keep,
+      senderUserId: senderUser, recipientUserId: recipientUser, senderPublic: sender.publicKey
+    )
+    XCTAssertEqual(opened, jpeg)
+  }
+
+  func testLibraryPhotoRejectsEmptyBytes() throws {
+    XCTAssertThrowsError(try PickedImage.imported(Data()))
+    let jpeg = PhotoBytes.sample()
+    let picked = try PickedImage.imported(jpeg)
+    XCTAssertEqual(picked.data, jpeg)
+    XCTAssertFalse(picked.data.isEmpty)
   }
 
   func testLongEdgeStaysAtMost2048() throws {
@@ -102,6 +148,28 @@ final class ChatPhotoFlowTests: XCTestCase {
     XCTAssertNil(after.first { $0.id == photo.id })
   }
 
+  func testFailedRemoveKeepsThePhoto() async throws {
+    XCTAssertFalse(ChatStorageRemoval.clearsPath(RemovalFailed()))
+    XCTAssertTrue(ChatStorageRemoval.clearsPath(MissingObject()))
+    let backend = try await signedInAlex()
+    try await backend.sendPhoto(PhotoBytes.sample(), retention: .keep)
+    let listed = try await backend.messages()
+    let photo = try XCTUnwrap(listed.first { $0.photo == .kept })
+    backend.photoRemoveError = RemovalFailed()
+    do {
+      try await backend.deleteChatPhoto(photo.id)
+      XCTFail("A failed remove deleted the photo")
+    } catch {
+      XCTAssertEqual(ErrorMap.app(error), .saveFailed)
+    }
+    let kept = backend.store.world.chats.first { $0.id == photo.id }
+    XCTAssertNotNil(kept?.objectBytes)
+    XCTAssertNotNil(kept?.photoPath)
+    backend.photoRemoveError = MissingObject()
+    try await backend.deleteChatPhoto(photo.id)
+    XCTAssertNil(backend.store.world.chats.first { $0.id == photo.id })
+  }
+
   func testScreenshotLineAndOutsider() async throws {
     let backend = try await signedInAlex()
     try await backend.sendPhoto(PhotoBytes.sample(), retention: .keep)
@@ -144,4 +212,10 @@ final class ChatPhotoFlowTests: XCTestCase {
   private func switchToCasey(_ backend: FakeBackend) {
     backend.store.world.sessionUserId = SeedID.casey
   }
+}
+
+private struct RemovalFailed: Error {}
+
+private struct MissingObject: Error, CustomStringConvertible {
+  var description: String { "Object not found" }
 }

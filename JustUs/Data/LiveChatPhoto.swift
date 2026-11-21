@@ -29,15 +29,9 @@ extension LiveBackend {
       guard ChatPhoto.expired(expiresAt: APIDate.parse(row.expiresAt), now: now) else { return nil }
       return row.photoPath
     }
-    if paths.isEmpty == false {
-      _ = try? await run { client in
-        try await client.storage.from("chat-photos").remove(paths: paths)
-      }
-    }
-    if paths.isEmpty == false {
-      _ = try? await run { client in
-        try await client.rpc("expire_chat_photos").execute()
-      }
+    guard paths.isEmpty == false, await removedChatObjects(paths) else { return }
+    _ = try? await run { client in
+      try await client.rpc("expire_chat_photos").execute()
     }
   }
 
@@ -47,8 +41,8 @@ extension LiveBackend {
     let messageId = UUID()
     let path = ChatPhoto.objectPath(coupleId: prepared.context.couple.id, messageId: messageId)
     let packed = try ChatPhotoCipher.package(
-      jpeg: jpeg, messageId: messageId, senderUserId: prepared.context.userId,
-      from: prepared.identity, to: prepared.targets
+      jpeg: jpeg, messageId: messageId, coupleId: prepared.context.couple.id, retention: retention,
+      senderUserId: prepared.context.userId, from: prepared.identity, to: prepared.targets
     )
     var uploaded = false
     do {
@@ -89,7 +83,10 @@ extension LiveBackend {
       try await client.storage.from("chat-photos").download(path: path)
     }
     let keys = try await loadDeviceKeys(coupleId: prepared.context.couple.id, senderKeys: [row.senderPublicKey])
-    return try openPhoto(row, object: object, identity: prepared.identity, userId: prepared.context.userId, keys: keys)
+    return try openPhoto(
+      row, object: object, identity: prepared.identity, userId: prepared.context.userId,
+      keys: keys, coupleId: prepared.context.couple.id
+    )
   }
 
   func consumeViewOnce(_ id: UUID) async throws {
@@ -97,10 +94,8 @@ extension LiveBackend {
     guard let row = try await chatRows(coupleId: context.couple.id).first(where: { $0.id == id }) else {
       throw AppError.notEditable
     }
-    if let path = row.photoPath {
-      _ = try? await run { client in
-        try await client.storage.from("chat-photos").remove(paths: [path])
-      }
+    if let path = row.photoPath, await removedChatObjects([path]) == false {
+      throw AppError.saveFailed
     }
     try await run { client in
       try await client.rpc("consume_chat_photo", params: MessageIDParams(pMessageId: id)).execute()
@@ -109,10 +104,9 @@ extension LiveBackend {
 
   func deleteChatPhoto(_ id: UUID) async throws {
     guard let context = try await loadContext() else { throw AppError.notAuthenticated }
-    if let row = try await chatRows(coupleId: context.couple.id).first(where: { $0.id == id }), let path = row.photoPath {
-      _ = try? await run { client in
-        try await client.storage.from("chat-photos").remove(paths: [path])
-      }
+    if let row = try await chatRows(coupleId: context.couple.id).first(where: { $0.id == id }),
+       let path = row.photoPath, await removedChatObjects([path]) == false {
+      throw AppError.saveFailed
     }
     try await run { client in
       try await client.from("chat_messages").delete().eq("id", value: id.uuidString).execute()
@@ -157,8 +151,19 @@ extension LiveBackend {
     }
   }
 
+  private func removedChatObjects(_ paths: [String]) async -> Bool {
+    do {
+      try await run { client in
+        try await client.storage.from("chat-photos").remove(paths: paths)
+      }
+      return true
+    } catch {
+      return ChatStorageRemoval.clearsPath(error)
+    }
+  }
+
   private func openPhoto(
-    _ row: ChatMessageRow, object: Data, identity: ChatIdentity, userId: UUID, keys: [DeviceKeyRow]
+    _ row: ChatMessageRow, object: Data, identity: ChatIdentity, userId: UUID, keys: [DeviceKeyRow], coupleId: UUID
   ) throws -> Data {
     let published = keys.compactMap { key -> (userId: UUID, publicKey: Data)? in
       guard let raw = ChatCoding.data(key.publicKey) else { return nil }
@@ -173,8 +178,10 @@ extension LiveBackend {
       return ChatEnvelope(keyId: wire.keyId, box: box)
     }
     let retired = DeviceKeyStore.retired(userId: userId)
+    guard let retention = ChatRetention(rawValue: row.retention ?? "") else { throw ChatCryptoError.unreadable }
     return try ChatPhotoCipher.jpeg(
-      object: object, envelopes: envelopes, current: identity, retired: retired, messageId: row.id,
+      object: object, envelopes: envelopes, current: identity, retired: retired,
+      messageId: row.id, coupleId: coupleId, retention: retention,
       senderUserId: row.senderUserId, recipientUserId: userId, senderPublic: sender
     )
   }

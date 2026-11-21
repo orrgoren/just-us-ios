@@ -1483,6 +1483,7 @@ declare
   photo uuid := 'c4c4c4c4-c4c4-44c4-84c4-c4c4c4c4c4c4';
   kept uuid := 'c5c5c5c5-c5c5-45c5-85c5-c5c5c5c5c5c5';
   alex_key text := 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+  active_key text := 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
   path text := couple::text || '/' || photo::text || '.bin';
   kept_path text := couple::text || '/' || kept::text || '.bin';
   stamped timestamptz;
@@ -1505,10 +1506,30 @@ begin
   execute 'set local role authenticated';
   insert into public.device_keys (id, user_id, public_key)
   values ('d0d0d0d0-d0d0-40d0-80d0-d0d0d0d0d0d0', alex, alex_key);
+  update public.device_keys
+  set retired_at = now()
+  where id = 'd0d0d0d0-d0d0-40d0-80d0-d0d0d0d0d0d0';
+  begin
+    insert into public.chat_messages (
+      id, couple_id, sender_user_id, sender_public_key, envelopes, kind, retention, photo_path
+    ) values (
+      photo, couple, alex, alex_key,
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
+      'photo', 'view_once', path
+    );
+    raise exception 'retired_key_sent_a_photo';
+  exception
+    when others then
+      if sqlerrm is distinct from 'unknown_sender_key' then
+        raise;
+      end if;
+  end;
+  insert into public.device_keys (id, user_id, public_key)
+  values ('d1d1d1d1-d1d1-41d1-81d1-d1d1d1d1d1d1', alex, active_key);
   insert into public.chat_messages (
     id, couple_id, sender_user_id, sender_public_key, envelopes, kind, retention, photo_path
   ) values (
-    photo, couple, alex, alex_key,
+    photo, couple, alex, active_key,
     '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
     'photo', 'view_once', path
   );
@@ -1519,7 +1540,7 @@ begin
   insert into public.chat_messages (
     id, couple_id, sender_user_id, sender_public_key, envelopes, kind, retention, photo_path
   ) values (
-    kept, couple, alex, alex_key,
+    kept, couple, alex, active_key,
     '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
     'photo', 'keep', kept_path
   );

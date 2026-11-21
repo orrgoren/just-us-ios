@@ -13,6 +13,8 @@ final class FakeBackend: DateBackend {
   /// PKCE verifier for the latest magic link. Sign-out drops it, so an old link cannot be reused.
   private(set) var codeVerifier: String?
   var chatFailure: AppError?
+  /// When set, deleting a chat photo object fails and the row keeps its path.
+  var photoRemoveError: Error?
   /// The token delete throws this instead of succeeding. A dead session signs out locally.
   var deleteFailure: Error?
   /// The key retire throws this after the token delete. The session stays, and the token is put back.

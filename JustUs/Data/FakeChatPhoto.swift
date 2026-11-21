@@ -23,7 +23,8 @@ extension FakeBackend {
     var preview: Data?
     if photo == .kept, trusted, let object = row.objectBytes {
       preview = try? ChatPhotoCipher.jpeg(
-        object: object, envelopes: envelopes, current: identity, retired: retired, messageId: row.id,
+        object: object, envelopes: envelopes, current: identity, retired: retired,
+        messageId: row.id, coupleId: row.coupleId, retention: .keep,
         senderUserId: row.senderUserId, recipientUserId: userId, senderPublic: row.senderPublicKey
       )
     }
@@ -40,6 +41,7 @@ extension FakeBackend {
       let row = store.world.chats[index]
       guard row.kind == "photo", row.retention == ChatRetention.viewOnce.rawValue, row.openedAt == nil else { continue }
       guard ChatPhoto.expired(expiresAt: row.expiresAt, now: now) else { continue }
+      guard objectCleared() else { continue }
       store.world.chats[index].objectBytes = nil
       store.world.chats[index].photoPath = nil
     }
@@ -52,7 +54,8 @@ extension FakeBackend {
     let messageId = UUID()
     let path = ChatPhoto.objectPath(coupleId: prepared.coupleId, messageId: messageId)
     let packed = try ChatPhotoCipher.package(
-      jpeg: jpeg, messageId: messageId, senderUserId: prepared.userId, from: prepared.identity, to: prepared.targets
+      jpeg: jpeg, messageId: messageId, coupleId: prepared.coupleId, retention: retention,
+      senderUserId: prepared.userId, from: prepared.identity, to: prepared.targets
     )
     store.world.chats.append(FakeChat(
       id: messageId, coupleId: prepared.coupleId, senderUserId: prepared.userId,
@@ -74,9 +77,11 @@ extension FakeBackend {
     }
     let identity = try ensureKey(userId: user.id, reason: .refresh)
     let envelopes = row.envelopes.map { ChatEnvelope(keyId: $0.keyId, box: $0.box) }
+    guard let retention = ChatRetention(rawValue: row.retention ?? "") else { throw AppError.notEditable }
     return try ChatPhotoCipher.jpeg(
       object: object, envelopes: envelopes, current: identity,
-      retired: retiredIdentities(userId: user.id, current: identity.id), messageId: row.id,
+      retired: retiredIdentities(userId: user.id, current: identity.id),
+      messageId: row.id, coupleId: row.coupleId, retention: retention,
       senderUserId: row.senderUserId, recipientUserId: user.id, senderPublic: row.senderPublicKey
     )
   }
@@ -91,6 +96,7 @@ extension FakeBackend {
     if row.openedAt != nil || row.objectBytes == nil { return }
     if row.senderUserId == user.id { throw AppError.notEditable }
     if ChatPhoto.expired(expiresAt: row.expiresAt, now: clock()) { throw AppError.notEditable }
+    guard objectCleared() else { throw AppError.saveFailed }
     store.world.chats[index].objectBytes = nil
     store.world.chats[index].photoPath = nil
     store.world.chats[index].openedAt = clock()
@@ -101,6 +107,9 @@ extension FakeBackend {
     guard let user = current(), let mine = member(user.id) else { throw AppError.notAuthenticated }
     guard let row = store.world.chats.first(where: { $0.id == id && $0.coupleId == mine.coupleId }), row.kind == "photo" else {
       throw AppError.notEditable
+    }
+    if row.photoPath != nil || row.objectBytes != nil {
+      guard objectCleared() else { throw AppError.saveFailed }
     }
     _ = user
     store.world.chats.removeAll { $0.id == id }
@@ -129,7 +138,8 @@ extension FakeBackend {
     guard let alex = member(SeedID.alex) else { return }
     let jpeg = PhotoBytes.sample()
     let when = clock()
-    if let blair = try? ensureKey(userId: SeedID.blair), let packed = try? sealedPhoto(jpeg, sender: SeedID.blair, key: blair, couple: alex.coupleId) {
+    if let blair = try? ensureKey(userId: SeedID.blair),
+       let packed = try? sealedPhoto(jpeg, sender: SeedID.blair, key: blair, couple: alex.coupleId, retention: .viewOnce) {
       store.world.chats.append(FakeChat(
         id: packed.id, coupleId: alex.coupleId, senderUserId: SeedID.blair, senderPublicKey: blair.publicKey,
         createdAt: when.addingTimeInterval(-30), envelopes: packed.envelopes, kind: "photo",
@@ -137,7 +147,8 @@ extension FakeBackend {
         expiresAt: when.addingTimeInterval(ChatPhoto.lifetime), photoPath: packed.path
       ))
     }
-    if let alexKey = try? ensureKey(userId: SeedID.alex), let packed = try? sealedPhoto(jpeg, sender: SeedID.alex, key: alexKey, couple: alex.coupleId) {
+    if let alexKey = try? ensureKey(userId: SeedID.alex),
+       let packed = try? sealedPhoto(jpeg, sender: SeedID.alex, key: alexKey, couple: alex.coupleId, retention: .keep) {
       store.world.chats.append(FakeChat(
         id: packed.id, coupleId: alex.coupleId, senderUserId: SeedID.alex, senderPublicKey: alexKey.publicKey,
         createdAt: when.addingTimeInterval(-20), envelopes: packed.envelopes, kind: "photo",
@@ -190,8 +201,12 @@ extension FakeBackend {
     return PreparedSend(userId: user.id, coupleId: mine.coupleId, identity: identity, targets: targets)
   }
 
+  private func objectCleared() -> Bool {
+    ChatStorageRemoval.clearsPath(photoRemoveError)
+  }
+
   private func sealedPhoto(
-    _ jpeg: Data, sender: UUID, key: ChatIdentity, couple: UUID
+    _ jpeg: Data, sender: UUID, key: ChatIdentity, couple: UUID, retention: ChatRetention
   ) throws -> (id: UUID, path: String, envelopes: [FakeEnvelope], object: Data) {
     let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == couple }
     let targets = ChatRecipients.choose(
@@ -199,7 +214,9 @@ extension FakeBackend {
       keys: keys.map { (id: $0.id, userId: $0.userId, publicKey: $0.publicKey, createdAt: $0.createdAt, retired: $0.retiredAt != nil) }
     )
     let messageId = UUID()
-    let packed = try ChatPhotoCipher.package(jpeg: jpeg, messageId: messageId, senderUserId: sender, from: key, to: targets)
+    let packed = try ChatPhotoCipher.package(
+      jpeg: jpeg, messageId: messageId, coupleId: couple, retention: retention, senderUserId: sender, from: key, to: targets
+    )
     return (
       messageId,
       ChatPhoto.objectPath(coupleId: couple, messageId: messageId),

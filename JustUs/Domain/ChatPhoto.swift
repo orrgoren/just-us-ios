@@ -65,6 +65,8 @@ enum ChatPhotoCipher {
   static func package(
     jpeg: Data,
     messageId: UUID,
+    coupleId: UUID,
+    retention: ChatRetention,
     senderUserId: UUID,
     from sender: ChatIdentity,
     to targets: [ChatTarget]
@@ -75,7 +77,8 @@ enum ChatPhotoCipher {
     let envelopes = try ChatCrypto.sealData(
       raw, messageId: messageId, senderUserId: senderUserId, from: sender, to: targets
     )
-    let sealed = try ChaChaPoly.seal(jpeg, using: content, authenticating: photoAAD(messageId))
+    let aad = photoAAD(messageId: messageId, coupleId: coupleId, retention: retention)
+    let sealed = try ChaChaPoly.seal(jpeg, using: content, authenticating: aad)
     return (envelopes, sealed.combined)
   }
 
@@ -85,6 +88,8 @@ enum ChatPhotoCipher {
     current: ChatIdentity,
     retired: [ChatIdentity],
     messageId: UUID,
+    coupleId: UUID,
+    retention: ChatRetention,
     senderUserId: UUID,
     recipientUserId: UUID,
     senderPublic: Data
@@ -94,13 +99,27 @@ enum ChatPhotoCipher {
       senderUserId: senderUserId, recipientUserId: recipientUserId, senderPublic: senderPublic
     ) else { throw ChatCryptoError.unreadable }
     let box = try ChaChaPoly.SealedBox(combined: object)
-    return try ChaChaPoly.open(box, using: SymmetricKey(data: raw), authenticating: photoAAD(messageId))
+    let aad = photoAAD(messageId: messageId, coupleId: coupleId, retention: retention)
+    return try ChaChaPoly.open(box, using: SymmetricKey(data: raw), authenticating: aad)
   }
 
-  private static func photoAAD(_ messageId: UUID) -> Data {
+  /// The ciphertext is bound to this couple, this photo, and view-once or keep.
+  static func photoAAD(messageId: UUID, coupleId: UUID, retention: ChatRetention) -> Data {
     var data = label
     data.append(Data(messageId.uuidString.lowercased().utf8))
+    data.append(Data(coupleId.uuidString.lowercased().utf8))
+    data.append(Data("photo".utf8))
+    data.append(Data(retention.rawValue.utf8))
     return data
+  }
+}
+
+/// A missing object is already gone. Any other failure keeps the path for the next try.
+enum ChatStorageRemoval {
+  static func clearsPath(_ error: Error?) -> Bool {
+    guard let error else { return true }
+    let text = String(describing: error).lowercased()
+    return text.contains("not found") || text.contains("notfound") || text.contains("404")
   }
 }
 

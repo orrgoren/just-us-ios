@@ -126,11 +126,13 @@ begin
   if app_private.is_chat_public_key(new.sender_public_key) = false then
     raise exception 'bad_key';
   end if;
+  perform pg_advisory_xact_lock(hashtextextended(new.sender_user_id::text, 0));
   if not exists (
     select 1
     from public.device_keys
     where user_id = new.sender_user_id
       and public_key = new.sender_public_key
+      and retired_at is null
   ) then
     raise exception 'unknown_sender_key';
   end if;

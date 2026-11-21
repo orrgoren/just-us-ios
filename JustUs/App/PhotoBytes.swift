@@ -7,9 +7,14 @@ import UIKit
 struct PickedImage: Transferable {
   let data: Data
 
+  static func imported(_ data: Data) throws -> PickedImage {
+    guard data.isEmpty == false else { throw CocoaError(.coderReadCorrupt) }
+    return PickedImage(data: data)
+  }
+
   static var transferRepresentation: some TransferRepresentation {
     DataRepresentation(importedContentType: .image) { data in
-      PickedImage(data: data)
+      try PickedImage.imported(data)
     }
   }
 }

@@ -31,8 +31,8 @@ struct ChatScreen: View {
     .onChange(of: libraryItem) { _, item in
       guard let item else { return }
       Task {
-        if let data = try? await item.loadTransferable(type: Data.self) {
-          model.stageChatPhoto(data)
+        if let picked = try? await item.loadTransferable(type: PickedImage.self), picked.data.isEmpty == false {
+          model.stageChatPhoto(picked.data)
         }
         libraryItem = nil
       }
@@ -129,14 +129,17 @@ struct ChatScreen: View {
       }
       Color.clear.frame(width: 0, height: 0).task { await rememberKept(line) }
     } else if line.photo == .viewOnce {
-      Button(L10n.chatPhotoTap) {
+      Button {
         model.openChatPhoto = line.id
         viewerFailed = false
         Task {
           viewerImage = await openedImage(line)
           viewerFailed = viewerImage == nil
         }
+      } label: {
+        ChatPhotoPlaceholder()
       }
+      .buttonStyle(.plain)
       .accessibilityIdentifier(A11y.chatPhotoCard)
     }
   }
@@ -187,6 +190,28 @@ struct ChatScreen: View {
 
   private func fill(mine: Bool) -> Color {
     mine ? Theme.wine : Theme.blush
+  }
+}
+
+struct ChatPhotoPlaceholder: View {
+  var body: some View {
+    ZStack {
+      LinearGradient(
+        colors: [Theme.wine.opacity(0.45), Theme.blush, Theme.champagne],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+      .scaleEffect(1.4)
+      .blur(radius: 16)
+      Text(L10n.chatPhotoTap)
+        .font(Theme.body)
+        .foregroundStyle(Theme.ink)
+        .multilineTextAlignment(.center)
+        .padding(12)
+    }
+    .frame(width: 200, height: 132)
+    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .accessibilityLabel(L10n.chatPhotoTap)
   }
 }
 
