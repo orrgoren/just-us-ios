@@ -6,8 +6,10 @@ import Supabase
 final class LiveBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
   var onChatInsert: (@MainActor (ChatMessageRow) -> Void)?
+  var onChatOpened: (@MainActor (UUID) -> Void)?
   var onChatReload: (@MainActor () -> Void)?
   var chatMaterials: ChatMaterials?
+  var recentShots: [UUID: Date] = [:]
   let client: SupabaseClient?
   let chatSocket = LiveWatch()
   let moodSocket = LiveWatch()

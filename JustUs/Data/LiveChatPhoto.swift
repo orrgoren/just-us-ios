@@ -128,10 +128,25 @@ extension LiveBackend {
     }
   }
 
-  func sendScreenshotNotice() async throws {
-    let prepared = try await preparedSend()
-    let name = prepared.context.mine.displayName.isEmpty ? "They" : prepared.context.mine.displayName
-    try await insertText(ChatNotice.screenshot(name), kind: "notice", prepared: prepared)
+  func sendScreenshotNotice(for photoId: UUID) async throws -> ChatLine? {
+    let now = Date()
+    let previous = recentShots[photoId].map { (photoId, $0) }
+    guard ScreenshotDedup.allow(messageId: photoId, now: now, previous: previous) else { return nil }
+    recentShots[photoId] = now
+    do {
+      let prepared = try await preparedSend()
+      let rawName = prepared.context.mine.displayName
+      let text = ChatNotice.screenshot(rawName.isEmpty ? "They" : rawName)
+      let id = try await insertText(text, kind: "notice", prepared: prepared)
+      nudgeChat()
+      return ChatLine(
+        id: id, senderUserId: prepared.context.userId, text: text, createdAt: now,
+        mine: true, unreadable: false, notice: true, delivery: .sent
+      )
+    } catch {
+      recentShots[photoId] = nil
+      throw error
+    }
   }
 
   struct PreparedSend {
@@ -164,7 +179,8 @@ extension LiveBackend {
     return PreparedSend(context: materials.context, identity: materials.identity, targets: targets)
   }
 
-  private func insertText(_ text: String, kind: String, prepared: PreparedSend) async throws {
+  @discardableResult
+  private func insertText(_ text: String, kind: String, prepared: PreparedSend) async throws -> UUID {
     let messageId = UUID()
     let envelopes = try ChatCrypto.seal(
       text: text, messageId: messageId, senderUserId: prepared.context.userId, from: prepared.identity, to: prepared.targets
@@ -178,6 +194,7 @@ extension LiveBackend {
     try await run { client in
       try await client.from("chat_messages").insert(row).execute()
     }
+    return messageId
   }
 
   private func removedChatObjects(_ paths: [String]) async -> Bool {

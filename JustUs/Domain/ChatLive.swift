@@ -43,7 +43,14 @@ enum ChatScroll {
   }
 }
 
-/// A chat insert is one row. A delete, an update, a bad payload, or a reconnect reloads.
+/// The arrow sits in the composer only when there is something to send.
+enum ChatComposer {
+  static func showsSend(_ text: String) -> Bool {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+  }
+}
+
+/// A chat insert is one row. An update patches that row. A delete, a bad payload, or a reconnect reloads.
 enum ChatSocket {
   enum Event: Equatable {
     case insert
@@ -55,11 +62,16 @@ enum ChatSocket {
 
   enum Step: Equatable {
     case append
+    case patch
     case reload
   }
 
   static func step(_ event: Event) -> Step {
-    event == .insert ? .append : .reload
+    switch event {
+    case .insert: return .append
+    case .update: return .patch
+    case .delete, .reconnect, .undecodable: return .reload
+    }
   }
 }
 

@@ -101,6 +101,7 @@ enum L10n {
   static var chatPhoto: String { text("chat.photo", "Photo") }
   static var chatCamera: String { text("chat.camera", "Camera") }
   static var chatLibrary: String { text("chat.library", "Photo library") }
+  static var chatAttach: String { text("chat.attach", "Add a photo") }
   static var chatViewOnce: String { text("chat.viewOnce", "View once") }
   static var chatKeep: String { text("chat.keep", "Keep") }
   static var chatPhotoChoice: String { text("chat.photoChoice", "How should this photo be kept?") }

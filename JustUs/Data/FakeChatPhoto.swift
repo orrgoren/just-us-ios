@@ -94,6 +94,7 @@ extension FakeBackend {
   }
 
   func consumeViewOnce(_ id: UUID) async throws {
+    await pauseConsumeIfNeeded()
     guard let user = current(), let mine = member(user.id),
           let index = store.world.chats.firstIndex(where: { $0.id == id && $0.coupleId == mine.coupleId }) else {
       throw AppError.notEditable
@@ -123,8 +124,12 @@ extension FakeBackend {
     store.save()
   }
 
-  func sendScreenshotNotice() async throws {
+  func sendScreenshotNotice(for photoId: UUID) async throws -> ChatLine? {
     try guardOnline()
+    let now = clock()
+    let previous = recentShots[photoId].map { (photoId, $0) }
+    guard ScreenshotDedup.allow(messageId: photoId, now: now, previous: previous) else { return nil }
+    recentShots[photoId] = now
     let prepared = try preparedSend()
     let name = display(prepared.userId)
     let text = ChatNotice.screenshot(name.isEmpty ? "They" : name)
@@ -134,11 +139,15 @@ extension FakeBackend {
     )
     store.world.chats.append(FakeChat(
       id: messageId, coupleId: prepared.coupleId, senderUserId: prepared.userId,
-      senderPublicKey: prepared.identity.publicKey, createdAt: clock(),
+      senderPublicKey: prepared.identity.publicKey, createdAt: now,
       envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) },
       kind: "notice"
     ))
     store.save()
+    return ChatLine(
+      id: messageId, senderUserId: prepared.userId, text: text, createdAt: now,
+      mine: true, unreadable: false, notice: true, delivery: .sent
+    )
   }
 
   func seedChatPhotoPreview() {

@@ -10,7 +10,6 @@ struct ChatScreen: View {
   @State private var viewerImage: UIImage?
   @State private var viewerFailed = false
   @State private var keptImages: [UUID: UIImage] = [:]
-  @State private var focusToken = 0
   @State private var nearBottom = true
   @State private var showPill = false
 
@@ -115,27 +114,7 @@ struct ChatScreen: View {
         Task { await model.sendStagedPhoto() }
       }
     } else {
-      LabeledField(
-        title: L10n.chatField, text: $model.chatDraft, identifier: A11y.chatField, need: .labelOnly, focusToken: focusToken
-      ) {
-        focusToken += 1
-        Task { await model.sendChat() }
-      }
-      WineButton(title: L10n.chatSend, identifier: A11y.chatSend) {
-        focusToken += 1
-        Task { await model.sendChat() }
-      }
-      PhotosPicker(selection: $libraryItem, matching: .images) { Text(L10n.chatLibrary) }
-        .buttonStyle(JustButtonStyle(kind: .secondary))
-        .accessibilityIdentifier(A11y.chatPhoto)
-      if UIImagePickerController.isSourceTypeAvailable(.camera) {
-        ActionButton(title: L10n.chatCamera) { showCamera = true }
-      }
-      if Launch.isUITest {
-        ActionButton(title: L10n.chatSamplePhoto, identifier: A11y.chatSamplePhoto) {
-          model.stageChatPhoto(PhotoBytes.sample())
-        }
-      }
+      ChatEntry(model: model, libraryItem: $libraryItem, showCamera: $showCamera)
     }
   }
 
@@ -190,7 +169,7 @@ struct ChatScreen: View {
           .accessibilityIdentifier(A11y.chatPhotoCard)
       }
       Color.clear.frame(width: 0, height: 0).task { await rememberKept(line) }
-    } else if line.photo == .viewOnce {
+    } else if line.photo == .viewOnce, model.canReopenPhoto(line.id) {
       Button {
         model.openChatPhoto = line.id
         viewerFailed = false
@@ -230,6 +209,7 @@ struct ChatScreen: View {
   }
 
   private func openedImage(_ line: ChatLine) async -> UIImage? {
+    guard model.canReopenPhoto(line.id) else { return nil }
     guard let data = try? await model.backend.chatPhoto(line.id) else { return nil }
     return UIImage(data: data)
   }
@@ -303,6 +283,7 @@ struct ChatPhotoViewer: View {
   var onClose: () -> Void
   var onScreenshot: () -> Void
   @State private var captured = UIScreen.main.isCaptured
+  @State private var shots = ScreenshotWatch()
 
   var body: some View {
     ZStack {
@@ -328,9 +309,11 @@ struct ChatPhotoViewer: View {
     .onReceive(NotificationCenter.default.publisher(for: UIScreen.capturedDidChangeNotification)) { _ in
       captured = UIScreen.main.isCaptured
     }
-    .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
-      if mine == false { onScreenshot() }
+    .onAppear {
+      shots.onShot = { if mine == false { onScreenshot() } }
+      shots.register()
     }
+    .onDisappear { shots.unregister() }
   }
 }
 

@@ -45,10 +45,13 @@ extension SessionModel {
 
   func loadMessages() async {
     do {
-      messages = try await backend.messages()
+      let raw = try await backend.messages()
+      rememberSeals(raw)
+      messages = ScreenshotDedup.collapse(raw.map(displayedChat))
       if let notice = backend.partnerKeyNotice() {
         chatKeyNotice = notice
       }
+      await flushConsumes()
     } catch {
       errorMessage = L10n.message(for: ErrorMap.app(error))
     }
@@ -215,7 +218,10 @@ extension SessionModel {
 
   func showIncoming(_ line: ChatLine) {
     let known = messages.contains { $0.id == line.id }
-    messages = ChatThread.merge(messages, line)
+    messages = ScreenshotDedup.collapse(ChatThread.merge(messages, line))
+    if line.photo == .opened || sealedOpens.contains(line.id) {
+      sealOpen(line.id)
+    }
     guard known == false else { return }
     if ChatPush.showsBanner(chat: true, chatVisible: tab == .chat) {
       chatBanner = L10n.chatArrived
@@ -316,14 +322,22 @@ extension SessionModel {
 
   func finishViewOnce(_ id: UUID) async {
     openChatPhoto = nil
-    guard let line = messages.first(where: { $0.id == id }), line.mine == false, line.photo == .viewOnce else { return }
-    do {
-      try await backend.consumeViewOnce(id)
-      await loadMessages()
-    } catch {
-      errorMessage = L10n.chatSendFailed
-      retryKind = nil
-    }
+    guard let line = messages.first(where: { $0.id == id }), line.mine == false else { return }
+    guard line.photo == .viewOnce || sealedOpens.contains(id) else { return }
+    sealOpen(id)
+    pendingConsumes.insert(id)
+    await flushConsumes()
+  }
+
+  func sealOpen(_ id: UUID) {
+    sealedOpens.insert(id)
+    storeSeals()
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    messages[index] = ChatOpen.seal(messages[index])
+  }
+
+  func canReopenPhoto(_ id: UUID) -> Bool {
+    sealedOpens.contains(id) == false && messages.first { $0.id == id }?.photo == .viewOnce
   }
 
   func deleteChatPhoto(_ id: UUID) async {
@@ -336,10 +350,46 @@ extension SessionModel {
   }
 
   func noteScreenshot() async {
-    guard openChatPhoto != nil else { return }
-    guard let line = messages.first(where: { $0.id == openChatPhoto }), line.mine == false, line.photo == .viewOnce else { return }
-    try? await backend.sendScreenshotNotice()
-    await loadMessages()
+    guard let id = openChatPhoto else { return }
+    guard let line = messages.first(where: { $0.id == id }), line.mine == false else { return }
+    guard line.photo == .viewOnce || line.photo == .opened else { return }
+    let now = Date()
+    guard ScreenshotDedup.allow(messageId: id, now: now, previous: lastShot) else { return }
+    lastShot = (id, now)
+    guard let notice = try? await backend.sendScreenshotNotice(for: id) else { return }
+    showIncoming(notice)
+  }
+
+  private func displayedChat(_ line: ChatLine) -> ChatLine {
+    sealedOpens.contains(line.id) ? ChatOpen.seal(line) : line
+  }
+
+  private func rememberSeals(_ lines: [ChatLine]) {
+    if let userId = ritual?.selfMember.userId {
+      sealedOpens.formUnion(SealedOpens.load(userId))
+    }
+    sealedOpens = Set(sealedOpens.filter { id in
+      lines.contains { $0.id == id && $0.photo == .viewOnce }
+    })
+    storeSeals()
+    pendingConsumes.formUnion(sealedOpens)
+  }
+
+  private func storeSeals() {
+    guard let userId = ritual?.selfMember.userId else { return }
+    SealedOpens.store(sealedOpens, userId: userId)
+  }
+
+  private func flushConsumes() async {
+    let ids = pendingConsumes
+    for id in ids {
+      do {
+        try await backend.consumeViewOnce(id)
+        pendingConsumes.remove(id)
+      } catch {
+        continue
+      }
+    }
   }
 
   private func noteChatFailure(_ error: Error) {

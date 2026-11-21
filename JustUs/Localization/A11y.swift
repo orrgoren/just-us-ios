@@ -34,6 +34,7 @@ enum A11y {
   static let chatField = "chatField"
   static let chatSend = "chatSend"
   static let chatPhoto = "chatPhoto"
+  static let chatAttach = "chatAttach"
   static let chatViewOnce = "chatViewOnce"
   static let chatKeep = "chatKeep"
   static let chatPhotoCard = "chatPhotoCard"

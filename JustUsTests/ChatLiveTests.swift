@@ -1,3 +1,4 @@
+import Supabase
 import XCTest
 @testable import JustUs
 
@@ -53,8 +54,8 @@ final class ChatLiveTests: XCTestCase {
     XCTAssertEqual(alex.messages.last?.text, "just this")
     XCTAssertNil(alex.errorMessage)
     XCTAssertEqual(ChatSocket.step(.insert), .append)
+    XCTAssertEqual(ChatSocket.step(.update), .patch)
     XCTAssertEqual(ChatSocket.step(.delete), .reload)
-    XCTAssertEqual(ChatSocket.step(.update), .reload)
     XCTAssertEqual(ChatSocket.step(.reconnect), .reload)
     XCTAssertEqual(ChatSocket.step(.undecodable), .reload)
   }
@@ -110,6 +111,58 @@ final class ChatLiveTests: XCTestCase {
     XCTAssertNotEqual(us, gb)
   }
 
+  func testComposerArrowWaitsForText() {
+    XCTAssertFalse(ChatComposer.showsSend(""))
+    XCTAssertFalse(ChatComposer.showsSend("   \n"))
+    XCTAssertTrue(ChatComposer.showsSend("hi"))
+  }
+
+  func testScreenshotWatchRegistersOnce() {
+    let center = NotificationCenter()
+    let name = Notification.Name("justus.test.screenshot")
+    let watch = ScreenshotWatch(center: center, name: name)
+    var hits = 0
+    watch.onShot = { hits += 1 }
+    watch.register()
+    watch.register()
+    center.post(name: name, object: nil)
+    XCTAssertEqual(watch.registrations, 1)
+    XCTAssertEqual(hits, 1)
+    watch.unregister()
+    center.post(name: name, object: nil)
+    XCTAssertEqual(hits, 1)
+  }
+
+  func testCloseScreenshotRowsCollapse() {
+    let now = Date()
+    let first = notice("Blair took a screenshot", at: now)
+    let second = notice("Blair took a screenshot", at: now.addingTimeInterval(1))
+    let later = notice("Blair took a screenshot", at: now.addingTimeInterval(10))
+    XCTAssertEqual(ScreenshotDedup.collapse([first, second]).count, 1)
+    XCTAssertEqual(ScreenshotDedup.collapse([first, later]).count, 2)
+  }
+
+  func testOpenedUpdatePatchesWithoutReloading() async throws {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    let sent = try await backend.sendPhoto(PhotoBytes.sample(), retention: .viewOnce)
+    await alex.loadMessages()
+    backend.chatFailure = .server(code: "chat")
+    let opened = ChatLine(
+      id: sent.id, senderUserId: SeedID.alex, text: L10n.chatOpened, createdAt: sent.createdAt,
+      mine: true, unreadable: false, photo: .opened
+    )
+    alex.showIncoming(opened)
+    XCTAssertEqual(alex.messages.first { $0.id == sent.id }?.photo, .opened)
+    XCTAssertNil(alex.errorMessage)
+    let partial: [String: AnyJSON] = [
+      "id": .string(sent.id.uuidString),
+      "photo_path": .null
+    ]
+    XCTAssertEqual(LiveBackend().openedPhotoId(partial), sent.id)
+    XCTAssertNil(LiveBackend().openedPhotoId(["id": .string(sent.id.uuidString)]))
+  }
+
   func testMergeReplacesTheSameSend() {
     let id = UUID()
     let sending = ChatLine(
@@ -136,6 +189,12 @@ final class ChatLiveTests: XCTestCase {
     await alex.verify()
     await alex.refresh()
     return alex
+  }
+
+  private func notice(_ text: String, at date: Date) -> ChatLine {
+    ChatLine(
+      id: UUID(), senderUserId: SeedID.blair, text: text, createdAt: date, mine: false, unreadable: false, notice: true
+    )
   }
 
   private func waitUntil(_ ready: () -> Bool) async -> Bool {

@@ -4,7 +4,12 @@ import Foundation
 final class FakeBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
   var onChatInsert: (@MainActor (ChatMessageRow) -> Void)?
+  var onChatOpened: (@MainActor (UUID) -> Void)?
   var onChatReload: (@MainActor () -> Void)?
+  var recentShots: [UUID: Date] = [:]
+  /// Holds the next view-once consume so a test can see the opened bubble first.
+  var holdConsume = false
+  private var consumeHold: CheckedContinuation<Void, Never>?
   /// Holds the next send so a test can see the optimistic bubble.
   var holdSend = false
   /// Thrown once, after the hold releases, instead of storing the message.
@@ -393,6 +398,19 @@ final class FakeBackend: DateBackend {
     holdSend = false
     sendHold?.resume()
     sendHold = nil
+  }
+
+  func releaseConsume() {
+    holdConsume = false
+    consumeHold?.resume()
+    consumeHold = nil
+  }
+
+  func pauseConsumeIfNeeded() async {
+    guard holdConsume else { return }
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      consumeHold = continuation
+    }
   }
 
   func sendMessage(_ text: String, id: UUID) async throws -> ChatLine {

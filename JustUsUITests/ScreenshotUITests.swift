@@ -50,11 +50,32 @@ final class ScreenshotUITests: XCTestCase {
     } else {
       _ = app.staticTexts["Just Us"].waitForExistence(timeout: 10)
     }
+    if screen == "chat" || screen == "chatPhoto" {
+      let field = app.descendants(matching: .any)["chatField"]
+      XCTAssertTrue(field.waitForExistence(timeout: 8))
+      XCTAssertTrue(app.buttons["chatAttach"].exists)
+      XCTAssertFalse(app.buttons["chatSend"].exists)
+    }
     let label = name ?? screen
     addShot(app, screen: label, appearance: appearance, size: size, suffix: nil)
     if swipe {
       app.swipeUp()
       addShot(app, screen: label, appearance: appearance, size: size, suffix: "scrolled")
+    }
+    if screen == "chat", appearance == "light", size == nil, extra.isEmpty, name == nil {
+      app.buttons["chatAttach"].tap()
+      let library = app.buttons["Photo library"]
+      XCTAssertTrue(library.waitForExistence(timeout: 4))
+      XCTAssertTrue(app.buttons["Camera"].exists)
+      XCTAssertTrue(app.buttons["chatPhoto"].waitForExistence(timeout: 4))
+      XCTAssertTrue(app.buttons["Send a sample photo"].exists)
+      app.buttons["Cancel"].tap()
+      let gone = NSPredicate(format: "exists == false")
+      _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: library)], timeout: 2)
+      let field = app.descendants(matching: .any)["chatField"]
+      field.tap()
+      field.typeText("hi")
+      XCTAssertTrue(app.buttons["chatSend"].waitForExistence(timeout: 4))
     }
     app.terminate()
   }

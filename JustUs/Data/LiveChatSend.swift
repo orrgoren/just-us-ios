@@ -39,11 +39,27 @@ extension LiveBackend {
         return
       }
       reloadChat(.undecodable)
-    case .update:
-      reloadChat(.update)
+    case .update(let update):
+      if let row = try? update.decodeRecord(as: ChatMessageRow.self, decoder: JSONDecoder()) {
+        onChatInsert?(row)
+        return
+      }
+      if let id = openedPhotoId(update.record) {
+        onChatOpened?(id)
+        return
+      }
+      reloadChat(.undecodable)
     case .delete:
       reloadChat(.delete)
     }
+  }
+
+  /// A photo update may arrive as the whole row or as just the opened columns.
+  func openedPhotoId(_ record: [String: AnyJSON]) -> UUID? {
+    guard let raw = record["id"]?.stringValue, let id = UUID(uuidString: raw) else { return nil }
+    if let opened = record["opened_at"]?.stringValue, opened.isEmpty == false { return id }
+    if let path = record["photo_path"], path.stringValue == nil { return id }
+    return nil
   }
 
   func reloadChat(_ event: ChatSocket.Event) {

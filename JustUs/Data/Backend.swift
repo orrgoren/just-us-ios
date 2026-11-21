@@ -6,6 +6,7 @@ import Supabase
 protocol DateBackend: AnyObject {
   var onRemoteChange: (@MainActor () -> Void)? { get set }
   var onChatInsert: (@MainActor (ChatMessageRow) -> Void)? { get set }
+  var onChatOpened: (@MainActor (UUID) -> Void)? { get set }
   var onChatReload: (@MainActor () -> Void)? { get set }
   func sendCode(email: String) async throws
   func verify(email: String, code: String) async throws -> SessionUser
@@ -54,7 +55,7 @@ protocol DateBackend: AnyObject {
   func chatPhoto(_ id: UUID) async throws -> Data
   func consumeViewOnce(_ id: UUID) async throws
   func deleteChatPhoto(_ id: UUID) async throws
-  func sendScreenshotNotice() async throws
+  func sendScreenshotNotice(for photoId: UUID) async throws -> ChatLine?
   func partnerKeyNotice() -> String?
 }
 
