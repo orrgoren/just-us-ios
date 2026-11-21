@@ -1159,7 +1159,40 @@ begin
     raise exception 'second_mood_was_allowed';
   exception
     when others then
-      if sqlerrm is distinct from 'deduped_6h' and sqlerrm is distinct from 'daily_non_transactional' then
+      if sqlerrm is distinct from 'deduped_6h' then
+        raise;
+      end if;
+  end;
+  if (
+    select count(*) from public.push_deliveries
+    where recipient_user_id = blair and kind = 'partnerMood' and transactional
+  ) <> 1 then
+    raise exception 'mood_push_was_not_transactional';
+  end if;
+end $$;
+
+-- A mood claimed after another non-transactional alert the same day still
+-- lands, and the next mood inside six hours is the six-hour wait.
+do $$
+declare
+  recipient uuid := '1c1c1c1c-1c1c-41c1-81c1-1c1c1c1c1c1c';
+begin
+  insert into auth.users (id) values (recipient);
+  insert into public.push_deliveries (recipient_user_id, kind, transactional)
+  values (recipient, 'planReady', false);
+  perform public.claim_push_delivery(recipient, 'partnerMood', 'Asia/Jerusalem');
+  if (
+    select count(*) from public.push_deliveries
+    where recipient_user_id = recipient and kind = 'partnerMood' and transactional
+  ) <> 1 then
+    raise exception 'mood_was_blocked_by_the_daily_cap';
+  end if;
+  begin
+    perform public.claim_push_delivery(recipient, 'partnerMood', 'Asia/Jerusalem');
+    raise exception 'second_mood_inside_six_hours_was_allowed';
+  exception
+    when others then
+      if sqlerrm is distinct from 'deduped_6h' then
         raise;
       end if;
   end;

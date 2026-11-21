@@ -18,8 +18,17 @@ export const MAX_FLUSH_ATTEMPTS = 5;
 // The live check is inside claim_push_delivery, in the same transaction as the insert.
 export const CHAT_PUSH_WINDOW_MS = 60 * 1000;
 
+// Mood, a ready plan, and an accepted invite each wait this long before
+// another alert of the same kind. Chat does not use this window.
+export const SIX_HOUR_DEDUPE_MS = 6 * 60 * 60 * 1000;
+
+export function keepsSixHourDedupe(kind) {
+  return kind === "partnerMood" || kind === "inviteAccepted" || kind === "planReady";
+}
+
+// Chat and mood skip the once-a-day cap. Mood still keeps the six-hour wait.
 export function skipsDailyCap(kind) {
-  return kind === "chatMessage";
+  return kind === "chatMessage" || kind === "partnerMood";
 }
 
 export function chatPushDecision({ recentMessage, lastPushAt, now }) {

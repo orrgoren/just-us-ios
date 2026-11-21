@@ -11,7 +11,9 @@ import {
   isServiceCaller,
   chatPushDecision,
   CHAT_PUSH_WINDOW_MS,
+  keepsSixHourDedupe,
   orderedDue,
+  SIX_HOUR_DEDUPE_MS,
   providerTokenRejected,
   retryableApns,
   safeErrorMessage,
@@ -237,5 +239,16 @@ test("a chat push needs a recent message, coalesces for 60s, and skips the daily
   assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - 30_000, now }), "coalesced");
   assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - CHAT_PUSH_WINDOW_MS, now }), "send");
   assert.equal(skipsDailyCap("chatMessage"), true);
-  assert.equal(skipsDailyCap("partnerMood"), false);
+  assert.equal(skipsDailyCap("partnerMood"), true);
+  assert.equal(skipsDailyCap("planReady"), false);
+});
+
+test("a mood push skips the daily cap and still waits six hours", () => {
+  assert.equal(SIX_HOUR_DEDUPE_MS, 6 * 60 * 60 * 1000);
+  assert.equal(keepsSixHourDedupe("partnerMood"), true);
+  assert.equal(keepsSixHourDedupe("planReady"), true);
+  assert.equal(keepsSixHourDedupe("inviteAccepted"), true);
+  assert.equal(keepsSixHourDedupe("chatMessage"), false);
+  assert.equal(keepsSixHourDedupe("weeklyReminder"), false);
+  assert.equal(skipsDailyCap("partnerMood"), true);
 });

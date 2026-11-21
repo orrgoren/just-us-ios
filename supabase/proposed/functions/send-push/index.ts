@@ -7,9 +7,11 @@
 // and the nudge index are never taken from the client. The recipient's tokens
 // are loaded with the service role after the caller's JWT is confirmed to be
 // a user. The daily cap, the six-hour dedupe, and the invite nudge windows
-// match JustUs/Domain/PushPolicy.swift. A push is not held for 22:00–08:00.
-// chatMessage still skips the daily cap and the six-hour dedupe. It is sent
-// only when the caller inserted a chat_messages row in the last 60 seconds.
+// match JustUs/Domain/PushPolicy.swift, except a mood alert: partnerMood
+// skips the daily cap and still waits six hours. A push is not held for
+// 22:00–08:00. chatMessage skips the daily cap and the six-hour dedupe. It
+// is sent only when the caller inserted a chat_messages row in the last 60
+// seconds.
 // The one-per-recipient window is checked and claimed together inside
 // claim_push_delivery, under its advisory lock.
 //
@@ -30,9 +32,8 @@
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
-import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, dropDeviceToken, flushDue, freshApnsToken, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, skipsDailyCap } from "./push.mjs";
+import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, dropDeviceToken, flushDue, freshApnsToken, keepsSixHourDedupe, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, SIX_HOUR_DEDUPE_MS, skipsDailyCap } from "./push.mjs";
 
-const DEDUPE_MS = 6 * 60 * 60 * 1000;
 const INVITE_TTL_HOURS = 7 * 24;
 const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge", "chatMessage"] as const;
 type Kind = (typeof KINDS)[number];
@@ -258,12 +259,12 @@ function decide(
   inviteAge: number | null,
   timeZone: string,
 ): "send" | string {
-  if (skipsDailyCap(kind)) return "send";
   const now = Date.now();
-  if (kind === "partnerMood" || kind === "inviteAccepted" || kind === "planReady") {
-    const recent = history.some((row) => row.kind === kind && now - Date.parse(row.sent_at) < DEDUPE_MS);
+  if (keepsSixHourDedupe(kind)) {
+    const recent = history.some((row) => row.kind === kind && now - Date.parse(row.sent_at) < SIX_HOUR_DEDUPE_MS);
     if (recent) return "deduped_6h";
   }
+  if (skipsDailyCap(kind)) return "send";
   if (kind === "inviteNudge") {
     if (inviteAge === null) return "no_invite";
     const inFirst = inviteAge >= 23.5 && inviteAge <= 24.5;
