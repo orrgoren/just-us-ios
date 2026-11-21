@@ -69,6 +69,8 @@ final class SessionModel {
   var messages: [ChatLine] = []
   var sealedOpens: Set<UUID> = []
   var pendingConsumes: Set<UUID> = []
+  var pendingPhotos: [UUID: PendingPhoto] = [:]
+  var photoSending = false
   var lastShot: (UUID, Date)?
   var chatKeyNotice: String?
   var focusReveal = false

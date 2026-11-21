@@ -47,11 +47,31 @@ extension FakeBackend {
     }
   }
 
-  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine {
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention, id messageId: UUID) async throws -> ChatLine {
+    if holdSend {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        sendHold = continuation
+      }
+    }
+    if let photoKeyFailure {
+      let error = photoKeyFailure
+      self.photoKeyFailure = nil
+      if ChatSendRecovery.refreshKeys(error) {
+        return try await sendPhoto(jpeg, retention: retention, id: messageId)
+      }
+      throw error
+    }
     try guardOnline()
     guard ChatPhoto.fits(jpeg) else { throw AppError.chatPhotoTooBig }
     let prepared = try preparedSend()
-    let messageId = UUID()
+    if let existing = store.world.chats.first(where: { $0.id == messageId }) {
+      let published = store.world.deviceKeys.filter { member($0.userId)?.coupleId == prepared.coupleId }
+        .map { (userId: $0.userId, publicKey: $0.publicKey) }
+      var line = presentChat(existing, identity: prepared.identity, userId: prepared.userId, published: published)
+      line.delivery = .sent
+      if line.photo == .kept { line.previewJPEG = jpeg }
+      return line
+    }
     let path = ChatPhoto.objectPath(coupleId: prepared.coupleId, messageId: messageId)
     let packed = try ChatPhotoCipher.package(
       jpeg: jpeg, messageId: messageId, coupleId: prepared.coupleId, retention: retention,
@@ -95,19 +115,25 @@ extension FakeBackend {
 
   func consumeViewOnce(_ id: UUID) async throws {
     await pauseConsumeIfNeeded()
+    if let consumeError {
+      throw consumeError
+    }
     guard let user = current(), let mine = member(user.id),
           let index = store.world.chats.firstIndex(where: { $0.id == id && $0.coupleId == mine.coupleId }) else {
       throw AppError.notEditable
     }
     let row = store.world.chats[index]
     guard row.kind == "photo", row.retention == ChatRetention.viewOnce.rawValue else { throw AppError.notEditable }
-    if row.openedAt != nil || row.objectBytes == nil { return }
     if row.senderUserId == user.id { throw AppError.notEditable }
-    if ChatPhoto.expired(expiresAt: row.expiresAt, now: clock()) { throw AppError.notEditable }
+    if row.openedAt == nil {
+      if ChatPhoto.expired(expiresAt: row.expiresAt, now: clock()) { throw AppError.notEditable }
+      store.world.chats[index].openedAt = clock()
+      store.save()
+    }
+    if row.objectBytes == nil && row.photoPath == nil { return }
     guard objectCleared() else { throw AppError.saveFailed }
     store.world.chats[index].objectBytes = nil
     store.world.chats[index].photoPath = nil
-    store.world.chats[index].openedAt = clock()
     store.save()
   }
 
@@ -130,6 +156,9 @@ extension FakeBackend {
     let previous = recentShots[photoId].map { (photoId, $0) }
     guard ScreenshotDedup.allow(messageId: photoId, now: now, previous: previous) else { return nil }
     recentShots[photoId] = now
+    if store.world.chats.contains(where: { $0.kind == "notice" && $0.noticeMessageId == photoId && $0.senderUserId == current()?.id }) {
+      return nil
+    }
     let prepared = try preparedSend()
     let name = display(prepared.userId)
     let text = ChatNotice.screenshot(name.isEmpty ? "They" : name)
@@ -141,7 +170,7 @@ extension FakeBackend {
       id: messageId, coupleId: prepared.coupleId, senderUserId: prepared.userId,
       senderPublicKey: prepared.identity.publicKey, createdAt: now,
       envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) },
-      kind: "notice"
+      kind: "notice", noticeMessageId: photoId
     ))
     store.save()
     return ChatLine(

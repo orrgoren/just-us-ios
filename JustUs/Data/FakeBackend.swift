@@ -14,6 +14,10 @@ final class FakeBackend: DateBackend {
   var holdSend = false
   /// Thrown once, after the hold releases, instead of storing the message.
   var failSend: AppError?
+  /// Thrown once from a photo send, so a key retry can be seen.
+  var photoKeyFailure: AppError?
+  /// Thrown at the start of consume, before the row is marked opened.
+  var consumeError: AppError?
   private var sendHold: CheckedContinuation<Void, Never>?
   /// Forces the next mood save to fail the way a live write can, including a
   /// PostgREST 42501 after reveal.
@@ -427,6 +431,12 @@ final class FakeBackend: DateBackend {
     try guardOnline()
     let clear = try ChatText.normalized(text)
     guard let user = current(), let mine = member(user.id) else { throw AppError.saveFailed }
+    if store.world.chats.contains(where: { $0.id == id }) {
+      return ChatLine(
+        id: id, senderUserId: user.id, text: clear, createdAt: clock(),
+        mine: true, unreadable: false, delivery: .sent
+      )
+    }
     let partner = store.world.members.contains { $0.coupleId == mine.coupleId && $0.userId != user.id }
     guard partner else { throw AppError.partnerNotReady }
     let identity = try ensureKey(userId: user.id, reason: .send)

@@ -97,6 +97,7 @@ struct FakeChat: Codable, Equatable {
   var openedAt: Date?
   var expiresAt: Date?
   var photoPath: String?
+  var noticeMessageId: UUID? = nil
 }
 
 struct FakeInvite: Codable, Equatable {

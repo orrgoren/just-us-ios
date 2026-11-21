@@ -110,7 +110,7 @@ struct ChatScreen: View {
       .accessibilityIdentifier(A11y.chatViewOnce)
       Text(model.chatRetention == .viewOnce ? L10n.chatViewOnceHelp : L10n.chatKeepHelp)
         .font(Theme.body)
-      WineButton(title: L10n.chatSend, identifier: A11y.chatSend) {
+      WineButton(title: L10n.chatSend, identifier: A11y.chatSend, busy: model.photoSending) {
         Task { await model.sendStagedPhoto() }
       }
     } else {
@@ -169,7 +169,7 @@ struct ChatScreen: View {
           .accessibilityIdentifier(A11y.chatPhotoCard)
       }
       Color.clear.frame(width: 0, height: 0).task { await rememberKept(line) }
-    } else if line.photo == .viewOnce, model.canReopenPhoto(line.id) {
+    } else if line.photo == .viewOnce, line.delivery == .sent, model.canReopenPhoto(line.id) {
       Button {
         model.openChatPhoto = line.id
         viewerFailed = false
@@ -182,6 +182,8 @@ struct ChatScreen: View {
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier(A11y.chatPhotoCard)
+    } else if line.photo == .viewOnce {
+      ChatPhotoPlaceholder()
     }
   }
 

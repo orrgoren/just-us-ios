@@ -1,5 +1,6 @@
-// Live send-push is v8. The earlier v6 source was 5013075 (the same content
-// as 7872d1e). a12f1d1 is v3 and is the rollback source.
+// Live send-push is v9. The previous deploy is not what is live.
+// The earlier v6 source was 5013075 (the same content as 7872d1e).
+// a12f1d1 is v3 and is the rollback source.
 // 002, 006, and 007 are already applied. Do not re-apply them.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,

@@ -220,6 +220,25 @@ extension LiveBackend {
   func stopSockets() async {
     await chatSocket.stop(client: client)
     await moodSocket.stop(client: client)
+    await keySocket.stop(client: client)
+  }
+
+  func watchKeys(userId: UUID) async {
+    guard let client else { return }
+    await keySocket.ensure(
+      id: userId,
+      client: client,
+      topic: "keys-\(userId.uuidString)",
+      changes: { channel in
+        channel.postgresChange(AnyAction.self, schema: "public", table: "device_keys")
+      },
+      onChange: { [weak self] _ in
+        self?.invalidateChatCache()
+      },
+      onReconnect: { [weak self] in
+        self?.invalidateChatCache()
+      }
+    )
   }
 
   private func watch(

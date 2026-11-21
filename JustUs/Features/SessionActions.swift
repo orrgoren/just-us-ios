@@ -47,7 +47,8 @@ extension SessionModel {
     do {
       let raw = try await backend.messages()
       rememberSeals(raw)
-      messages = ScreenshotDedup.collapse(raw.map(displayedChat))
+      let remote = ScreenshotDedup.collapse(raw.map(displayedChat))
+      messages = ChatThread.keepingPending(remote, local: messages)
       if let notice = backend.partnerKeyNotice() {
         chatKeyNotice = notice
       }
@@ -210,7 +211,14 @@ extension SessionModel {
   }
 
   func retryChatLine(_ id: UUID) async {
-    guard let line = messages.first(where: { $0.id == id }), line.delivery == .failed, line.photo == nil else { return }
+    guard let line = messages.first(where: { $0.id == id }), line.delivery == .failed else { return }
+    if pendingPhotos[id] != nil {
+      setDelivery(id, .sending)
+      errorMessage = nil
+      await finishPhoto(id: id)
+      return
+    }
+    guard line.photo == nil else { return }
     setDelivery(id, .sending)
     errorMessage = nil
     await finishSend(id: id, text: line.text)
@@ -256,6 +264,7 @@ extension SessionModel {
   }
 
   private func failSend(id: UUID, text: String, error: Error) {
+    guard messages.first(where: { $0.id == id })?.delivery != .sent else { return }
     let mapped = ErrorMap.app(error)
     if keepsFailedBubble(mapped) {
       setDelivery(id, .failed)
@@ -266,7 +275,7 @@ extension SessionModel {
     noteChatFailure(error)
   }
 
-  private func keepsFailedBubble(_ error: AppError) -> Bool {
+  func keepsFailedBubble(_ error: AppError) -> Bool {
     switch error {
     case .rateLimited, .sessionExpired, .notAuthenticated, .chatTooLong, .chatPhotoTooBig, .partnerNotReady, .invalid:
       return false
@@ -282,7 +291,7 @@ extension SessionModel {
     )
   }
 
-  private func setDelivery(_ id: UUID, _ delivery: ChatDelivery) {
+  func setDelivery(_ id: UUID, _ delivery: ChatDelivery) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
     messages[index].delivery = delivery
   }
@@ -297,22 +306,11 @@ extension SessionModel {
     errorMessage = nil
   }
 
-  func sendStagedPhoto() async {
-    guard let jpeg = stagedChatJPEG else { return }
-    do {
-      let saved = try await backend.sendPhoto(jpeg, retention: chatRetention)
-      stagedChatJPEG = nil
-      messages = ChatThread.merge(messages, saved)
-      errorMessage = nil
-      retryKind = nil
-    } catch {
-      noteChatFailure(error)
-    }
-  }
-
   func retryChat() async {
     if stagedChatJPEG != nil {
       await sendStagedPhoto()
+    } else if let failed = messages.last(where: { $0.delivery == .failed && pendingPhotos[$0.id] != nil }) {
+      await retryChatLine(failed.id)
     } else if let failed = messages.last(where: { $0.delivery == .failed && $0.photo == nil }) {
       await retryChatLine(failed.id)
     } else {
@@ -392,7 +390,7 @@ extension SessionModel {
     }
   }
 
-  private func noteChatFailure(_ error: Error) {
+  func noteChatFailure(_ error: Error) {
     let mapped = ErrorMap.app(error)
     if mapped == .sessionExpired || mapped == .notAuthenticated || mapped == .chatTooLong || mapped == .chatPhotoTooBig || mapped == .rateLimited {
       errorMessage = L10n.message(for: mapped)

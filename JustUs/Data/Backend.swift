@@ -49,7 +49,7 @@ protocol DateBackend: AnyObject {
   func savePreferences(_ preferences: PushPreferences) async
   func messages() async throws -> [ChatLine]
   func sendMessage(_ text: String, id: UUID) async throws -> ChatLine
-  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention, id: UUID) async throws -> ChatLine
   func incomingLine(_ row: ChatMessageRow) async -> ChatLine?
   func invalidateChatCache()
   func chatPhoto(_ id: UUID) async throws -> Data
@@ -57,6 +57,12 @@ protocol DateBackend: AnyObject {
   func deleteChatPhoto(_ id: UUID) async throws
   func sendScreenshotNotice(for photoId: UUID) async throws -> ChatLine?
   func partnerKeyNotice() -> String?
+}
+
+extension DateBackend {
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine {
+    try await sendPhoto(jpeg, retention: retention, id: UUID())
+  }
 }
 
 enum ErrorMap {

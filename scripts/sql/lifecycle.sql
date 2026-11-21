@@ -1601,10 +1601,44 @@ begin
   execute 'set local role authenticated';
   perform public.consume_chat_photo(photo);
   if (
-    select photo_path is null and opened_at is not null
+    select opened_at is not null and photo_path = path
     from public.chat_messages where id = photo
   ) is distinct from true then
-    raise exception 'view_once_was_not_consumed';
+    raise exception 'view_once_was_not_opened_with_its_path';
+  end if;
+  perform public.clear_chat_photo_path(photo);
+  if (select photo_path from public.chat_messages where id = photo) is not null then
+    raise exception 'view_once_path_was_not_cleared';
+  end if;
+  insert into public.device_keys (id, user_id, public_key)
+  values ('d2d2d2d2-d2d2-42d2-82d2-d2d2d2d2d2d2', blair, 'AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=');
+  insert into public.chat_messages (
+    id, couple_id, sender_user_id, sender_public_key, envelopes, kind, notice_message_id
+  ) values (
+    'c6c6c6c6-c6c6-46c6-86c6-c6c6c6c6c6c6', couple, blair,
+    'AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=',
+    '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
+    'notice', photo
+  );
+  begin
+    insert into public.chat_messages (
+      id, couple_id, sender_user_id, sender_public_key, envelopes, kind, notice_message_id
+    ) values (
+      'c3c3c3c3-c3c3-43c3-83c3-c3c3c3c3c3c3', couple, blair,
+      'AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=',
+      '[{"key_id":"1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a","box":"Y2lwaGVydGV4dA=="}]'::jsonb,
+      'notice', photo
+    );
+    raise exception 'second_screenshot_notice_was_stored';
+  exception
+    when unique_violation then
+      null;
+  end;
+  if (
+    select count(*) from public.chat_messages
+    where kind = 'notice' and notice_message_id = photo and sender_user_id = blair
+  ) <> 1 then
+    raise exception 'screenshot_notice_was_not_one_row';
   end if;
   delete from public.chat_messages where id = photo;
   get diagnostics n = row_count;

@@ -35,42 +35,68 @@ extension LiveBackend {
     }
   }
 
-  func sendPhoto(_ jpeg: Data, retention: ChatRetention) async throws -> ChatLine {
+  func sendPhoto(_ jpeg: Data, retention: ChatRetention, id: UUID) async throws -> ChatLine {
+    try await writePhoto(jpeg, retention: retention, id: id, allowRefresh: true)
+  }
+
+  private func writePhoto(
+    _ jpeg: Data, retention: ChatRetention, id: UUID, allowRefresh: Bool
+  ) async throws -> ChatLine {
     guard ChatPhoto.fits(jpeg) else { throw AppError.chatPhotoTooBig }
     let prepared = try await preparedSend()
-    let messageId = UUID()
-    let path = ChatPhoto.objectPath(coupleId: prepared.context.couple.id, messageId: messageId)
+    let path = ChatPhoto.objectPath(coupleId: prepared.context.couple.id, messageId: id)
     let packed = try ChatPhotoCipher.package(
-      jpeg: jpeg, messageId: messageId, coupleId: prepared.context.couple.id, retention: retention,
+      jpeg: jpeg, messageId: id, coupleId: prepared.context.couple.id, retention: retention,
       senderUserId: prepared.context.userId, from: prepared.identity, to: prepared.targets
     )
     var uploaded = false
     do {
-      try await run { client in
-        try await client.storage.from("chat-photos").upload(
-          path, data: packed.object, options: FileOptions(contentType: "application/octet-stream", upsert: false)
-        )
-      }
+      try await uploadPhoto(path, object: packed.object)
       uploaded = true
-      let row = ChatPhotoInsert(
-        id: messageId, coupleId: prepared.context.couple.id, senderUserId: prepared.context.userId,
-        senderPublicKey: ChatCoding.text(prepared.identity.publicKey),
-        envelopes: packed.envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) },
-        kind: "photo", retention: retention.rawValue, photoPath: path
-      )
-      try await run { client in
-        try await client.from("chat_messages").insert(row).execute()
-      }
+      try await insertPhoto(id: id, prepared: prepared, retention: retention, path: path, envelopes: packed.envelopes)
     } catch {
+      if ChatInsertGate.alreadyStored(error) {
+        nudgeChat()
+        return sentPhotoLine(id: id, prepared: prepared, retention: retention, path: path, jpeg: jpeg)
+      }
+      if allowRefresh, ChatSendRecovery.refreshKeys(error) {
+        chatMaterials = nil
+        _ = await removedChatObjects([path])
+        return try await writePhoto(jpeg, retention: retention, id: id, allowRefresh: false)
+      }
       if uploaded {
-        _ = try? await run { client in
-          try await client.storage.from("chat-photos").remove(paths: [path])
-        }
+        _ = await removedChatObjects([path])
       }
       throw ErrorMap.app(error)
     }
     nudgeChat()
-    return sentPhotoLine(id: messageId, prepared: prepared, retention: retention, path: path, jpeg: jpeg)
+    return sentPhotoLine(id: id, prepared: prepared, retention: retention, path: path, jpeg: jpeg)
+  }
+
+  private func uploadPhoto(_ path: String, object: Data) async throws {
+    do {
+      try await run { client in
+        try await client.storage.from("chat-photos").upload(
+          path, data: object, options: FileOptions(contentType: "application/octet-stream", upsert: false)
+        )
+      }
+    } catch {
+      guard ChatInsertGate.alreadyStored(error) else { throw error }
+    }
+  }
+
+  private func insertPhoto(
+    id: UUID, prepared: PreparedSend, retention: ChatRetention, path: String, envelopes: [ChatEnvelope]
+  ) async throws {
+    let row = ChatPhotoInsert(
+      id: id, coupleId: prepared.context.couple.id, senderUserId: prepared.context.userId,
+      senderPublicKey: ChatCoding.text(prepared.identity.publicKey),
+      envelopes: envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) },
+      kind: "photo", retention: retention.rawValue, photoPath: path
+    )
+    try await run { client in
+      try await client.from("chat_messages").insert(row).execute()
+    }
   }
 
   private func sentPhotoLine(
@@ -109,11 +135,13 @@ extension LiveBackend {
     guard let row = try await chatRows(coupleId: context.couple.id).first(where: { $0.id == id }) else {
       throw AppError.notEditable
     }
-    if let path = row.photoPath, await removedChatObjects([path]) == false {
-      throw AppError.saveFailed
-    }
     try await run { client in
       try await client.rpc("consume_chat_photo", params: MessageIDParams(pMessageId: id)).execute()
+    }
+    guard let path = row.photoPath else { return }
+    guard await removedChatObjects([path]) else { throw AppError.saveFailed }
+    try await run { client in
+      try await client.rpc("clear_chat_photo_path", params: MessageIDParams(pMessageId: id)).execute()
     }
   }
 
@@ -137,13 +165,14 @@ extension LiveBackend {
       let prepared = try await preparedSend()
       let rawName = prepared.context.mine.displayName
       let text = ChatNotice.screenshot(rawName.isEmpty ? "They" : rawName)
-      let id = try await insertText(text, kind: "notice", prepared: prepared)
+      let id = try await insertText(text, kind: "notice", prepared: prepared, noticeMessageId: photoId)
       nudgeChat()
       return ChatLine(
         id: id, senderUserId: prepared.context.userId, text: text, createdAt: now,
         mine: true, unreadable: false, notice: true, delivery: .sent
       )
     } catch {
+      if ChatInsertGate.alreadyStored(error) { return nil }
       recentShots[photoId] = nil
       throw error
     }
@@ -156,7 +185,10 @@ extension LiveBackend {
   }
 
   func preparedSend() async throws -> PreparedSend {
-    if let cached = cachedPreparedSend() { return cached }
+    if let cached = cachedPreparedSend() {
+      if await keyRingCurrent() { return cached }
+      chatMaterials = nil
+    }
     guard let context = try await loadContext() else { throw AppError.saveFailed }
     guard context.members.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
     let identity = try await publishDeviceKey(userId: context.userId, reason: .send)
@@ -165,6 +197,27 @@ extension LiveBackend {
     guard targets.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
     chatMaterials = ChatMaterials(context: context, identity: identity, keys: keys)
     return PreparedSend(context: context, identity: identity, targets: targets)
+  }
+
+  private func keyRingCurrent() async -> Bool {
+    guard let materials = chatMaterials else { return false }
+    let memberIds = materials.context.members.map(\.userId.uuidString)
+    guard memberIds.isEmpty == false else { return false }
+    do {
+      let rows: [DeviceKeyStamp] = try await run { client in
+        let response: PostgrestResponse<[DeviceKeyStamp]> = try await client
+          .from("device_keys")
+          .select("id, retired_at")
+          .in("user_id", values: memberIds.map { $0 as any PostgrestFilterValue })
+          .execute()
+        return response.value
+      }
+      let fresh = Set(rows.compactMap { $0.retiredAt == nil ? $0.id : nil })
+      let cached = Set(materials.keys.compactMap { $0.retiredAt == nil ? $0.id : nil })
+      return KeyRing.matches(cached: cached, fresh: fresh)
+    } catch {
+      return false
+    }
   }
 
   private func cachedPreparedSend() -> PreparedSend? {
@@ -180,7 +233,9 @@ extension LiveBackend {
   }
 
   @discardableResult
-  private func insertText(_ text: String, kind: String, prepared: PreparedSend) async throws -> UUID {
+  private func insertText(
+    _ text: String, kind: String, prepared: PreparedSend, noticeMessageId: UUID? = nil
+  ) async throws -> UUID {
     let messageId = UUID()
     let envelopes = try ChatCrypto.seal(
       text: text, messageId: messageId, senderUserId: prepared.context.userId, from: prepared.identity, to: prepared.targets
@@ -189,7 +244,7 @@ extension LiveBackend {
       id: messageId, coupleId: prepared.context.couple.id, senderUserId: prepared.context.userId,
       senderPublicKey: ChatCoding.text(prepared.identity.publicKey),
       envelopes: envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) },
-      kind: kind, retention: nil, photoPath: nil
+      kind: kind, retention: nil, photoPath: nil, noticeMessageId: noticeMessageId
     )
     try await run { client in
       try await client.from("chat_messages").insert(row).execute()

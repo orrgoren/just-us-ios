@@ -89,8 +89,12 @@ extension LiveBackend {
       senderPublicKey: ChatCoding.text(prepared.identity.publicKey),
       envelopes: envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) }
     )
-    try await run { client in
-      try await client.from("chat_messages").insert(row).execute()
+    do {
+      try await run { client in
+        try await client.from("chat_messages").insert(row).execute()
+      }
+    } catch {
+      guard ChatInsertGate.alreadyStored(error) else { throw error }
     }
     nudgeChat()
     return ChatLine(

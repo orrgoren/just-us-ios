@@ -181,9 +181,111 @@ final class ChatLiveTests: XCTestCase {
     FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
   }
 
+  func testReloadKeepsAnUnsentBubble() async {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    let pending = ChatLine(
+      id: UUID(), senderUserId: SeedID.alex, text: "still here", createdAt: Date(),
+      mine: true, unreadable: false, delivery: .failed
+    )
+    alex.messages.append(pending)
+    await alex.loadMessages()
+    XCTAssertEqual(alex.messages.first { $0.id == pending.id }?.text, "still here")
+    XCTAssertEqual(alex.messages.first { $0.id == pending.id }?.delivery, .failed)
+  }
+
+  func testASentBubbleStaysSentWhenTheWriteFailsLate() async {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    backend.holdSend = true
+    backend.failSend = .offline
+    alex.chatDraft = "landed"
+    let task = Task { await alex.sendChat() }
+    let appeared = await waitUntil { alex.messages.last?.delivery == .sending }
+    XCTAssertTrue(appeared)
+    alex.setDelivery(alex.messages[alex.messages.count - 1].id, .sent)
+    backend.releaseSend()
+    await task.value
+    XCTAssertEqual(alex.messages.last?.delivery, .sent)
+    XCTAssertNil(alex.errorMessage)
+  }
+
+  func testPhotoRetryReusesTheSameId() async throws {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    backend.photoKeyFailure = .offline
+    alex.stageChatPhoto(PhotoBytes.sample())
+    await alex.sendStagedPhoto()
+    let failed = try XCTUnwrap(alex.messages.last)
+    XCTAssertEqual(failed.delivery, .failed)
+    XCTAssertTrue(backend.store.world.chats.filter { $0.id == failed.id }.isEmpty)
+    await alex.retryChatLine(failed.id)
+    XCTAssertEqual(alex.messages.last?.delivery, .sent)
+    XCTAssertEqual(backend.store.world.chats.filter { $0.id == failed.id }.count, 1)
+  }
+
+  func testASecondPhotoTapDoesNotInsertTwice() async {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    backend.holdSend = true
+    alex.stageChatPhoto(PhotoBytes.sample())
+    let first = Task { await alex.sendStagedPhoto() }
+    let appeared = await waitUntil { alex.messages.contains { $0.photo != nil && $0.delivery == .sending } }
+    XCTAssertTrue(appeared)
+    await alex.sendStagedPhoto()
+    backend.releaseSend()
+    await first.value
+    XCTAssertEqual(backend.store.world.chats.filter { $0.kind == "photo" }.count, 1)
+  }
+
+  func testARepeatedTextIdDoesNotInsertTwice() async throws {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    alex.chatDraft = "once"
+    await alex.sendChat()
+    let id = try XCTUnwrap(alex.messages.last?.id)
+    _ = try await backend.sendMessage("once", id: id)
+    XCTAssertEqual(backend.store.world.chats.filter { $0.id == id }.count, 1)
+  }
+
+  func testPhotoKeyRefreshRetriesOnce() async throws {
+    let backend = coupleBackend()
+    let alex = await signedIn(backend)
+    backend.photoKeyFailure = .server(code: "unknown_sender_key")
+    alex.stageChatPhoto(PhotoBytes.sample())
+    await alex.sendStagedPhoto()
+    let sent = try XCTUnwrap(alex.messages.last)
+    XCTAssertEqual(sent.delivery, .sent)
+    XCTAssertEqual(backend.store.world.chats.filter { $0.id == sent.id }.count, 1)
+    XCTAssertNil(alex.errorMessage)
+  }
+
+  func testKeyRingNoticesANewDevice() {
+    let id = UUID()
+    XCTAssertTrue(KeyRing.matches(cached: [id], fresh: [id]))
+    XCTAssertFalse(KeyRing.matches(cached: [id], fresh: [id, UUID()]))
+  }
+
+  func testAnAlreadyStoredInsertCountsAsSent() {
+    XCTAssertTrue(ChatInsertGate.alreadyStored(AppError.server(code: "23505")))
+    XCTAssertTrue(ChatInsertGate.alreadyStored(AppError.server(code: "409")))
+    XCTAssertFalse(ChatInsertGate.alreadyStored(AppError.offline))
+  }
+
+  func testHebrewClockDoesNotUseMeridiem() {
+    let label = ChatTime.label(
+      Date(timeIntervalSince1970: 1_700_000_000),
+      locale: Locale(identifier: "he_IL"),
+      timeZone: TimeZone(secondsFromGMT: 0) ?? .current
+    )
+    XCTAssertTrue(label.contains("22:13"))
+    XCTAssertFalse(label.contains("PM"))
+  }
+
   private func signedIn(_ backend: FakeBackend) async -> SessionModel {
-    // Blair already has a phone in this couple. Without that key the send is partnerNotReady
-    // and the optimistic bubble is removed.
+    // Both phones publish a key before the thread is used. Without Blair's key the send is
+    // partnerNotReady and the optimistic bubble is removed.
+    _ = try? backend.ensureKey(userId: SeedID.alex)
     _ = try? backend.ensureKey(userId: SeedID.blair)
     let alex = SessionModel(backend: backend)
     alex.email = "alex@couple-a.test"

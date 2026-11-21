@@ -227,6 +227,24 @@ final class ChatPhotoFlowTests: XCTestCase {
     XCTAssertNotNil(cleared.openedAt)
   }
 
+  func testViewOnceSealSurvivesRelaunch() async throws {
+    let backend = try await signedInAlex()
+    let sent = try await backend.sendPhoto(PhotoBytes.sample(), retention: .viewOnce)
+    switchToBlair(backend)
+    let blair = SessionModel(backend: backend)
+    await blair.refresh()
+    await blair.loadMessages()
+    backend.consumeError = .offline
+    await blair.finishViewOnce(sent.id)
+    XCTAssertEqual(blair.messages.first { $0.id == sent.id }?.photo, .opened)
+    XCTAssertNil(backend.store.world.chats.first { $0.id == sent.id }?.openedAt)
+    let relaunched = SessionModel(backend: backend)
+    await relaunched.refresh()
+    await relaunched.loadMessages()
+    XCTAssertEqual(relaunched.messages.first { $0.id == sent.id }?.photo, .opened)
+    XCTAssertFalse(relaunched.canReopenPhoto(sent.id))
+  }
+
   func testOneScreenshotMakesOneNotice() async throws {
     let backend = try await signedInAlex()
     let sent = try await backend.sendPhoto(PhotoBytes.sample(), retention: .viewOnce)

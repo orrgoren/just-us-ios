@@ -13,6 +13,7 @@ final class LiveBackend: DateBackend {
   let client: SupabaseClient?
   let chatSocket = LiveWatch()
   let moodSocket = LiveWatch()
+  let keySocket = LiveWatch()
   private var cachedUser: UUID?
   private var deviceToken: String?
   private var partnerKeyNoticeText: String?
@@ -436,6 +437,7 @@ final class LiveBackend: DateBackend {
     guard let context else { return [] }
     let identity = try await publishDeviceKey(userId: context.userId, reason: .refresh)
     await watchChat(coupleId: context.couple.id)
+    await watchKeys(userId: context.userId)
     let rows = try await chatRows(coupleId: context.couple.id)
     let keys = try await loadDeviceKeys(
       coupleId: context.couple.id, senderKeys: rows.map(\.senderPublicKey)
