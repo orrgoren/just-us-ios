@@ -58,14 +58,17 @@ final class MemoryPhotoTests: XCTestCase {
   func testAManualSwapStaysUntilTheNightIsFinished() async throws {
     let backend = FakeBackend(store: FakeStore(inMemory: true), cooldown: 0)
     try await signIn(backend, "alex@couple-a.test")
-    let before = try XCTUnwrap(try await backend.ritual())
+    let loaded = try await backend.ritual()
+    let before = try XCTUnwrap(loaded)
     XCTAssertEqual(before.date?.plannerUserId, SeedID.alex)
     try await backend.swapPlanner()
     try await backend.ensureDraft()
-    let after = try XCTUnwrap(try await backend.ritual())
+    let swapped = try await backend.ritual()
+    let after = try XCTUnwrap(swapped)
     XCTAssertEqual(after.date?.plannerUserId, SeedID.blair)
     XCTAssertFalse(after.isPlanner)
-    let held = try XCTUnwrap(try await backend.ritual())
+    let again = try await backend.ritual()
+    let held = try XCTUnwrap(again)
     XCTAssertEqual(held.date?.plannerUserId, SeedID.blair)
   }
 
