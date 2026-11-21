@@ -229,12 +229,34 @@ final class FlowUITests: XCTestCase {
     tapAboveKeyboard("sendCode", in: app, record: true)
     let codeField = app.textFields["codeField"]
     XCTAssertTrue(codeField.waitForExistence(timeout: 8))
-    codeField.tap()
-    codeField.typeText(code)
+    typeCode(code, into: codeField, in: app)
     tapAboveKeyboard("verifyCode", in: app, record: false)
     if expectHome {
       XCTAssertTrue(app.buttons["Us"].waitForExistence(timeout: 8))
     }
+  }
+
+  /// The email keyboard is often still closing when the code field appears.
+  /// A number pad also ignores `typeText` until the field actually has focus.
+  private func typeCode(_ code: String, into field: XCUIElement, in app: XCUIApplication) {
+    let gone = NSPredicate(format: "exists == false")
+    _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: app.keyboards.firstMatch)], timeout: 3)
+    let focused = NSPredicate(format: "hasKeyboardFocus == true")
+    for _ in 0..<4 {
+      field.tap()
+      let ready = XCTNSPredicateExpectation(predicate: focused, object: field)
+      guard XCTWaiter().wait(for: [ready], timeout: 2) == .completed else { continue }
+      let zero = app.keyboards.keys["0"]
+      if zero.waitForExistence(timeout: 1) {
+        for character in code {
+          app.keyboards.keys[String(character)].tap()
+        }
+      } else {
+        field.typeText(code)
+      }
+      return
+    }
+    field.typeText(code)
   }
 
   private static var recordedKeyboard = false

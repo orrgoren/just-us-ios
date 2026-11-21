@@ -177,7 +177,6 @@ struct RitualScreen: View {
 
 struct MemoriesScreen: View {
   @Bindable var model: SessionModel
-  @State private var photo: PhotosPickerItem?
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
@@ -185,34 +184,10 @@ struct MemoriesScreen: View {
       Text(L10n.memoriesBody)
       HelperText(text: L10n.memoriesNext)
       if model.memories.isEmpty {
-        Text(L10n.memoriesEmpty)
+        Text(L10n.memoriesEmpty).accessibilityIdentifier(A11y.memoriesEmpty)
       }
       ForEach(model.memories) { memory in
-        GlassCard {
-          VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.memoryNumber(memory.number))
-            Text(memory.title).font(Theme.title)
-            if let data = memory.photoJPEG, let image = UIImage(data: data) {
-              Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxHeight: 220)
-                .accessibilityLabel(L10n.photo)
-                .accessibilityIdentifier(A11y.memoryPhoto)
-            }
-            ForEach(memory.notes) { note in
-              Text(note.note)
-              if note.mine {
-                ActionButton(title: L10n.editMoment) {
-                  model.editingDate = memory.id
-                  model.editingNote = note.id
-                  model.noteDraft = note.note
-                }
-              }
-            }
-            ActionButton(title: L10n.addMoment) { model.editingDate = memory.id }
-          }
-        }
+        DateMemoryCard(model: model, memory: memory)
       }
       if model.editingDate != nil {
         LabeledField(title: L10n.moment, text: $model.noteDraft, identifier: A11y.memoryNoteField, need: .optional)
@@ -220,23 +195,76 @@ struct MemoriesScreen: View {
           Task { await model.saveMoment() }
         }
         ActionButton(title: L10n.deleteMoment, kind: .destructive) { Task { await model.deleteMoment() } }
-        PhotosPicker(selection: $photo, matching: .images) { Text(L10n.addPhoto) }
-          .buttonStyle(JustButtonStyle(kind: .secondary))
-        if Launch.isUITest {
-          ActionButton(title: L10n.samplePhoto, identifier: A11y.samplePhoto) {
-            Task { await model.useSamplePhoto() }
+      }
+    }
+  }
+}
+
+private struct DateMemoryCard: View {
+  @Bindable var model: SessionModel
+  let memory: MemoryItem
+  @State private var photo: PhotosPickerItem?
+
+  var body: some View {
+    HStack(alignment: .top, spacing: Theme.Space.stack) {
+      Capsule()
+        .fill(Theme.wine)
+        .frame(width: 3)
+      GlassCard {
+        VStack(alignment: .leading, spacing: 8) {
+          Text(memory.when.formatted(date: .abbreviated, time: .omitted))
+            .font(Theme.caption)
+          Text(L10n.memoryNumber(memory.number))
+          Text(memory.title).font(Theme.title)
+          photoView
+          ForEach(memory.notes) { note in
+            Text(note.note)
+            if note.mine {
+              ActionButton(title: L10n.editMoment) {
+                model.editingDate = memory.id
+                model.editingNote = note.id
+                model.noteDraft = note.note
+              }
+            }
+          }
+          ActionButton(title: L10n.addMoment) { model.editingDate = memory.id }
+          PhotosPicker(selection: $photo, matching: .images) { Text(L10n.addPhoto) }
+            .buttonStyle(JustButtonStyle(kind: .secondary))
+          if Launch.isUITest {
+            ActionButton(title: L10n.samplePhoto, identifier: A11y.samplePhoto) {
+              model.editingDate = memory.id
+              Task { await model.useSamplePhoto() }
+            }
           }
         }
       }
     }
     .onChange(of: photo) { _, item in
       guard let item else { return }
-      Task {
-        if let data = try? await item.loadTransferable(type: Data.self) {
-          await model.savePhoto(data)
-        }
-      }
+      Task { await store(item) }
     }
+  }
+
+  @ViewBuilder
+  private var photoView: some View {
+    if let data = memory.photoJPEG, let image = UIImage(data: data) {
+      Image(uiImage: image)
+        .resizable()
+        .scaledToFit()
+        .frame(maxHeight: 220)
+        .accessibilityLabel(L10n.photo)
+        .accessibilityIdentifier(A11y.memoryPhoto)
+    } else if memory.photoState == .failed {
+      Text(L10n.retryPhoto)
+    }
+  }
+
+  private func store(_ item: PhotosPickerItem) async {
+    guard let picked = try? await item.loadTransferable(type: PickedImage.self) else {
+      model.errorMessage = L10n.photoFailed
+      return
+    }
+    await model.savePhoto(picked.data, dateId: memory.id)
   }
 }
 

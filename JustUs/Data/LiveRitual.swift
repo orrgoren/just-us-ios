@@ -238,7 +238,8 @@ extension LiveBackend {
 
   func savePhoto(dateId: UUID, jpeg: Data) async throws {
     guard let context = try await loadContext() else { throw AppError.notAuthenticated }
-    let path = "\(context.couple.id.uuidString.lowercased())/\(dateId.uuidString.lowercased()).jpg"
+    guard MemoryPhoto.accepted(jpeg) else { throw AppError.saveFailed }
+    let path = MemoryPhoto.objectPath(coupleId: context.couple.id, dateId: dateId)
     var uploaded = false
     do {
       try await runWrite { client in
