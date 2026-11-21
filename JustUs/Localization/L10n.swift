@@ -311,6 +311,12 @@ enum L10n {
   }
 
   private static func outcomeMessage(_ error: AppError) -> String {
+    if let message = sessionMessage(error) { return message }
+    if let message = inviteMessage(error) { return message }
+    return planMessage(error)
+  }
+
+  private static func sessionMessage(_ error: AppError) -> String? {
     switch error {
     case .offline: return offline
     case .timeout: return text("err.timeout", "That took too long. Nothing was marked as saved.")
@@ -320,6 +326,14 @@ enum L10n {
     case .invalidCode: return text("err.badCode", "That code isn't valid.")
     case .expiredCode: return text("err.expiredCode", "That code has expired. Resend a new one.")
     case .cooldown(let seconds): return cooldown(seconds)
+    case .notAuthenticated: return text("err.auth", "Sign in again.")
+    case .rateLimited: return text("err.rate", "Too many tries. Wait a few minutes.")
+    default: return nil
+    }
+  }
+
+  private static func inviteMessage(_ error: AppError) -> String? {
+    switch error {
     case .alreadyInCouple: return text("err.already", "This account is already in a shared space.")
     case .soloNotEmpty: return text("err.solo", "Your space already has more than an empty draft, so an invite can't replace it.")
     case .invalidInvite: return text("err.invite", "That invite isn't valid.")
@@ -328,13 +342,17 @@ enum L10n {
     case .expiredInvite: return text("err.inviteExpired", "That invite has expired.")
     case .coupleFull: return text("err.full", "That space already has two people.")
     case .selfRedeem: return text("err.self", "You can't redeem an invite you created.")
-    case .notAuthenticated: return text("err.auth", "Sign in again.")
+    default: return nil
+    }
+  }
+
+  private static func planMessage(_ error: AppError) -> String {
+    switch error {
     case .notPlanner: return text("err.planner", "Only this week's planner can do that.")
     case .notEditable: return text("err.notEditable", "That can't be edited now.")
     case .missingPlan: return text("err.plan", "Pick an idea first.")
     case .unavailable: return text("err.unavailable", "That needs a server update that isn't on yet. Nothing was changed.")
     case .saveFailed: return text("err.save", "We couldn't save. Nothing was marked as done.")
-    case .rateLimited: return text("err.rate", "Too many tries. Wait a few minutes.")
     case .confirmationRequired: return text("err.needConfirm", "Confirm before adding to memories you already have.")
     case .unsyncedChanges: return text("err.unsynced", "You still have changes that aren't saved. Try again when you're online, or discard them.")
     case .signOutBlocked: return text("err.signOut", "This phone is still on the account, so you're still signed in. Try again.")
@@ -343,6 +361,7 @@ enum L10n {
     case .chatTooLong: return chatTooLong
     case .chatPhotoTooBig: return chatPhotoTooBig
     case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
+    default: return sessionMessage(error) ?? inviteMessage(error) ?? offline
     }
   }
 

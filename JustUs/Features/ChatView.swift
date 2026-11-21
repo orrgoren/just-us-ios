@@ -56,7 +56,7 @@ struct ChatScreen: View {
   }
 
   @ViewBuilder private var composer: some View {
-    if let _ = model.stagedChatJPEG {
+    if model.stagedChatJPEG != nil {
       Text(L10n.chatPhotoChoice).font(Theme.body)
       Picker(L10n.chatPhotoChoice, selection: $model.chatRetention) {
         Text(L10n.chatViewOnce).tag(ChatRetention.viewOnce)
