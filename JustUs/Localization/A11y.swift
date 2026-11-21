@@ -77,6 +77,7 @@ enum A11y {
   static let loginRoot = "loginRoot"
   static let settingsRoot = "settingsRoot"
   static let memoriesRoot = "memoriesRoot"
+  static let memoriesEmpty = "memoriesEmpty"
 
   static func mood(_ key: MoodKey) -> String { "mood.\(key.rawValue)" }
   static func place(_ choice: PlaceChoice) -> String { "place.\(choice.rawValue)" }

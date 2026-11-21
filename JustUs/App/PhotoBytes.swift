@@ -1,4 +1,18 @@
+import CoreTransferable
+import UniformTypeIdentifiers
 import UIKit
+
+/// PhotosPicker's `Data` transferable often comes back empty for a library
+/// photo, so the upload never runs. Importing the image type yields bytes.
+struct PickedImage: Transferable {
+  let data: Data
+
+  static var transferRepresentation: some TransferRepresentation {
+    DataRepresentation(importedContentType: .image) { data in
+      PickedImage(data: data)
+    }
+  }
+}
 
 enum PhotoBytes {
   static func jpeg(from data: Data, maxEdge: CGFloat = 1600) -> Data? {

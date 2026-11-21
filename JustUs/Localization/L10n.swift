@@ -151,8 +151,8 @@ enum L10n {
   static var addCalendar: String { text("after.calendar", "Add to calendar") }
   static var openWeek: String { text("home.open", "Open this week") }
   static var noDate: String { text("home.noDate", "No evening is open. You can start the next one without losing memories.") }
-  static var memoriesTitle: String { text("memories.title", "What we kept") }
-  static var memoriesBody: String { text("memories.body", "One note, and one photo, for each night.") }
+  static var memoriesTitle: String { text("memories.title", "Our dates") }
+  static var memoriesBody: String { text("memories.body", "The nights you finished, newest first, with the photo from that night.") }
   static var memoriesEmpty: String { text("memories.empty", "Nothing saved yet. Your first night is on the way.") }
   static var addMoment: String { text("memories.add", "Add your moment") }
   static var saveMoment: String { text("memories.save", "Save") }

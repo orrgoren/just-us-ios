@@ -22,7 +22,7 @@ extension FakeBackend {
         when: date.completedAt ?? date.scheduledAt,
         number: rows.count - index,
         notes: notes,
-        photoPath: date.photoJPEG == nil ? nil : "\(mine.coupleId.uuidString)/\(date.id.uuidString).jpg",
+        photoPath: date.photoJPEG == nil ? nil : MemoryPhoto.objectPath(coupleId: mine.coupleId, dateId: date.id),
         photoJPEG: date.photoJPEG,
         photoState: date.photoJPEG == nil ? .empty : .saved
       )
@@ -58,9 +58,11 @@ extension FakeBackend {
 
   func savePhoto(dateId: UUID, jpeg: Data) async throws {
     try requireOnline()
+    guard MemoryPhoto.accepted(jpeg) else { throw AppError.saveFailed }
     guard let mine = memberOfSession(), let index = store.world.dates.firstIndex(where: { $0.id == dateId && $0.coupleId == mine.coupleId }) else {
       throw AppError.saveFailed
     }
+    guard store.world.dates[index].status == .completed else { throw AppError.saveFailed }
     guard PhotoSavePolicy.shouldCommitPath(uploadSucceeded: true) else { throw AppError.saveFailed }
     store.world.dates[index].photoJPEG = jpeg
     store.save()

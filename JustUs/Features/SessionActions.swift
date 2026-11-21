@@ -161,12 +161,13 @@ extension SessionModel {
     await act { try await self.backend.deleteNote(id: editingNote); await self.refresh() }
   }
 
-  func savePhoto(_ data: Data) async {
-    guard let editingDate, let jpeg = PhotoBytes.jpeg(from: data) else {
+  func savePhoto(_ data: Data, dateId: UUID? = nil) async {
+    let target = dateId ?? editingDate
+    guard let target, let jpeg = PhotoBytes.jpeg(from: data), MemoryPhoto.accepted(jpeg) else {
       errorMessage = L10n.photoFailed
       return
     }
-    await act { try await self.backend.savePhoto(dateId: editingDate, jpeg: jpeg); await self.refresh() }
+    await act { try await self.backend.savePhoto(dateId: target, jpeg: jpeg); await self.refresh() }
   }
 
   func useSamplePhoto() async {
