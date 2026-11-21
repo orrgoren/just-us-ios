@@ -118,8 +118,8 @@ extension FakeBackend {
     }
     _ = user
     store.world.dates[index].status = .skipped
-    try addDraft(coupleId: mine.coupleId, planner: store.world.dates[index].plannerUserId)
     store.save()
+    try await ensureDraft()
   }
 
   func swapPlanner() async throws {
@@ -185,8 +185,21 @@ extension FakeBackend {
   func ensureDraft() async throws {
     try online()
     guard let mine = currentMember() else { throw AppError.notAuthenticated }
-    try addDraft(coupleId: mine.coupleId, planner: mine.userId)
+    let planner = PlannerTurn.nextPlanner(nights: datedNights(mine.coupleId), members: memberRefs(mine.coupleId)) ?? mine.userId
+    try addDraft(coupleId: mine.coupleId, planner: planner)
     store.save()
+  }
+
+  private func datedNights(_ coupleId: UUID) -> [DatedNight] {
+    store.world.dates.filter { $0.coupleId == coupleId }.map {
+      DatedNight(status: $0.status, scheduledAt: $0.scheduledAt, createdAt: $0.createdAt, plannerUserId: $0.plannerUserId)
+    }
+  }
+
+  private func memberRefs(_ coupleId: UUID) -> [MemberRef] {
+    store.world.members.filter { $0.coupleId == coupleId }.map {
+      MemberRef(userId: $0.userId, displayName: $0.displayName, memberIndex: $0.memberIndex)
+    }
   }
 
   private func online() throws {
