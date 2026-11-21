@@ -182,6 +182,9 @@ final class ChatLiveTests: XCTestCase {
   }
 
   private func signedIn(_ backend: FakeBackend) async -> SessionModel {
+    // Blair already has a phone in this couple. Without that key the send is partnerNotReady
+    // and the optimistic bubble is removed.
+    _ = try? backend.ensureKey(userId: SeedID.blair)
     let alex = SessionModel(backend: backend)
     alex.email = "alex@couple-a.test"
     await alex.sendCode()

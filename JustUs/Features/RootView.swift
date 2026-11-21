@@ -19,14 +19,18 @@ struct RootView: View {
       ScrollViewReader { proxy in
       Group {
         if chatting {
-          page.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+          // The identifier stays off this column. On the scrolling screens it marks the
+          // scroll view; here it would collapse the composer into that one element.
+          page
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .accessibilityElement(children: .contain)
         } else {
           ScrollView { page }
             .scrollDismissesKeyboard(.immediately)
+            .accessibilityIdentifier(A11y.content)
         }
       }
       .ignoresSafeArea(.keyboard, edges: .bottom)
-      .accessibilityIdentifier(A11y.content)
       .safeAreaInset(edge: .bottom, spacing: 0) {
         if pinReplace {
           PinnedReplaceActions(model: model)

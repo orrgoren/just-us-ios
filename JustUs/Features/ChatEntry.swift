@@ -59,6 +59,7 @@ struct ChatEntry: View {
     .padding(.trailing, 12)
     .padding(.vertical, 4)
     .background(fieldFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .accessibilityElement(children: .contain)
   }
 
   private var sendButton: some View {
