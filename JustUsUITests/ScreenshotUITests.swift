@@ -50,13 +50,46 @@ final class ScreenshotUITests: XCTestCase {
     } else {
       _ = app.staticTexts["Just Us"].waitForExistence(timeout: 10)
     }
+    if screen == "chat" || screen == "chatPhoto" {
+      let field = app.descendants(matching: .any)["chatField"]
+      XCTAssertTrue(field.waitForExistence(timeout: 8))
+      XCTAssertTrue(app.buttons["chatAttach"].exists)
+      XCTAssertFalse(app.buttons["chatSend"].exists)
+    }
     let label = name ?? screen
     addShot(app, screen: label, appearance: appearance, size: size, suffix: nil)
     if swipe {
       app.swipeUp()
       addShot(app, screen: label, appearance: appearance, size: size, suffix: "scrolled")
     }
+    if screen == "chat", appearance == "light", size == nil, extra.isEmpty, name == nil {
+      app.buttons["chatAttach"].tap()
+      let library = app.buttons["Photo library"]
+      XCTAssertTrue(library.waitForExistence(timeout: 4))
+      XCTAssertTrue(app.buttons["Camera"].exists)
+      XCTAssertTrue(app.buttons["chatPhoto"].waitForExistence(timeout: 4))
+      XCTAssertTrue(app.buttons["Send a sample photo"].exists)
+      dismissAttachMenu(app, library: library)
+      let field = app.descendants(matching: .any)["chatField"]
+      field.tap()
+      field.typeText("hi")
+      XCTAssertTrue(app.buttons["chatSend"].waitForExistence(timeout: 4))
+    }
     app.terminate()
+  }
+
+  /// The system Cancel on a confirmation dialog is outside this app's button list.
+  private func dismissAttachMenu(_ app: XCUIApplication, library: XCUIElement) {
+    if app.buttons["Cancel"].exists {
+      app.buttons["Cancel"].tap()
+    } else {
+      app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+    }
+    let gone = NSPredicate(format: "exists == false")
+    let dismissed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: library)], timeout: 2)
+    guard dismissed != .completed else { return }
+    app.swipeDown()
+    _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: library)], timeout: 2)
   }
 
   private func addShot(_ app: XCUIApplication, screen: String, appearance: String, size: String?, suffix: String?) {

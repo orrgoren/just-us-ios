@@ -223,6 +223,15 @@ struct DeviceKeyRow: Decodable {
   }
 }
 
+struct DeviceKeyStamp: Decodable {
+  var id: UUID
+  var retiredAt: String?
+  enum CodingKeys: String, CodingKey {
+    case id
+    case retiredAt = "retired_at"
+  }
+}
+
 struct DeviceKeyRetire: Encodable {
   var retiredAt: String
   enum CodingKeys: String, CodingKey { case retiredAt = "retired_at" }
@@ -297,6 +306,7 @@ struct ChatPhotoInsert: Encodable {
   var kind: String
   var retention: String?
   var photoPath: String?
+  var noticeMessageId: UUID? = nil
 
   enum CodingKeys: String, CodingKey {
     case id
@@ -307,6 +317,7 @@ struct ChatPhotoInsert: Encodable {
     case kind
     case retention
     case photoPath = "photo_path"
+    case noticeMessageId = "notice_message_id"
   }
 }
 

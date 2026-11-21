@@ -3,6 +3,22 @@ import Foundation
 @MainActor
 final class FakeBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
+  var onChatInsert: (@MainActor (ChatMessageRow) -> Void)?
+  var onChatOpened: (@MainActor (UUID) -> Void)?
+  var onChatReload: (@MainActor () -> Void)?
+  var recentShots: [UUID: Date] = [:]
+  /// Holds the next view-once consume so a test can see the opened bubble first.
+  var holdConsume = false
+  private var consumeHold: CheckedContinuation<Void, Never>?
+  /// Holds the next send so a test can see the optimistic bubble.
+  var holdSend = false
+  /// Thrown once, after the hold releases, instead of storing the message.
+  var failSend: AppError?
+  /// Thrown once from a photo send, so a key retry can be seen.
+  var photoKeyFailure: AppError?
+  /// Thrown at the start of consume, before the row is marked opened.
+  var consumeError: AppError?
+  private var sendHold: CheckedContinuation<Void, Never>?
   /// Forces the next mood save to fail the way a live write can, including a
   /// PostgREST 42501 after reveal.
   var moodFailure: AppError?
@@ -376,10 +392,58 @@ final class FakeBackend: DateBackend {
     return ChatWindow.chronological(lines)
   }
 
-  func sendMessage(_ text: String) async throws {
+  func invalidateChatCache() {}
+
+  func incomingLine(_ row: ChatMessageRow) async -> ChatLine? {
+    nil
+  }
+
+  func releaseSend() {
+    holdSend = false
+    sendHold?.resume()
+    sendHold = nil
+  }
+
+  func releaseConsume() {
+    holdConsume = false
+    consumeHold?.resume()
+    consumeHold = nil
+  }
+
+  func pauseSendIfNeeded() async {
+    guard holdSend else { return }
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      sendHold = continuation
+    }
+  }
+
+  func pauseConsumeIfNeeded() async {
+    guard holdConsume else { return }
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      consumeHold = continuation
+    }
+  }
+
+  func sendMessage(_ text: String, id: UUID) async throws -> ChatLine {
+    if holdSend {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        sendHold = continuation
+      }
+    }
+    if let failSend {
+      let error = failSend
+      self.failSend = nil
+      throw error
+    }
     try guardOnline()
     let clear = try ChatText.normalized(text)
     guard let user = current(), let mine = member(user.id) else { throw AppError.saveFailed }
+    if store.world.chats.contains(where: { $0.id == id }) {
+      return ChatLine(
+        id: id, senderUserId: user.id, text: clear, createdAt: clock(),
+        mine: true, unreadable: false, delivery: .sent
+      )
+    }
     let partner = store.world.members.contains { $0.coupleId == mine.coupleId && $0.userId != user.id }
     guard partner else { throw AppError.partnerNotReady }
     let identity = try ensureKey(userId: user.id, reason: .send)
@@ -391,15 +455,20 @@ final class FakeBackend: DateBackend {
       }
     )
     guard targets.contains(where: { $0.userId != user.id }) else { throw AppError.partnerNotReady }
-    let messageId = UUID()
     let envelopes = try ChatCrypto.seal(
-      text: clear, messageId: messageId, senderUserId: user.id, from: identity, to: targets
+      text: clear, messageId: id, senderUserId: user.id, from: identity, to: targets
     )
-    store.world.chats.append(FakeChat(
-      id: messageId, coupleId: mine.coupleId, senderUserId: user.id, senderPublicKey: identity.publicKey,
+    let row = FakeChat(
+      id: id, coupleId: mine.coupleId, senderUserId: user.id, senderPublicKey: identity.publicKey,
       createdAt: Date(), envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
-    ))
+    )
+    store.world.chats.append(row)
     store.save()
+    let published = store.world.deviceKeys.filter { member($0.userId)?.coupleId == mine.coupleId }
+      .map { (userId: $0.userId, publicKey: $0.publicKey) }
+    var line = presentChat(row, identity: identity, userId: user.id, published: published)
+    line.delivery = .sent
+    return line
   }
 
   func seedChatPreview() {

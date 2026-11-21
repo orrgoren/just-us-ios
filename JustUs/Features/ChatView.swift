@@ -10,6 +10,8 @@ struct ChatScreen: View {
   @State private var viewerImage: UIImage?
   @State private var viewerFailed = false
   @State private var keptImages: [UUID: UIImage] = [:]
+  @State private var nearBottom = true
+  @State private var showPill = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
@@ -26,6 +28,7 @@ struct ChatScreen: View {
         composer
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .sheet(isPresented: viewerPresented) { viewer }
     .sheet(isPresented: $showCamera) { CameraCapture { model.stageChatPhoto($0) } }
     .onChange(of: libraryItem) { _, item in
@@ -46,12 +49,53 @@ struct ChatScreen: View {
   @ViewBuilder private var thread: some View {
     if model.ritual?.partner == nil {
       Text(L10n.chatWaiting)
-    } else if model.messages.isEmpty {
-      Text(L10n.chatEmpty)
+      Spacer(minLength: 0)
     } else {
-      ForEach(model.messages) { line in
-        bubble(line)
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: Theme.Space.stack) {
+            if model.messages.isEmpty {
+              Text(L10n.chatEmpty)
+            }
+            ForEach(model.messages) { line in
+              bubble(line).id(line.id)
+            }
+            Color.clear.frame(height: 1)
+              .id(ChatScroll.bottom)
+              .onAppear {
+                nearBottom = true
+                showPill = false
+              }
+              .onDisappear { nearBottom = false }
+          }
+        }
+        .defaultScrollAnchor(.bottom)
+        .scrollDismissesKeyboard(.interactively)
+        .onChange(of: model.messages.count) { _, _ in
+          follow(proxy)
+        }
+        .overlay(alignment: .bottom) {
+          if showPill {
+            Button(L10n.chatArrived) {
+              showPill = false
+              nearBottom = true
+              proxy.scrollTo(ChatScroll.bottom, anchor: .bottom)
+            }
+            .buttonStyle(JustButtonStyle(kind: .secondary))
+            .accessibilityIdentifier(A11y.chatNew)
+          }
+        }
       }
+    }
+  }
+
+  private func follow(_ proxy: ScrollViewProxy) {
+    switch ChatScroll.action(nearBottom: nearBottom) {
+    case .follow:
+      showPill = false
+      proxy.scrollTo(ChatScroll.bottom, anchor: .bottom)
+    case .pill:
+      showPill = true
     }
   }
 
@@ -66,25 +110,11 @@ struct ChatScreen: View {
       .accessibilityIdentifier(A11y.chatViewOnce)
       Text(model.chatRetention == .viewOnce ? L10n.chatViewOnceHelp : L10n.chatKeepHelp)
         .font(Theme.body)
-      WineButton(title: L10n.chatSend, identifier: A11y.chatSend, busy: model.activity == .sendChat, busyTitle: L10n.loading) {
+      WineButton(title: L10n.chatSend, identifier: A11y.chatSend, busy: model.photoSending) {
         Task { await model.sendStagedPhoto() }
       }
     } else {
-      LabeledField(title: L10n.chatField, text: $model.chatDraft, identifier: A11y.chatField, need: .labelOnly)
-      WineButton(title: L10n.chatSend, identifier: A11y.chatSend, busy: model.activity == .sendChat, busyTitle: L10n.loading) {
-        Task { await model.sendChat() }
-      }
-      PhotosPicker(selection: $libraryItem, matching: .images) { Text(L10n.chatLibrary) }
-        .buttonStyle(JustButtonStyle(kind: .secondary))
-        .accessibilityIdentifier(A11y.chatPhoto)
-      if UIImagePickerController.isSourceTypeAvailable(.camera) {
-        ActionButton(title: L10n.chatCamera) { showCamera = true }
-      }
-      if Launch.isUITest {
-        ActionButton(title: L10n.chatSamplePhoto, identifier: A11y.chatSamplePhoto) {
-          model.stageChatPhoto(PhotoBytes.sample())
-        }
-      }
+      ChatEntry(model: model, libraryItem: $libraryItem, showCamera: $showCamera)
     }
   }
 
@@ -110,10 +140,21 @@ struct ChatScreen: View {
             Task { await model.deleteChatPhoto(line.id) }
           }
         }
+        Text(ChatTime.label(line.createdAt))
+          .font(Theme.caption)
+          .foregroundStyle(line.mine && line.notice == false ? Theme.canvas.opacity(0.8) : Theme.muted(scheme))
+        if line.delivery == .sending {
+          Text(L10n.chatSending).font(Theme.caption).foregroundStyle(Theme.muted(scheme))
+        } else if line.delivery == .failed {
+          Text(L10n.chatSendFailed).font(Theme.caption).foregroundStyle(Theme.muted(scheme))
+        }
       }
       .padding(12)
       .background(line.notice ? Color.clear : fill(mine: line.mine), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-      .accessibilityIdentifier(line.photo == .opened ? A11y.chatOpened : A11y.chatLine)
+      .accessibilityIdentifier(lineIdentifier(line))
+      .modifier(ChatRetryTap(enabled: line.delivery == .failed && line.photo == nil) {
+        Task { await model.retryChatLine(line.id) }
+      })
       if line.mine == false { Spacer(minLength: 48) }
     }
   }
@@ -128,7 +169,7 @@ struct ChatScreen: View {
           .accessibilityIdentifier(A11y.chatPhotoCard)
       }
       Color.clear.frame(width: 0, height: 0).task { await rememberKept(line) }
-    } else if line.photo == .viewOnce {
+    } else if line.photo == .viewOnce, line.delivery == .sent, model.canReopenPhoto(line.id) {
       Button {
         model.openChatPhoto = line.id
         viewerFailed = false
@@ -141,6 +182,8 @@ struct ChatScreen: View {
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier(A11y.chatPhotoCard)
+    } else if line.photo == .viewOnce {
+      ChatPhotoPlaceholder()
     }
   }
 
@@ -168,6 +211,7 @@ struct ChatScreen: View {
   }
 
   private func openedImage(_ line: ChatLine) async -> UIImage? {
+    guard model.canReopenPhoto(line.id) else { return nil }
     guard let data = try? await model.backend.chatPhoto(line.id) else { return nil }
     return UIImage(data: data)
   }
@@ -184,12 +228,31 @@ struct ChatScreen: View {
     Task { await model.finishViewOnce(id) }
   }
 
+  private func lineIdentifier(_ line: ChatLine) -> String {
+    if line.delivery == .failed { return A11y.chatRetry }
+    if line.photo == .opened { return A11y.chatOpened }
+    return A11y.chatLine
+  }
+
   private func foreground(mine: Bool) -> Color {
     mine ? Theme.canvas : Theme.ink
   }
 
   private func fill(mine: Bool) -> Color {
     mine ? Theme.wine : Theme.blush
+  }
+}
+
+private struct ChatRetryTap: ViewModifier {
+  var enabled: Bool
+  var action: () -> Void
+
+  @ViewBuilder func body(content: Content) -> some View {
+    if enabled {
+      content.onTapGesture(perform: action)
+    } else {
+      content
+    }
   }
 }
 
@@ -222,6 +285,7 @@ struct ChatPhotoViewer: View {
   var onClose: () -> Void
   var onScreenshot: () -> Void
   @State private var captured = UIScreen.main.isCaptured
+  @State private var shots = ScreenshotWatch()
 
   var body: some View {
     ZStack {
@@ -247,9 +311,11 @@ struct ChatPhotoViewer: View {
     .onReceive(NotificationCenter.default.publisher(for: UIScreen.capturedDidChangeNotification)) { _ in
       captured = UIScreen.main.isCaptured
     }
-    .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
-      if mine == false { onScreenshot() }
+    .onAppear {
+      shots.onShot = { if mine == false { onScreenshot() } }
+      shots.register()
     }
+    .onDisappear { shots.unregister() }
   }
 }
 

@@ -51,6 +51,57 @@ enum ChatNotice {
   }
 }
 
+/// Closing a view-once photo is local first. The server catch-up must not bring the tile back.
+enum ChatOpen {
+  static func seal(_ line: ChatLine) -> ChatLine {
+    guard line.photo == .viewOnce || line.photo == .opened else { return line }
+    var next = line
+    next.photo = .opened
+    next.text = L10n.chatOpened
+    next.photoPath = nil
+    next.previewJPEG = nil
+    return next
+  }
+}
+
+/// Closed view-once ids stay closed across a relaunch until the server agrees.
+enum SealedOpens {
+  static func load(_ userId: UUID, defaults: UserDefaults = .standard) -> Set<UUID> {
+    let raw = defaults.stringArray(forKey: key(userId)) ?? []
+    return Set(raw.compactMap { UUID(uuidString: $0) })
+  }
+
+  static func store(_ ids: Set<UUID>, userId: UUID, defaults: UserDefaults = .standard) {
+    let values = ids.map(\.uuidString)
+    defaults.set(values, forKey: key(userId))
+  }
+
+  private static func key(_ userId: UUID) -> String {
+    "justus.sealed.\(userId.uuidString.lowercased())"
+  }
+}
+
+/// One screenshot notice per photo inside a short window, on send and on screen.
+enum ScreenshotDedup {
+  static let window: TimeInterval = 3
+
+  static func allow(messageId: UUID, now: Date, previous: (UUID, Date)?) -> Bool {
+    guard let previous, previous.0 == messageId else { return true }
+    return now.timeIntervalSince(previous.1) >= window
+  }
+
+  static func collapse(_ lines: [ChatLine], window: TimeInterval = ScreenshotDedup.window) -> [ChatLine] {
+    var kept: [ChatLine] = []
+    for line in lines {
+      if line.notice, let prior = kept.last(where: { $0.notice && $0.text == line.text }) {
+        if abs(line.createdAt.timeIntervalSince(prior.createdAt)) < window { continue }
+      }
+      kept.append(line)
+    }
+    return kept
+  }
+}
+
 enum ChatPushCopy {
   static let body = "New message"
 

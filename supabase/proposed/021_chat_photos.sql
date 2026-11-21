@@ -42,7 +42,11 @@ begin
   end if;
 end $$;
 
-alter table storage.objects enable row level security;
+-- Hosted storage.objects already has row level security. The role that
+-- applies this file is not the table owner, so
+-- `alter table storage.objects enable row level security` fails with
+-- "must be owner of table objects". The policies below still attach.
+-- scripts/sql/harness.sql enables it for the embedded database, which owns the table.
 
 drop policy if exists chat_photos_select on storage.objects;
 drop policy if exists chat_photos_insert on storage.objects;

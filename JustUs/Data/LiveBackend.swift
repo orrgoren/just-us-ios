@@ -5,9 +5,15 @@ import Supabase
 @MainActor
 final class LiveBackend: DateBackend {
   var onRemoteChange: (@MainActor () -> Void)?
+  var onChatInsert: (@MainActor (ChatMessageRow) -> Void)?
+  var onChatOpened: (@MainActor (UUID) -> Void)?
+  var onChatReload: (@MainActor () -> Void)?
+  var chatMaterials: ChatMaterials?
+  var recentShots: [UUID: Date] = [:]
   let client: SupabaseClient?
   let chatSocket = LiveWatch()
   let moodSocket = LiveWatch()
+  let keySocket = LiveWatch()
   private var cachedUser: UUID?
   private var deviceToken: String?
   private var partnerKeyNoticeText: String?
@@ -214,6 +220,7 @@ final class LiveBackend: DateBackend {
       PartnerKeyMemory.clear(userId: cachedUser)
     }
     cachedUser = nil
+    chatMaterials = nil
     var record = DeviceTokenStore.load()
     record.removedFromAccount()
     DeviceTokenStore.save(record)
@@ -234,6 +241,7 @@ final class LiveBackend: DateBackend {
     try await run { client in
       try await client.rpc("create_couple", params: params).execute()
     }
+    chatMaterials = nil
   }
 
   func createInvite() async throws -> String {
@@ -263,6 +271,7 @@ final class LiveBackend: DateBackend {
     try await run { client in
       try await client.rpc("redeem_couple_invite", params: RedeemParams(pToken: extracted, pReplaceEmpty: replaceEmpty)).execute()
     }
+    chatMaterials = nil
     await notify("inviteAccepted")
   }
 
@@ -359,6 +368,7 @@ final class LiveBackend: DateBackend {
       let response: PostgrestResponse<[UUID]> = try await client.rpc("leave_couple").execute()
       return response.value
     }
+    chatMaterials = nil
     await forgetPhotos(closed)
   }
 
@@ -427,6 +437,7 @@ final class LiveBackend: DateBackend {
     guard let context else { return [] }
     let identity = try await publishDeviceKey(userId: context.userId, reason: .refresh)
     await watchChat(coupleId: context.couple.id)
+    await watchKeys(userId: context.userId)
     let rows = try await chatRows(coupleId: context.couple.id)
     let keys = try await loadDeviceKeys(
       coupleId: context.couple.id, senderKeys: rows.map(\.senderPublicKey)
@@ -438,6 +449,7 @@ final class LiveBackend: DateBackend {
     if PartnerKeyMemory.remember(userId: context.userId, current: partnerKeys) {
       partnerKeyNoticeText = L10n.chatKeyChanged
     }
+    chatMaterials = ChatMaterials(context: context, identity: identity, keys: keys)
     await sweepChatPhotos()
     let fresh = (try? await chatRows(coupleId: context.couple.id)) ?? rows
     let retired = DeviceKeyStore.retired(userId: context.userId)
@@ -447,28 +459,8 @@ final class LiveBackend: DateBackend {
     return ChatWindow.chronological(lines)
   }
 
-  func sendMessage(_ text: String) async throws {
-    let clear = try ChatText.normalized(text)
-    guard let context = try await loadContext() else { throw AppError.saveFailed }
-    guard context.members.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
-    let identity = try await publishDeviceKey(userId: context.userId, reason: .send)
-    let keys = try await loadDeviceKeys(coupleId: context.couple.id)
-    let targets = chatTargets(keys: keys.filter { $0.retiredAt == nil }, userId: context.userId, identity: identity)
-    guard targets.contains(where: { $0.userId != context.userId }) else { throw AppError.partnerNotReady }
-    let messageId = UUID()
-    let envelopes = try ChatCrypto.seal(
-      text: clear, messageId: messageId, senderUserId: context.userId, from: identity, to: targets
-    )
-    guard envelopes.contains(where: { $0.keyId != identity.id }) else { throw AppError.partnerNotReady }
-    let row = ChatInsert(
-      id: messageId, coupleId: context.couple.id, senderUserId: context.userId,
-      senderPublicKey: ChatCoding.text(identity.publicKey),
-      envelopes: envelopes.map { EnvelopeWire(keyId: $0.keyId, box: ChatCoding.text($0.box)) }
-    )
-    try await run { client in
-      try await client.from("chat_messages").insert(row).execute()
-    }
-    await notify("chatMessage")
+  func sendMessage(_ text: String, id: UUID) async throws -> ChatLine {
+    try await writeMessage(text, id: id, allowRefresh: true)
   }
 
   func chatTargets(keys: [DeviceKeyRow], userId: UUID, identity: ChatIdentity) -> [ChatTarget] {

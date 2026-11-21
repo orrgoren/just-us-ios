@@ -176,7 +176,10 @@ final class ChatPhotoFlowTests: XCTestCase {
     let listed = try await backend.messages()
     let photo = try XCTUnwrap(listed.first { $0.photo == .kept })
     switchToBlair(backend)
-    try await backend.sendScreenshotNotice()
+    let sentNotice = try await backend.sendScreenshotNotice(for: photo.id)
+    XCTAssertNotNil(sentNotice)
+    let again = try await backend.sendScreenshotNotice(for: photo.id)
+    XCTAssertNil(again)
     switchToAlex(backend)
     let lines = try await backend.messages()
     let notice = try XCTUnwrap(lines.first { $0.notice })
@@ -190,6 +193,80 @@ final class ChatPhotoFlowTests: XCTestCase {
     } catch {
       XCTAssertEqual(ErrorMap.app(error), .notEditable)
     }
+  }
+
+  func testViewOnceClosesBeforeTheBytesAreGone() async throws {
+    let backend = try await signedInAlex()
+    let sent = try await backend.sendPhoto(PhotoBytes.sample(), retention: .viewOnce)
+    switchToBlair(backend)
+    let blair = SessionModel(backend: backend)
+    await blair.loadMessages()
+    backend.holdConsume = true
+    let closing = Task { await blair.finishViewOnce(sent.id) }
+    let opened = await waitUntil { blair.messages.first { $0.id == sent.id }?.photo == .opened }
+    XCTAssertTrue(opened)
+    XCTAssertEqual(blair.messages.first { $0.id == sent.id }?.text, L10n.chatOpened)
+    XCTAssertFalse(blair.canReopenPhoto(sent.id))
+    XCTAssertNil(blair.errorMessage)
+    let held = try XCTUnwrap(backend.store.world.chats.first { $0.id == sent.id })
+    XCTAssertNotNil(held.objectBytes)
+    backend.photoRemoveError = RemovalFailed()
+    backend.releaseConsume()
+    await closing.value
+    let kept = try XCTUnwrap(backend.store.world.chats.first { $0.id == sent.id })
+    XCTAssertNotNil(kept.objectBytes)
+    XCTAssertNotNil(kept.photoPath)
+    await blair.loadMessages()
+    XCTAssertEqual(blair.messages.first { $0.id == sent.id }?.photo, .opened)
+    XCTAssertFalse(blair.canReopenPhoto(sent.id))
+    backend.photoRemoveError = nil
+    await blair.loadMessages()
+    let cleared = try XCTUnwrap(backend.store.world.chats.first { $0.id == sent.id })
+    XCTAssertNil(cleared.objectBytes)
+    XCTAssertNil(cleared.photoPath)
+    XCTAssertNotNil(cleared.openedAt)
+  }
+
+  func testViewOnceSealSurvivesRelaunch() async throws {
+    let backend = try await signedInAlex()
+    let sent = try await backend.sendPhoto(PhotoBytes.sample(), retention: .viewOnce)
+    switchToBlair(backend)
+    let blair = SessionModel(backend: backend)
+    await blair.refresh()
+    await blair.loadMessages()
+    backend.consumeError = .offline
+    await blair.finishViewOnce(sent.id)
+    XCTAssertEqual(blair.messages.first { $0.id == sent.id }?.photo, .opened)
+    XCTAssertNil(backend.store.world.chats.first { $0.id == sent.id }?.openedAt)
+    let relaunched = SessionModel(backend: backend)
+    await relaunched.refresh()
+    await relaunched.loadMessages()
+    XCTAssertEqual(relaunched.messages.first { $0.id == sent.id }?.photo, .opened)
+    XCTAssertFalse(relaunched.canReopenPhoto(sent.id))
+  }
+
+  func testOneScreenshotMakesOneNotice() async throws {
+    let backend = try await signedInAlex()
+    let sent = try await backend.sendPhoto(PhotoBytes.sample(), retention: .viewOnce)
+    switchToBlair(backend)
+    let blair = SessionModel(backend: backend)
+    await blair.loadMessages()
+    blair.openChatPhoto = sent.id
+    await blair.noteScreenshot()
+    await blair.noteScreenshot()
+    XCTAssertEqual(blair.messages.filter(\.notice).count, 1)
+    XCTAssertEqual(backend.store.world.chats.filter { $0.kind == "notice" }.count, 1)
+    let lines = try await backend.messages()
+    XCTAssertEqual(lines.filter(\.notice).count, 1)
+    XCTAssertEqual(lines.first { $0.notice }?.text, "Blair took a screenshot")
+  }
+
+  private func waitUntil(_ ready: () -> Bool) async -> Bool {
+    for _ in 0..<40 {
+      if ready() { return true }
+      try? await Task.sleep(for: .milliseconds(25))
+    }
+    return ready()
   }
 
   private func signedInAlex() async throws -> FakeBackend {
