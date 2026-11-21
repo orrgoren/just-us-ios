@@ -1,14 +1,13 @@
-// Live send-push is v6, deployed on 2026-11-16 from 5013075 (the same
-// content as 7872d1e) with verify_jwt on. a12f1d1 is v3 and is the rollback
-// source. This file adds chatMessage on top of that v6 source. 002, 006, and
-// 007 are already applied. Do not re-apply them.
+// Live send-push is v8. The earlier v6 source was 5013075 (the same content
+// as 7872d1e). a12f1d1 is v3 and is the rollback source.
+// 002, 006, and 007 are already applied. Do not re-apply them.
 //
 // The body is only { "kind" }. Device tokens, display names, the local hour,
 // and the nudge index are never taken from the client. The recipient's tokens
 // are loaded with the service role after the caller's JWT is confirmed to be
 // a user. The daily cap, the six-hour dedupe, and the invite nudge windows
-// match JustUs/Domain/PushPolicy.swift, except a mood alert: partnerMood
-// skips the daily cap and still waits six hours. A push is not held for
+// match JustUs/Domain/PushPolicy.swift. partnerMood skips the daily cap
+// and still waits six hours. A push is not held for
 // 22:00–08:00. chatMessage skips the daily cap and the six-hour dedupe. It
 // is sent only when the caller inserted a chat_messages row in the last 60
 // seconds.

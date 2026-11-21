@@ -845,9 +845,9 @@ begin
   execute 'reset role';
 end $$;
 
--- 017. Applied live on 2026-11-16 as 20261116024327.
+-- 017, then 020. 017 is applied live as 20261116024327. 020 is proposed.
 -- A new draft takes the other member after the last completed or
--- scheduled night. A skip leaves that turn alone.
+-- scheduled night. A skip keeps that night's planner.
 insert into auth.users (id) values
   ('61616161-6161-4161-8161-616161616161'),
   ('62626262-6262-4262-8262-626262626262');
@@ -920,7 +920,7 @@ insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, 
   (
     '67676767-6767-4676-8676-676767676767',
     '63636363-6363-4363-8363-636363636363',
-    '61616161-6161-4161-8161-616161616161',
+    '62626262-6262-4262-8262-626262626262',
     'skipped',
     '2026-11-05 18:30:00+00',
     'home'
@@ -977,6 +977,40 @@ begin
 end $$;
 
 delete from public.dates where id = '6a6a6a6a-6a6a-46a6-86a6-6a6a6a6a6a6a';
+
+insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, location) values
+  (
+    '6f6f6f6f-6f6f-46f6-86f6-6f6f6f6f6f6f',
+    '63636363-6363-4363-8363-636363636363',
+    '62626262-6262-4262-8262-626262626262',
+    'skipped',
+    '2026-11-19 18:30:00+00',
+    'home'
+  );
+
+insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, location) values
+  (
+    '70707070-7070-4070-8070-707070707070',
+    '63636363-6363-4363-8363-636363636363',
+    '61616161-6161-4161-8161-616161616161',
+    'draft',
+    '2026-11-26 18:30:00+00',
+    'home'
+  );
+
+do $$
+begin
+  if (
+    select planner_user_id from public.dates where id = '70707070-7070-4070-8070-707070707070'
+  ) is distinct from '62626262-6262-4262-8262-626262626262' then
+    raise exception 'swapped_skip_did_not_keep_the_planner';
+  end if;
+end $$;
+
+delete from public.dates where id in (
+  '70707070-7070-4070-8070-707070707070',
+  '6f6f6f6f-6f6f-46f6-86f6-6f6f6f6f6f6f'
+);
 
 insert into public.dates (id, couple_id, planner_user_id, status, scheduled_at, location) values
   (

@@ -123,7 +123,7 @@ final class DomainTests: XCTestCase {
     let prior = PushRecord(kind: .weeklyReminder, sentAt: noon, transactional: false)
     XCTAssertEqual(
       PushPolicy.decide(kind: .partnerMood, now: noon.addingTimeInterval(60), timeZone: zone, history: [prior], preferences: .allOn),
-      .suppress("daily_non_transactional")
+      .send
     )
     XCTAssertEqual(
       PushPolicy.decide(kind: .planReady, now: noon.addingTimeInterval(60), timeZone: zone, history: [prior], preferences: .allOn),
@@ -412,6 +412,8 @@ final class DomainTests: XCTestCase {
     let finished = try night("2026-11-12", .completed, SeedID.blair)
     let skipped = try night("2026-11-19", .skipped, SeedID.alex)
     XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished, skipped], members: members), SeedID.alex)
+    let swapped = try night("2026-11-19", .skipped, SeedID.blair)
+    XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished, swapped], members: members), SeedID.blair)
     let scheduled = try night("2026-11-19", .scheduled, SeedID.alex)
     XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished, scheduled], members: members), SeedID.blair)
     XCTAssertEqual(PlannerTurn.nextPlanner(nights: [finished], members: [alex]), SeedID.alex)

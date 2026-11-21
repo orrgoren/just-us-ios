@@ -9,19 +9,22 @@ struct DatedNight: Equatable, Sendable {
 
 enum PlannerTurn {
   /// The person who plans the next draft. A scheduled or completed night hands
-  /// the following one to the other member. A skip leaves the turn where it is.
-  /// The latest night is the one with the latest scheduled time, then the latest
-  /// created time, matching `next_planner_user_id`.
+  /// the following one to the other member. A skip keeps whoever was planning
+  /// that night, including after a manual swap. The latest night is the one
+  /// with the latest scheduled time, then the latest created time.
   static func nextPlanner(nights: [DatedNight], members: [MemberRef]) -> UUID? {
     let ordered = members.sorted { $0.memberIndex < $1.memberIndex }
     guard let first = ordered.first else { return nil }
     let history = nights
-      .filter { $0.status == .completed || $0.status == .scheduled }
+      .filter { $0.status == .completed || $0.status == .scheduled || $0.status == .skipped }
       .sorted { lhs, rhs in
         if lhs.scheduledAt != rhs.scheduledAt { return lhs.scheduledAt > rhs.scheduledAt }
         return lhs.createdAt > rhs.createdAt
       }
     guard let last = history.first else { return first.userId }
+    if last.status == .skipped {
+      return ordered.contains { $0.userId == last.plannerUserId } ? last.plannerUserId : first.userId
+    }
     return ordered.first { $0.userId != last.plannerUserId }?.userId ?? last.plannerUserId
   }
 }

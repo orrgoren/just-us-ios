@@ -1,10 +1,12 @@
 import Foundation
 
 enum PushPolicy {
+  /// Chat and a partner mood skip the once-a-day cap. A mood still waits six
+  /// hours, and that wait is checked before the cap.
   static func isTransactional(_ kind: PushKind) -> Bool {
     switch kind {
-    case .partnerMood, .planReady, .inviteAccepted, .weeklyReminder, .inviteNudge: return false
-    case .chatMessage: return true
+    case .chatMessage, .partnerMood: return true
+    case .planReady, .inviteAccepted, .weeklyReminder, .inviteNudge: return false
     }
   }
 
