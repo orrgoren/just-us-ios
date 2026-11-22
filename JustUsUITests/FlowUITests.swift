@@ -24,7 +24,9 @@ final class FlowUITests: XCTestCase {
     let dismissed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: keyboard)], timeout: 4)
     XCTAssertEqual(dismissed, .completed)
     XCTAssertFalse(keyboard.exists)
-    XCTAssertFalse(field.hasKeyboardFocus)
+    let unfocused = NSPredicate(format: "hasKeyboardFocus == false")
+    let closed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: unfocused, object: field)], timeout: 2)
+    XCTAssertEqual(closed, .completed)
     XCTAssertTrue(app.buttons["chatSend"].exists)
   }
 
