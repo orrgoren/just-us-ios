@@ -82,9 +82,41 @@ final class ChatLiveTests: XCTestCase {
     alex.tab = .week
     alex.noteForegroundChat()
     XCTAssertEqual(alex.chatBanner, L10n.chatArrived)
-    alex.tab = .chat
-    alex.noteForegroundChat()
+    alex.presentChat()
+    XCTAssertTrue(alex.chatPresented)
     XCTAssertNil(alex.chatBanner)
+    alex.noteForegroundChat()
+    alex.showIncoming(ChatLine(
+      id: UUID(), senderUserId: SeedID.blair, text: "later", createdAt: Date(), mine: false, unreadable: false
+    ))
+    XCTAssertNil(alex.chatBanner)
+    alex.chatPresented = false
+    guard let chatURL = URL(string: "justus://chat") else {
+      return XCTFail("Missing chat URL")
+    }
+    await alex.open(chatURL)
+    XCTAssertTrue(alex.chatPresented)
+  }
+
+  func testUnreadCountsPartnerLinesUntilTheThreadIsOpened() {
+    let now = Date(timeIntervalSince1970: 1_763_000_000)
+    let partner = ChatLine(
+      id: UUID(), senderUserId: SeedID.blair, text: "tea", createdAt: now, mine: false, unreadable: false
+    )
+    let mine = ChatLine(
+      id: UUID(), senderUserId: SeedID.alex, text: "ok", createdAt: now, mine: true, unreadable: false
+    )
+    let notice = ChatLine(
+      id: UUID(), senderUserId: SeedID.blair, text: "shot", createdAt: now, mine: false, unreadable: false, notice: true
+    )
+    XCTAssertEqual(ChatUnread.count([partner, mine, notice], seenThrough: nil), 1)
+    XCTAssertEqual(ChatUnread.count([partner], seenThrough: now), 0)
+    XCTAssertEqual(ChatUnread.count([partner], seenThrough: now.addingTimeInterval(-1)), 1)
+    let defaults = UserDefaults(suiteName: "chat-seen-\(UUID().uuidString)") ?? .standard
+    ChatSeen.mark(now, userId: SeedID.alex, defaults: defaults)
+    XCTAssertEqual(ChatSeen.through(SeedID.alex, defaults: defaults), now)
+    ChatSeen.mark(now.addingTimeInterval(-10), userId: SeedID.alex, defaults: defaults)
+    XCTAssertEqual(ChatSeen.through(SeedID.alex, defaults: defaults), now)
   }
 
   func testScrollFollowsOnlyWhenAlreadyAtTheBottom() {

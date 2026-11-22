@@ -2,8 +2,38 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+struct ChatSheet: View {
+  @Bindable var model: SessionModel
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.keyboardDismiss) private var keyboardDismiss
+  @FocusState private var composerFocused: Bool
+
+  var body: some View {
+    NavigationStack {
+      ChatScreen(model: model, composerFocused: $composerFocused)
+        .padding(Theme.Space.screen)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button(L10n.close) { model.chatPresented = false }
+              .accessibilityIdentifier(A11y.chatClose)
+          }
+          ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button(L10n.dismissKeyboard) { composerFocused = false }
+              .accessibilityIdentifier(A11y.dismissKeyboard)
+          }
+        }
+    }
+    .presentationDetents([.large])
+    .presentationDragIndicator(.visible)
+    .presentationBackground(Theme.canvas(scheme))
+    .onChange(of: keyboardDismiss) { _, _ in composerFocused = false }
+  }
+}
+
 struct ChatScreen: View {
   @Bindable var model: SessionModel
+  @FocusState.Binding var composerFocused: Bool
   @Environment(\.colorScheme) private var scheme
   @State private var libraryItem: PhotosPickerItem?
   @State private var showCamera = false
@@ -12,6 +42,7 @@ struct ChatScreen: View {
   @State private var keptImages: [UUID: UIImage] = [:]
   @State private var nearBottom = true
   @State private var showPill = false
+  @State private var threadHeight: CGFloat = 0
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.stack) {
@@ -73,9 +104,19 @@ struct ChatScreen: View {
               }
               .onDisappear { nearBottom = false }
           }
+          .frame(maxWidth: .infinity, minHeight: threadHeight, alignment: .bottom)
+          .contentShape(Rectangle())
+          .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
         }
+        .background {
+          GeometryReader { proxy in
+            Color.clear.preference(key: ThreadHeightKey.self, value: proxy.size.height)
+          }
+        }
+        .onPreferenceChange(ThreadHeightKey.self) { threadHeight = $0 }
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
+        .accessibilityIdentifier(A11y.chatThread)
         .onChange(of: model.messages.count) { _, _ in
           follow(proxy)
         }
@@ -119,7 +160,7 @@ struct ChatScreen: View {
         Task { await model.sendStagedPhoto() }
       }
     } else {
-      ChatEntry(model: model, libraryItem: $libraryItem, showCamera: $showCamera)
+      ChatEntry(model: model, libraryItem: $libraryItem, showCamera: $showCamera, focused: $composerFocused)
     }
   }
 
@@ -254,6 +295,13 @@ struct ChatScreen: View {
 
   private func fill(mine: Bool) -> Color {
     mine ? Theme.wine : Theme.blush
+  }
+}
+
+private struct ThreadHeightKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }
 

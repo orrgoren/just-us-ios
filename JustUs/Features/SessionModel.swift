@@ -24,6 +24,7 @@ final class SessionModel {
 
   var screen: Screen = .loading
   var tab: AppTab = .week
+  var chatPresented = false
   var email = ""
   var code = ""
   var draft = CoupleDraft(selfName: "", partnerName: "", weekday: 4, localTime: "20:30", timezone: TimeZone.current.identifier, durationMinutes: 90)
@@ -74,6 +75,15 @@ final class SessionModel {
   var lastShot: (UUID, Date)?
   var chatKeyNotice: String?
   var focusReveal = false
+
+  var coupleIsLinked: Bool {
+    ritual?.partner != nil || settings?.partnerJoined == true
+  }
+
+  var chatUnread: Int {
+    guard chatPresented == false, let userId = ritual?.selfMember.userId else { return 0 }
+    return ChatUnread.count(messages, seenThrough: ChatSeen.through(userId))
+  }
   let backend: any DateBackend
   let pendingAppleNonce = AppleNonceBox()
   private let apple = AppleSignInCoordinator()
@@ -373,6 +383,8 @@ final class SessionModel {
     pendingReplace = false
     blocked = false
     focusReveal = false
+    chatPresented = false
+    chatBanner = nil
     signedIn = false
     offerNewLink = false
     spaceClosed = false
@@ -621,7 +633,7 @@ final class SessionModel {
     case .settings:
       tab = .settings
     case .chat:
-      tab = .chat
+      presentChat()
     case .invite(let token):
       presentInvite(token)
     }

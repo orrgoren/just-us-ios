@@ -164,7 +164,7 @@ jobs:
           printf '%s' "se" > /tmp/justus-screenshot-prefix.txt
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b || true
-          # Unit tests plus launch, create-couple, and sign-out.
+          # Unit tests plus launch, create-couple, sign-out, and the chat keyboard and bubble.
           # ui_suite=full runs every test in the scheme, including the rest of the UI suite.
           common=(
             -project JustUs.xcodeproj
@@ -183,6 +183,11 @@ jobs:
               -only-testing:JustUsUITests/FlowUITests/testLaunchShowsLogin
               -only-testing:JustUsUITests/FlowUITests/testCreateCoupleAndInvite
               -only-testing:JustUsUITests/FlowUITests/testSignOutReturnsToLogin
+              -only-testing:JustUsUITests/FlowUITests/testChatDoneDismissesTheKeyboard
+              -only-testing:JustUsUITests/FlowUITests/testChatReturnInsertsALine
+              -only-testing:JustUsUITests/FlowUITests/testChatListTapDismissesTheKeyboard
+              -only-testing:JustUsUITests/FlowUITests/testChatDraftSurvivesReopeningTheSheet
+              -only-testing:JustUsUITests/FlowUITests/testChatBubbleOpensTheModal
             )
             if [ "${SCREENSHOTS}" = "true" ]; then
               only+=(-only-testing:JustUsUITests/ScreenshotUITests)

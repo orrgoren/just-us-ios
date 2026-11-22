@@ -53,9 +53,23 @@ extension SessionModel {
         chatKeyNotice = notice
       }
       await flushConsumes()
+      if chatPresented { markChatSeen() }
     } catch {
       errorMessage = L10n.message(for: ErrorMap.app(error))
     }
+  }
+
+  func presentChat() {
+    chatPresented = true
+    chatBanner = nil
+    markChatSeen()
+    Task { await loadMessages() }
+  }
+
+  func markChatSeen() {
+    guard let userId = ritual?.selfMember.userId else { return }
+    let latest = messages.map(\.createdAt).max() ?? Date()
+    ChatSeen.mark(latest, userId: userId)
   }
 
   func choose(mood: MoodKey) async {
@@ -231,7 +245,12 @@ extension SessionModel {
       sealOpen(line.id)
     }
     guard known == false else { return }
-    if ChatPush.showsBanner(chat: true, chatVisible: tab == .chat) {
+    if chatPresented {
+      markChatSeen()
+      chatBanner = nil
+      return
+    }
+    if ChatPush.showsBanner(chat: true, chatVisible: false) {
       chatBanner = L10n.chatArrived
     }
   }
@@ -245,7 +264,7 @@ extension SessionModel {
   }
 
   func noteForegroundChat() {
-    guard ChatPush.showsBanner(chat: true, chatVisible: tab == .chat) else {
+    guard ChatPush.showsBanner(chat: true, chatVisible: chatPresented) else {
       chatBanner = nil
       return
     }
@@ -534,6 +553,13 @@ extension SessionModel {
       screen = .main
     case "chat", "chatPhoto", "chatPhotoChoice":
       await chatScreenshot(name)
+    case "chatBadge":
+      await signedIn("alex@couple-a.test")
+      (backend as? FakeBackend)?.seedUnreadChat()
+      await loadMessages()
+      tab = .week
+      chatPresented = false
+      screen = .main
     default:
       return false
     }
@@ -608,8 +634,9 @@ extension SessionModel {
     } else {
       stageChatPhoto(PhotoBytes.sample())
     }
-    tab = .chat
+    tab = .week
     screen = .main
+    presentChat()
   }
 
   private func signedIn(_ email: String) async {

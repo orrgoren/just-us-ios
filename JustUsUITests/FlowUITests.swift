@@ -6,6 +6,103 @@ final class FlowUITests: XCTestCase {
     continueAfterFailure = false
   }
 
+  func testChatDoneDismissesTheKeyboard() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "chat", "-JustUsAppearance", "light"]
+    app.launch()
+    let field = app.descendants(matching: .any)["chatField"]
+    XCTAssertTrue(field.waitForExistence(timeout: 10))
+    field.tap()
+    let keyboard = app.keyboards.firstMatch
+    XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+    field.typeText("hi")
+    XCTAssertTrue(app.buttons["chatSend"].waitForExistence(timeout: 4))
+    let done = app.buttons["dismissKeyboard"]
+    XCTAssertTrue(done.waitForExistence(timeout: 4))
+    done.tap()
+    let gone = NSPredicate(format: "exists == false")
+    let dismissed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: keyboard)], timeout: 4)
+    XCTAssertEqual(dismissed, .completed)
+    XCTAssertFalse(keyboard.exists)
+    let unfocused = NSPredicate(format: "hasKeyboardFocus == false")
+    let closed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: unfocused, object: field)], timeout: 2)
+    XCTAssertEqual(closed, .completed)
+    XCTAssertTrue(app.buttons["chatSend"].exists)
+  }
+
+  func testChatReturnInsertsALine() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "chat", "-JustUsAppearance", "light"]
+    app.launch()
+    let field = app.descendants(matching: .any)["chatField"]
+    XCTAssertTrue(field.waitForExistence(timeout: 10))
+    let lines = app.descendants(matching: .any).matching(identifier: "chat.line")
+    let before = lines.count
+    field.tap()
+    field.typeText("hi\nthere")
+    let value = field.value as? String ?? ""
+    XCTAssertTrue(value.contains("\n"))
+    XCTAssertTrue(value.contains("hi"))
+    XCTAssertTrue(value.contains("there"))
+    app.buttons["dismissKeyboard"].tap()
+    let gone = NSPredicate(format: "exists == false")
+    _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: app.keyboards.firstMatch)], timeout: 4)
+    XCTAssertEqual(lines.count, before)
+    XCTAssertTrue(app.buttons["chatSend"].exists)
+    let kept = field.value as? String ?? ""
+    XCTAssertTrue(kept.contains("\n"))
+  }
+
+  func testChatListTapDismissesTheKeyboard() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "chat", "-JustUsAppearance", "light"]
+    app.launch()
+    let field = app.descendants(matching: .any)["chatField"]
+    XCTAssertTrue(field.waitForExistence(timeout: 10))
+    field.tap()
+    let keyboard = app.keyboards.firstMatch
+    XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+    let thread = app.descendants(matching: .any)["chatThread"]
+    XCTAssertTrue(thread.waitForExistence(timeout: 4))
+    thread.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+    let gone = NSPredicate(format: "exists == false")
+    let dismissed = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: keyboard)], timeout: 4)
+    XCTAssertEqual(dismissed, .completed)
+  }
+
+  func testChatDraftSurvivesReopeningTheSheet() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "homePlanner", "-JustUsAppearance", "light"]
+    app.launch()
+    let bubble = app.buttons["chatBubble"]
+    XCTAssertTrue(bubble.waitForExistence(timeout: 10))
+    bubble.tap()
+    let field = app.descendants(matching: .any)["chatField"]
+    XCTAssertTrue(field.waitForExistence(timeout: 8))
+    field.tap()
+    field.typeText("keep me")
+    app.buttons["chatClose"].tap()
+    XCTAssertTrue(bubble.waitForExistence(timeout: 4))
+    bubble.tap()
+    XCTAssertTrue(field.waitForExistence(timeout: 8))
+    let value = field.value as? String ?? ""
+    XCTAssertTrue(value.contains("keep me"))
+  }
+
+  func testChatBubbleOpensTheModal() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "homePlanner", "-JustUsAppearance", "light"]
+    app.launch()
+    XCTAssertTrue(app.staticTexts["Just Us"].waitForExistence(timeout: 10))
+    XCTAssertFalse(app.buttons["Chat"].exists)
+    let bubble = app.buttons["chatBubble"]
+    XCTAssertTrue(bubble.waitForExistence(timeout: 4))
+    XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "chatBadge").count, 0)
+    bubble.tap()
+    XCTAssertTrue(app.descendants(matching: .any)["chatField"].waitForExistence(timeout: 8))
+    XCTAssertTrue(app.buttons["chatClose"].exists)
+  }
+
   func testLaunchShowsLogin() {
     let app = launch()
     XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 12))

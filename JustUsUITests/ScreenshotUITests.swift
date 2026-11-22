@@ -5,7 +5,8 @@ final class ScreenshotUITests: XCTestCase {
     let screens = [
       "login", "code", "setup", "inviteShare", "softPrompt", "inviteRedeem",
       "inviteReplace", "inviteBlocked", "homeSolo", "homePlanner", "homePartner",
-      "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount", "offline", "chat",
+      "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount",
+      "offline", "chat", "chatBadge",
       "chatPhoto", "chatPhotoChoice",
       "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan", "editHint",
       "errorBanner", "unlinkConfirm", "postDeletion", "spaceClosed", "notificationTap", "signOut"
@@ -24,6 +25,7 @@ final class ScreenshotUITests: XCTestCase {
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryAccessibilityXXXL")
     }
     capture(screen: "chat", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-chat")
+    capture(screen: "chatBadge", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-chat-badge")
     capture(screen: "homePlanner", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-home")
     capture(screen: "settings", appearance: "dark", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-settings")
     capture(screen: "memories", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-memories")
@@ -48,8 +50,23 @@ final class ScreenshotUITests: XCTestCase {
       _ = app.textFields["emailField"].waitForExistence(timeout: 10)
     } else if screen == "spaceClosed" {
       XCTAssertTrue(app.staticTexts["spaceClosed"].waitForExistence(timeout: 10))
+    } else if screen == "chat" || screen == "chatPhoto" || screen == "chatPhotoChoice" {
+      _ = app.buttons["chatClose"].waitForExistence(timeout: 10)
     } else {
       _ = app.staticTexts["Just Us"].waitForExistence(timeout: 10)
+    }
+    if screen == "homePlanner" || screen == "homePartner" || screen == "settings" {
+      XCTAssertFalse(app.buttons["Chat"].exists)
+      XCTAssertTrue(app.buttons["chatBubble"].waitForExistence(timeout: 4))
+      XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "chatBadge").count, 0)
+    }
+    if screen == "homeSolo" || screen == "memoriesEmpty" {
+      XCTAssertFalse(app.buttons["chatBubble"].exists)
+    }
+    if screen == "chatBadge" {
+      XCTAssertFalse(app.buttons["Chat"].exists)
+      XCTAssertTrue(app.buttons["chatBubble"].waitForExistence(timeout: 4))
+      XCTAssertTrue(app.descendants(matching: .any)["chatBadge"].waitForExistence(timeout: 4))
     }
     if screen == "chat" || screen == "chatPhoto" {
       let field = app.descendants(matching: .any)["chatField"]
@@ -78,8 +95,20 @@ final class ScreenshotUITests: XCTestCase {
       dismissAttachMenu(app, library: library)
       let field = app.descendants(matching: .any)["chatField"]
       field.tap()
+      XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 4))
       field.typeText("hi")
       XCTAssertTrue(app.buttons["chatSend"].waitForExistence(timeout: 4))
+      addShot(app, screen: label, appearance: appearance, size: size, suffix: "keyboard")
+      let done = app.buttons["dismissKeyboard"]
+      XCTAssertTrue(done.waitForExistence(timeout: 4))
+      XCTAssertEqual(done.label, "Done")
+      done.tap()
+      let gone = NSPredicate(format: "exists == false")
+      XCTAssertEqual(
+        XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: app.keyboards.firstMatch)], timeout: 4),
+        .completed
+      )
+      addShot(app, screen: label, appearance: appearance, size: size, suffix: "dismissed")
     }
     app.terminate()
   }

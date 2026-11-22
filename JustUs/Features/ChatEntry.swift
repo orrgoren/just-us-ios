@@ -7,8 +7,8 @@ struct ChatEntry: View {
   @Bindable var model: SessionModel
   @Binding var libraryItem: PhotosPickerItem?
   @Binding var showCamera: Bool
+  @FocusState.Binding var focused: Bool
   @Environment(\.colorScheme) private var scheme
-  @FocusState private var focused: Bool
   @State private var showAttach = false
   @State private var showLibrary = false
 
@@ -54,8 +54,6 @@ struct ChatEntry: View {
         .font(Theme.body)
         .foregroundStyle(Theme.ink(scheme))
         .accessibilityIdentifier(A11y.chatField)
-        .submitLabel(.send)
-        .onSubmit(send)
     }
     .padding(.leading, 4)
     .padding(.trailing, 12)
