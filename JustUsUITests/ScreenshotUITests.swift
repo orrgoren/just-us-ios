@@ -23,6 +23,7 @@ final class ScreenshotUITests: XCTestCase {
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryXS")
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryAccessibilityXXXL")
     }
+    capture(screen: "chat", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-chat")
     capture(screen: "homePlanner", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-home")
     capture(screen: "settings", appearance: "dark", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-settings")
     capture(screen: "memories", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-memories")
@@ -55,6 +56,11 @@ final class ScreenshotUITests: XCTestCase {
       XCTAssertTrue(field.waitForExistence(timeout: 8))
       XCTAssertTrue(app.buttons["chatAttach"].exists)
       XCTAssertFalse(app.buttons["chatSend"].exists)
+    }
+    if screen == "chat" {
+      let days = app.descendants(matching: .any).matching(identifier: "chatDay")
+      XCTAssertTrue(days.firstMatch.waitForExistence(timeout: 8))
+      XCTAssertGreaterThanOrEqual(days.count, 2)
     }
     let label = name ?? screen
     addShot(app, screen: label, appearance: appearance, size: size, suffix: nil)
