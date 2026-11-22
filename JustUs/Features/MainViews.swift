@@ -255,7 +255,7 @@ private struct DateMemoryCard: View {
 
   private var memoryWhen: String {
     var style = Date.FormatStyle(date: .abbreviated, time: .omitted)
-    style.locale = AppLanguage.shared.clockLocale(AppLanguage.shared.locale)
+    style.locale = AppLanguage.clockLocale(AppLanguage.shared.locale)
     return memory.when.formatted(style)
   }
 

@@ -96,9 +96,8 @@ final class AppLanguage {
       return hebrewLocale
     }
     if choice == .en {
-      var components = Locale.Components(languageCode: Locale.LanguageCode("en"))
-      components.languageRegion = Locale.current.region
-      return Locale(components: components)
+      let region = Locale.current.region?.identifier ?? "US"
+      return Locale(identifier: "en_\(region)")
     }
     return .current
   }
@@ -118,10 +117,8 @@ final class AppLanguage {
     return .other
   }
 
+  /// Unicode extension hc-h23 forces the 24-hour clock on he_IL.
   private static var hebrewLocale: Locale {
-    var components = Locale.Components(languageCode: Locale.LanguageCode("he"))
-    components.languageRegion = Locale.Region("IL")
-    components.hourCycle = .zeroToTwentyThree
-    return Locale(components: components)
+    Locale(identifier: "he-IL-u-hc-h23")
   }
 }
