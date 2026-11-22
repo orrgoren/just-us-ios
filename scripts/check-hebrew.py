@@ -69,6 +69,24 @@ for key in (
         print(f"missing Hebrew Info.plist string: {key}")
         failed = True
 
+runtime = json.loads(Path("JustUs/Resources/he.json").read_text(encoding="utf-8"))
+if set(runtime) != seen:
+    missing_runtime = sorted(seen - set(runtime))
+    extra_runtime = sorted(set(runtime) - seen)
+    if missing_runtime:
+        print(f"he.json missing: {', '.join(missing_runtime)}")
+    if extra_runtime:
+        print(f"he.json extra: {', '.join(extra_runtime)}")
+    failed = True
+else:
+    for key in seen:
+        catalog_value = (
+            strings[key].get("localizations", {}).get("he", {}).get("stringUnit", {}).get("value", "")
+        )
+        if runtime[key] != catalog_value:
+            print(f"he.json drift: {key}")
+            failed = True
+
 if failed:
     sys.exit(1)
 print(f"Hebrew covers {len(seen)} strings and the permission prompts.")

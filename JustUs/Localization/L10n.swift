@@ -386,7 +386,11 @@ enum L10n {
   }
 
   static func lookup(_ key: StaticString, _ value: String.LocalizationValue, locale: Locale) -> String {
-    String(localized: key, defaultValue: value, bundle: Bundle(for: LocalizationAnchor.self), locale: locale)
+    let name = "\(key)"
+    if locale.language.languageCode?.identifier == "he", let translated = HebrewCopy.text(name) {
+      return translated
+    }
+    return String(localized: key, defaultValue: value, bundle: Bundle(for: LocalizationAnchor.self), locale: locale)
   }
 
   private static func text(_ key: StaticString, _ value: String.LocalizationValue) -> String {
@@ -395,3 +399,18 @@ enum L10n {
 }
 
 private final class LocalizationAnchor {}
+
+/// Hebrew copy shipped in the app bundle. The string catalog is the source, and this
+/// table is what an in-app override reads without waiting for the phone language.
+enum HebrewCopy {
+  static func text(_ key: String) -> String? {
+    strings[key]
+  }
+
+  private static let strings: [String: String] = {
+    guard let url = Bundle(for: LocalizationAnchor.self).url(forResource: "he", withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let table = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+    return table
+  }()
+}
