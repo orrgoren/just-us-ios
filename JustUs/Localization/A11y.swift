@@ -46,6 +46,7 @@ enum A11y {
   static let chatRetry = "chat.retry"
   static let chatBanner = "chat.banner"
   static let chatNew = "chat.new"
+  static let chatDay = "chatDay"
   static let chatKeyNotice = "chat.keyNotice"
   static let tabMemories = "tab.memories"
   static let tabSettings = "tab.settings"

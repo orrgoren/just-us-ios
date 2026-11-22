@@ -474,11 +474,15 @@ final class FakeBackend: DateBackend {
   func seedChatPreview() {
     guard let alex = member(SeedID.alex), let blairKey = try? ensureKey(userId: SeedID.blair),
           let alexKey = try? ensureKey(userId: SeedID.alex) else { return }
+    let now = Date()
+    let calendar = Calendar.current
+    let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now))?
+      .addingTimeInterval(12 * 60 * 60) ?? now
     let lines = [
-      (SeedID.blair, blairKey, "I'll bring tea."),
-      (SeedID.alex, alexKey, "Thursday still works.")
+      (SeedID.blair, blairKey, "I'll bring tea.", yesterday),
+      (SeedID.alex, alexKey, "Thursday still works.", now)
     ]
-    for (userId, key, text) in lines {
+    for (userId, key, text, when) in lines {
       let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == alex.coupleId }
       let targets = ChatRecipients.choose(
         senderUserId: userId, senderKeyId: key.id,
@@ -492,7 +496,7 @@ final class FakeBackend: DateBackend {
       ) else { continue }
       store.world.chats.append(FakeChat(
         id: messageId, coupleId: alex.coupleId, senderUserId: userId, senderPublicKey: key.publicKey,
-        createdAt: Date(), envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
+        createdAt: when, envelopes: envelopes.map { FakeEnvelope(keyId: $0.keyId, box: $0.box) }
       ))
     }
     store.save()

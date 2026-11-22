@@ -35,7 +35,9 @@ struct ChatEntry: View {
   }
 
   private var field: some View {
-    HStack(alignment: .bottom, spacing: 4) {
+    // Center keeps the placeholder in the middle of the pill, level with the plus.
+    // A bottom alignment parked that one line under the button. Extra lines still grow the field.
+    HStack(alignment: .center, spacing: 4) {
       Button {
         showAttach = true
       } label: {

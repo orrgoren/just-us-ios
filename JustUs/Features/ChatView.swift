@@ -57,8 +57,13 @@ struct ChatScreen: View {
             if model.messages.isEmpty {
               Text(L10n.chatEmpty)
             }
-            ForEach(model.messages) { line in
-              bubble(line).id(line.id)
+            ForEach(ChatDay.rows(model.messages)) { row in
+              switch row {
+              case .divider(_, let label):
+                dayDivider(label)
+              case .message(let line):
+                bubble(line).id(line.id)
+              }
             }
             Color.clear.frame(height: 1)
               .id(ChatScroll.bottom)
@@ -116,6 +121,15 @@ struct ChatScreen: View {
     } else {
       ChatEntry(model: model, libraryItem: $libraryItem, showCamera: $showCamera)
     }
+  }
+
+  private func dayDivider(_ label: String) -> some View {
+    Text(label)
+      .font(Theme.caption)
+      .foregroundStyle(Theme.muted(scheme))
+      .multilineTextAlignment(.center)
+      .frame(maxWidth: .infinity)
+      .accessibilityIdentifier(A11y.chatDay)
   }
 
   private func bubble(_ line: ChatLine) -> some View {

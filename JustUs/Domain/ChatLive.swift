@@ -27,6 +27,62 @@ enum ChatThread {
   }
 }
 
+/// A quiet day line between messages. Today and Yesterday come from the locale, and so does the weekday.
+enum ChatDay {
+  enum Row: Identifiable, Equatable {
+    case divider(id: String, label: String)
+    case message(ChatLine)
+
+    var id: String {
+      switch self {
+      case .divider(let id, _): return id
+      case .message(let line): return line.id.uuidString
+      }
+    }
+  }
+
+  static func rows(_ lines: [ChatLine], now: Date = Date(), calendar: Calendar = .current) -> [Row] {
+    var last: DateComponents?
+    var rows: [Row] = []
+    for line in ChatWindow.chronological(lines) {
+      let day = calendar.dateComponents([.year, .month, .day], from: line.createdAt)
+      let sameDay = last?.year == day.year && last?.month == day.month && last?.day == day.day
+      if sameDay == false {
+        last = day
+        let stamp = "\(day.year ?? 0)-\(day.month ?? 0)-\(day.day ?? 0)"
+        rows.append(.divider(id: "day-\(stamp)", label: label(line.createdAt, now: now, calendar: calendar)))
+      }
+      rows.append(.message(line))
+    }
+    return rows
+  }
+
+  static func label(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
+    if calendar.isDate(date, inSameDayAs: now) {
+      return relative(dayOffset: 0, calendar: calendar)
+    }
+    if let previous = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: previous) {
+      return relative(dayOffset: -1, calendar: calendar)
+    }
+    let formatter = DateFormatter()
+    formatter.locale = calendar.locale ?? .current
+    formatter.calendar = calendar
+    formatter.timeZone = calendar.timeZone
+    formatter.setLocalizedDateFormatFromTemplate("EEEEMMMd")
+    return formatter.string(from: date)
+  }
+
+  /// "Today" and "Yesterday" in the device language. A fixed English string would stay English in Hebrew.
+  private static func relative(dayOffset: Int, calendar: Calendar) -> String {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.locale = calendar.locale ?? .current
+    formatter.calendar = calendar
+    formatter.dateTimeStyle = .named
+    formatter.unitsStyle = .full
+    return formatter.localizedString(from: DateComponents(day: dayOffset)).localizedCapitalized
+  }
+}
+
 /// The clock in the corner of a bubble. The locale chooses 12-hour or 24-hour.
 enum ChatTime {
   static func label(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {

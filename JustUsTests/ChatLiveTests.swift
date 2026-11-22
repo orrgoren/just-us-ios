@@ -111,6 +111,51 @@ final class ChatLiveTests: XCTestCase {
     XCTAssertNotEqual(us, gb)
   }
 
+  func testDayLinesGroupAcrossMidnightAndTimeZones() {
+    var utc = Calendar(identifier: .gregorian)
+    utc.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+    utc.locale = Locale(identifier: "en_US")
+    let now = utc.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 15)) ?? Date()
+    let today = utc.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 9)) ?? now
+    let yesterday = utc.date(from: DateComponents(year: 2026, month: 11, day: 21, hour: 23, minute: 59)) ?? now
+    let sunday = utc.date(from: DateComponents(year: 2026, month: 11, day: 15, hour: 12)) ?? now
+    XCTAssertEqual(ChatDay.label(today, now: now, calendar: utc).lowercased(), "today")
+    XCTAssertEqual(ChatDay.label(yesterday, now: now, calendar: utc).lowercased(), "yesterday")
+    let dated = ChatDay.label(sunday, now: now, calendar: utc)
+    XCTAssertTrue(dated.contains("15"))
+    XCTAssertTrue(dated.localizedCaseInsensitiveContains("Sun"))
+
+    var hebrew = utc
+    hebrew.locale = Locale(identifier: "he_IL")
+    let hebrewToday = ChatDay.label(today, now: now, calendar: hebrew)
+    let hebrewSunday = ChatDay.label(sunday, now: now, calendar: hebrew)
+    XCTAssertFalse(hebrewToday.localizedCaseInsensitiveContains("today"))
+    XCTAssertFalse(hebrewToday.isEmpty)
+    XCTAssertFalse(hebrewSunday.localizedCaseInsensitiveContains("sun"))
+    XCTAssertNotEqual(hebrewSunday, dated)
+
+    let late = line("late", at: yesterday)
+    let early = line("early", at: utc.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 0, minute: 1)) ?? now)
+    let split = ChatDay.rows([early, late], now: now, calendar: utc)
+    XCTAssertEqual(dividerLabels(split).map { $0.lowercased() }, ["yesterday", "today"])
+    XCTAssertEqual(messageTexts(split), ["late", "early"])
+
+    let evening = utc.date(from: DateComponents(year: 2026, month: 11, day: 21, hour: 22, minute: 30)) ?? now
+    let afterMidnight = utc.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 1, minute: 30)) ?? now
+    let pair = [line("evening", at: evening), line("after", at: afterMidnight)]
+    XCTAssertEqual(ChatDay.rows(pair, now: now, calendar: utc).filter(isDivider).count, 2)
+    var losAngeles = utc
+    losAngeles.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? utc.timeZone
+    XCTAssertEqual(ChatDay.rows(pair, now: now, calendar: losAngeles).filter(isDivider).count, 1)
+    var jerusalem = utc
+    jerusalem.timeZone = TimeZone(identifier: "Asia/Jerusalem") ?? utc.timeZone
+    jerusalem.locale = Locale(identifier: "he_IL")
+    let jerusalemRows = ChatDay.rows(pair, now: now, calendar: jerusalem)
+    XCTAssertEqual(jerusalemRows.filter(isDivider).count, 1)
+    XCTAssertEqual(messageTexts(jerusalemRows), ["evening", "after"])
+    XCTAssertTrue(ChatDay.rows([], now: now, calendar: utc).isEmpty)
+  }
+
   func testComposerArrowWaitsForText() {
     XCTAssertFalse(ChatComposer.showsSend(""))
     XCTAssertFalse(ChatComposer.showsSend("   \n"))
@@ -294,6 +339,29 @@ final class ChatLiveTests: XCTestCase {
     await alex.verify()
     await alex.refresh()
     return alex
+  }
+
+  private func line(_ text: String, at date: Date) -> ChatLine {
+    ChatLine(id: UUID(), senderUserId: SeedID.alex, text: text, createdAt: date, mine: true, unreadable: false)
+  }
+
+  private func dividerLabels(_ rows: [ChatDay.Row]) -> [String] {
+    rows.compactMap { row in
+      if case .divider(_, let label) = row { return label }
+      return nil
+    }
+  }
+
+  private func messageTexts(_ rows: [ChatDay.Row]) -> [String] {
+    rows.compactMap { row in
+      if case .message(let line) = row { return line.text }
+      return nil
+    }
+  }
+
+  private func isDivider(_ row: ChatDay.Row) -> Bool {
+    if case .divider = row { return true }
+    return false
   }
 
   private func notice(_ text: String, at date: Date) -> ChatLine {
