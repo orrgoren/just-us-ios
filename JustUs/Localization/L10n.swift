@@ -88,6 +88,7 @@ enum L10n {
   static var tabUs: String { text("tab.us", "Us") }
   static var homeTitle: String { text("home.title", "This week, just us") }
   static var chatTitle: String { text("chat.title", "A note, just for them") }
+  static var chatOpen: String { text("chat.open", "Open chat") }
   static var chatHelp: String { text("chat.help", "Only the two of you can read these. A notification says a message arrived, not what it says.") }
   static var chatWaiting: String { text("chat.waiting", "Chat opens once you're both here.") }
   static var chatEmpty: String { text("chat.empty", "Nothing here yet.") }

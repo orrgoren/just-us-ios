@@ -176,6 +176,40 @@ enum ChatPush {
   }
 }
 
+/// Partner lines the reader has not opened. The cursor is the newest time they have already seen.
+enum ChatUnread {
+  static func count(_ lines: [ChatLine], seenThrough: Date?) -> Int {
+    lines.filter { line in
+      line.mine == false && line.notice == false && line.delivery == .sent && unseen(line.createdAt, seenThrough: seenThrough)
+    }.count
+  }
+
+  private static func unseen(_ date: Date, seenThrough: Date?) -> Bool {
+    guard let seenThrough else { return true }
+    return date > seenThrough
+  }
+}
+
+/// The last moment this phone had the thread open. Kept on the device, not in the database.
+enum ChatSeen {
+  static func through(_ userId: UUID, defaults: UserDefaults = .standard) -> Date? {
+    let raw = defaults.double(forKey: key(userId))
+    guard raw > 0 else { return nil }
+    return Date(timeIntervalSince1970: raw)
+  }
+
+  static func mark(_ date: Date, userId: UUID, defaults: UserDefaults = .standard) {
+    let current = through(userId, defaults: defaults)?.timeIntervalSince1970 ?? 0
+    let next = date.timeIntervalSince1970
+    guard next > current else { return }
+    defaults.set(next, forKey: key(userId))
+  }
+
+  private static func key(_ userId: UUID) -> String {
+    "justus.chat.seen.\(userId.uuidString.lowercased())"
+  }
+}
+
 /// One retry when the cached device key was retired out from under this phone.
 enum ChatSendRecovery {
   static func refreshKeys(_ error: Error) -> Bool {

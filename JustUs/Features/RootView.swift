@@ -12,36 +12,38 @@ struct RootView: View {
     keyboardOverlap > 0 && model.screen == .invite && model.pendingReplace
   }
 
-  private var chatting: Bool { model.screen == .main && model.tab == .chat }
+  private var showChatBubble: Bool {
+    model.screen == .main && model.chatPresented == false && model.coupleIsLinked
+  }
 
   var body: some View {
     JustScreen {
       ScrollViewReader { proxy in
-      Group {
-        if chatting {
-          // The identifier stays off this column. On the scrolling screens it marks the
-          // scroll view; here it would collapse the composer into that one element.
-          page
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .accessibilityElement(children: .contain)
-        } else {
-          ScrollView { page }
-            .scrollDismissesKeyboard(.immediately)
-            .accessibilityIdentifier(A11y.content)
-        }
-      }
+      ScrollView { page }
+        .scrollDismissesKeyboard(.immediately)
+        .accessibilityIdentifier(A11y.content)
       .ignoresSafeArea(.keyboard, edges: .bottom)
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        if pinReplace {
+        if showChatBubble {
+          HStack {
+            Spacer(minLength: 0)
+            ChatBubble(unread: model.chatUnread) { model.presentChat() }
+          }
+          .padding(.trailing, 20)
+          .padding(.bottom, 8)
+        } else if pinReplace {
           PinnedReplaceActions(model: model)
             .padding(.bottom, keyboardOverlap)
         }
       }
       .toolbar {
-        ToolbarItemGroup(placement: .keyboard) {
-          Spacer()
-          ActionButton(title: L10n.dismissKeyboard, identifier: A11y.dismissKeyboard, kind: .link) {
-            keyboardDismiss += 1
+        // The chat sheet has its own Done. Two of them would both match the same identifier.
+        if model.chatPresented == false {
+          ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            ActionButton(title: L10n.dismissKeyboard, identifier: A11y.dismissKeyboard, kind: .link) {
+              keyboardDismiss += 1
+            }
           }
         }
       }
@@ -66,6 +68,10 @@ struct RootView: View {
         keyboardOverlap = next
       }
       }
+    }
+    .environment(\.keyboardDismiss, keyboardDismiss)
+    .sheet(isPresented: $model.chatPresented) {
+      ChatSheet(model: model)
     }
     .preferredColorScheme(Launch.preferredScheme)
     .onOpenURL { url in Task { await model.open(url) } }

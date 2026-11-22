@@ -9,15 +9,13 @@ struct MainScreen: View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
       Picker(L10n.tabWeek, selection: $model.tab) {
         Text(L10n.tabWeek).tag(AppTab.week)
-        Text(L10n.tabChat).tag(AppTab.chat)
         Text(L10n.tabMemories).tag(AppTab.memories)
         Text(L10n.tabUs).tag(AppTab.settings)
       }
       .pickerStyle(.segmented)
-      if let banner = model.chatBanner, model.tab != .chat {
+      if let banner = model.chatBanner, model.chatPresented == false {
         Button(banner) {
-          model.chatBanner = nil
-          model.tab = .chat
+          model.presentChat()
         }
         .buttonStyle(JustButtonStyle(kind: .secondary))
         .accessibilityIdentifier(A11y.chatBanner)
@@ -31,7 +29,7 @@ struct MainScreen: View {
       case .week:
         RitualScreen(model: model)
       case .chat:
-        ChatScreen(model: model)
+        RitualScreen(model: model)
       case .memories:
         MemoriesScreen(model: model)
       case .settings:
@@ -39,10 +37,57 @@ struct MainScreen: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .onAppear {
+      guard model.tab == .chat else { return }
+      model.tab = .week
+      model.presentChat()
+    }
   }
 
   private var coupleIsLinked: Bool {
     model.ritual?.partner != nil || model.settings?.partnerJoined == true
+  }
+}
+
+struct ChatBubble: View {
+  var unread: Int
+  var action: () -> Void
+  @Environment(\.colorScheme) private var scheme
+
+  var body: some View {
+    ZStack(alignment: .topTrailing) {
+      Button(action: action) {
+        Image(systemName: "message.fill")
+          .font(.title2)
+          .foregroundStyle(bubbleInk)
+          .frame(width: 56, height: 56)
+          .background(bubbleFill, in: Circle())
+      }
+      .accessibilityIdentifier(A11y.chatBubble)
+      .accessibilityLabel(L10n.chatOpen)
+      if unread > 0 {
+        Text(badge)
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(Theme.ink)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(Theme.canvas(scheme), in: Capsule())
+          .accessibilityIdentifier(A11y.chatBadge)
+          .allowsHitTesting(false)
+      }
+    }
+  }
+
+  private var badge: String {
+    unread > 9 ? "9+" : String(unread)
+  }
+
+  private var bubbleFill: Color {
+    scheme == .dark ? Theme.color(Palette.accentOnDark) : Theme.wine
+  }
+
+  private var bubbleInk: Color {
+    scheme == .dark ? Theme.ink : Theme.canvas
   }
 }
 

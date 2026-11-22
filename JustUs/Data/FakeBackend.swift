@@ -502,6 +502,17 @@ final class FakeBackend: DateBackend {
     store.save()
   }
 
+  /// One partner line newer than any seen cursor this simulator may already have stored.
+  func seedUnreadChat() {
+    seedChatPreview()
+    guard let alex = member(SeedID.alex) else { return }
+    guard let index = store.world.chats.lastIndex(where: {
+      $0.senderUserId == SeedID.blair && $0.coupleId == alex.coupleId
+    }) else { return }
+    store.world.chats[index].createdAt = Date().addingTimeInterval(120)
+    store.save()
+  }
+
   func ensureKey(userId: UUID, reason: KeyRotation.Reason = .refresh) throws -> ChatIdentity {
     let held = heldKey(userId: userId)
     let activeCount = store.world.deviceKeys.filter { $0.userId == userId && $0.retiredAt == nil }.count
