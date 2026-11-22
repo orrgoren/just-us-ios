@@ -38,17 +38,21 @@ final class AppLanguage {
   private init() {
     let launch = Launch.argument(after: "-JustUsLanguage")
     let stored = UserDefaults.standard.string(forKey: Self.storageKey)
+    let initial: Choice
+    let persist: Bool
     if let launch, let parsed = Choice(rawValue: launch) {
-      choice = parsed
-      persistChoice = false
+      initial = parsed
+      persist = false
     } else if let stored, let parsed = Choice(rawValue: stored) {
-      choice = parsed
-      persistChoice = true
+      initial = parsed
+      persist = true
     } else {
-      choice = .system
-      persistChoice = true
+      initial = .system
+      persist = true
     }
-    lastResolved = Self.resolvedCode(choice: choice, preferred: Locale.preferredLanguages)
+    persistChoice = persist
+    choice = initial
+    lastResolved = Self.resolvedCode(choice: initial, preferred: Locale.preferredLanguages)
   }
 
   /// `en` or `he`. This is the value stored on the server for push copy.
