@@ -83,6 +83,9 @@ final class LanguageTests: XCTestCase {
     XCTAssertLessThan(lead.lowerBound, url.lowerBound)
     XCTAssertLessThan(url.lowerBound, tail.lowerBound)
     XCTAssertEqual(ChatBidi.display(raw, rightToLeft: false), raw)
-    XCTAssertEqual(ChatBidi.display("Thursday still works.", rightToLeft: true).contains("Thursday"), true)
+    let english = ChatBidi.display("Thursday still works.", rightToLeft: true)
+    XCTAssertTrue(english.contains("\u{2066}Thursday still works.\u{2069}"))
+    let phrase = ChatBidi.display("I'll bring tea.", rightToLeft: true)
+    XCTAssertTrue(phrase.contains("\u{2066}I'll bring tea.\u{2069}"))
   }
 }
