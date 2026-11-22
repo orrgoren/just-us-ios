@@ -9,6 +9,12 @@
             "state": "translated",
             "value": "Just Us"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just Us"
+          }
         }
       }
     },
@@ -20,6 +26,12 @@
             "state": "translated",
             "value": "ערב אחד. כל שבוע. רק שלנו."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One night. Every week. Just us."
+          }
         }
       }
     },
@@ -27,6 +39,12 @@
       "extractionState": "manual",
       "localizations": {
         "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just Us"
+          }
+        },
+        "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Just Us"
@@ -42,6 +60,12 @@
             "state": "translated",
             "value": "ערב שרק שלכם"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A night that is only yours"
+          }
         }
       }
     },
@@ -52,6 +76,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אפשר להיכנס עם Apple, או עם קישור שנשלח לאימייל באייפון הזה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with Apple, or with a link we email to this iPhone."
           }
         }
       }
@@ -64,6 +94,12 @@
             "state": "translated",
             "value": "אימייל"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email"
+          }
         }
       }
     },
@@ -71,6 +107,12 @@
       "extractionState": "manual",
       "localizations": {
         "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "you@example.com"
+          }
+        },
+        "en": {
           "stringUnit": {
             "state": "translated",
             "value": "you@example.com"
@@ -86,6 +128,12 @@
             "state": "translated",
             "value": "שלחו לי קישור לכניסה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email me a sign-in link"
+          }
         }
       }
     },
@@ -96,6 +144,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שלחו לי קישור חדש"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email me a new link"
           }
         }
       }
@@ -108,6 +162,12 @@
             "state": "translated",
             "value": "כניסה עם Apple"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with Apple"
+          }
         }
       }
     },
@@ -118,6 +178,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "יש לי הזמנה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I have an invite"
           }
         }
       }
@@ -130,6 +196,12 @@
             "state": "translated",
             "value": "בדקו את האימייל"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check your email"
+          }
         }
       }
     },
@@ -140,6 +212,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "בדקו את האימייל ולחצו על קישור הכניסה באייפון הזה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check your email and tap the sign-in link on this iPhone."
           }
         }
       }
@@ -152,6 +230,12 @@
             "state": "translated",
             "value": "קוד"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code"
+          }
         }
       }
     },
@@ -162,6 +246,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "המשך"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
           }
         }
       }
@@ -174,6 +264,12 @@
             "state": "translated",
             "value": "שליחה מחדש"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resend link"
+          }
         }
       }
     },
@@ -184,6 +280,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אימייל אחר"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use a different email"
           }
         }
       }
@@ -196,6 +298,12 @@
             "state": "translated",
             "value": "בואו נעשה את זה שלכם"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make it yours"
+          }
         }
       }
     },
@@ -206,6 +314,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "השם שלך, השם שלהם, והערב שאתם רוצים לשמור."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your name, their name, and the evening you want to keep."
           }
         }
       }
@@ -218,6 +332,12 @@
             "state": "translated",
             "value": "השם שלי"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My name"
+          }
         }
       }
     },
@@ -228,6 +348,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "השם שלהם"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Their name"
           }
         }
       }
@@ -240,6 +366,12 @@
             "state": "translated",
             "value": "הערב שלנו"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Our evening"
+          }
         }
       }
     },
@@ -250,6 +382,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מתחילים ב"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts at"
           }
         }
       }
@@ -262,6 +400,12 @@
             "state": "translated",
             "value": "אזור זמן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time zone"
+          }
         }
       }
     },
@@ -272,6 +416,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "משך"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Length"
           }
         }
       }
@@ -284,6 +434,12 @@
             "state": "translated",
             "value": "בדרך כלל שעה וחצי. אפשר לשנות אם אצלכם זה יותר."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "90 minutes is the usual evening. Change it if yours runs longer."
+          }
         }
       }
     },
@@ -294,6 +450,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תורך. מלאו את זה, ואז שלחו להם קישור."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your turn. Fill this in, then send them a link."
           }
         }
       }
@@ -306,6 +468,12 @@
             "state": "translated",
             "value": "הם יראו את השם שבחרת כשיצטרפו."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They'll see the name you chose when they join."
+          }
         }
       }
     },
@@ -316,6 +484,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מכינים את המרחב שלכם…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up your space…"
           }
         }
       }
@@ -328,6 +502,12 @@
             "state": "translated",
             "value": "חובה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Required"
+          }
         }
       }
     },
@@ -338,6 +518,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "סיום"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
           }
         }
       }
@@ -350,6 +536,12 @@
             "state": "translated",
             "value": "לא חובה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optional"
+          }
         }
       }
     },
@@ -360,6 +552,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תורך"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your turn"
           }
         }
       }
@@ -372,6 +570,12 @@
             "state": "translated",
             "value": "תורך לתכנן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your turn to plan"
+          }
         }
       }
     },
@@ -382,6 +586,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "התור של %@ לתכנן"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@'s turn to plan"
           }
         }
       }
@@ -394,6 +604,12 @@
             "state": "translated",
             "value": "%@ על התכנון הפעם. בחרו מצב רוח, והרמז יופיע כשזה מוכן."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is planning this one. Pick a mood. The hint shows up when it's ready."
+          }
         }
       }
     },
@@ -404,6 +620,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שבוע אחד ביחד"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One week together"
           }
         }
       }
@@ -416,6 +638,12 @@
             "state": "translated",
             "value": "שבועיים ברצף"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 weeks in a row"
+          }
         }
       }
     },
@@ -426,6 +654,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld שבועות ברצף"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld weeks in a row"
           }
         }
       }
@@ -438,6 +672,12 @@
             "state": "translated",
             "value": "מחכים להם"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting on them"
+          }
         }
       }
     },
@@ -448,6 +688,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "השלב הבא: כניסה. אחר כך פותחים מרחב, או מצטרפים לשלהם."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next: sign in. Then make a space, or join theirs."
           }
         }
       }
@@ -460,6 +706,12 @@
             "state": "translated",
             "value": "הקישור הוא הדרך פנימה. הקוד כאן אם כבר יש לכם אותו."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The link is the way in. The code is there if you already have it."
+          }
         }
       }
     },
@@ -470,6 +722,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שלחו את קישור האפליקציה. הוא פותח את Just Us אצלם."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send the app link. It opens Just Us on their phone."
           }
         }
       }
@@ -482,6 +740,12 @@
             "state": "translated",
             "value": "נפתח באפליקציה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens in the app"
+          }
         }
       }
     },
@@ -492,6 +756,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הדביקו את הקוד שלהם. אתם מצטרפים למרחב שלהם, לא פותחים חדש."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste their code. You join their space, not a new one."
           }
         }
       }
@@ -504,6 +774,12 @@
             "state": "translated",
             "value": "המרחב שלכם מוכן."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your space is ready."
+          }
         }
       }
     },
@@ -514,6 +790,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אתם מחוברים. השבוע שלכם."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're paired. The week is yours."
           }
         }
       }
@@ -526,6 +808,12 @@
             "state": "translated",
             "value": "הערב נקבע."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The night is set."
+          }
         }
       }
     },
@@ -536,6 +824,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אין מה לעשות עד שהם יפתחו את הקישור."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing else for you until they open the link."
           }
         }
       }
@@ -548,6 +842,12 @@
             "state": "translated",
             "value": "אתם מתכננים. הם רואים את הרמז, לא את ההפתעה, עד שתחשפו."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're planning. They see the hint, not the surprise, until you reveal it."
+          }
         }
       }
     },
@@ -558,6 +858,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הם מתכננים. בחרו מצב רוח, וחכו לרמז."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They're planning. Pick your mood, then wait for the hint."
           }
         }
       }
@@ -570,6 +876,12 @@
             "state": "translated",
             "value": "מצב רוח אחד. הם יראו את שלכם. התוכנית נשארת אצל מי שמתכנן."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One mood. They'll see yours. The plan stays with the planner."
+          }
         }
       }
     },
@@ -580,6 +892,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "לא חובה. שורה או תמונה, אחרי שהערב נגמר."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optional. A line or a photo, once the night is done."
           }
         }
       }
@@ -592,6 +910,12 @@
             "state": "translated",
             "value": "שמות חובה. התזכורות לא."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names are required. The nudges are optional."
+          }
         }
       }
     },
@@ -602,6 +926,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תורך. תגידו כן אם בא לכם נדנוד כשהם מצטרפים."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your turn. Say yes if you want a nudge when they join."
           }
         }
       }
@@ -614,6 +944,12 @@
             "state": "translated",
             "value": "ניצור את המרחב שלנו"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create our space"
+          }
         }
       }
     },
@@ -624,6 +960,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "יש לי קוד, אני מצטרף"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join with a code instead"
           }
         }
       }
@@ -636,6 +978,12 @@
             "state": "translated",
             "value": "תזמינו אותם"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring them in"
+          }
         }
       }
     },
@@ -646,6 +994,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שתפו קישור חד־פעמי, או תקריאו את הקוד. הוא תקף שבעה ימים."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share a one-time link, or read them the code. It lasts seven days."
           }
         }
       }
@@ -658,6 +1012,12 @@
             "state": "translated",
             "value": "שיתוף הזמנה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share invite"
+          }
         }
       }
     },
@@ -668,6 +1028,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הצגת הקוד"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the code"
           }
         }
       }
@@ -680,6 +1046,12 @@
             "state": "translated",
             "value": "אזמין אותם אחר כך"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll invite them later"
+          }
         }
       }
     },
@@ -690,6 +1062,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "קוד הזמנה או קישור"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invite code or link"
           }
         }
       }
@@ -702,6 +1080,12 @@
             "state": "translated",
             "value": "הצטרפות למרחב"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join this space"
+          }
         }
       }
     },
@@ -712,6 +1096,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הצטרפות ומחיקת המרחב הריק שלי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join and leave my empty space"
           }
         }
       }
@@ -724,6 +1114,12 @@
             "state": "translated",
             "value": "נשארים איפה שאני"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stay where I am"
+          }
         }
       }
     },
@@ -734,6 +1130,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "כבר יש לך מרחב ריק, בלי בן או בת זוג ובלי ערב שמור. הצטרפות מוחקת את המרחב הריק ומחברת את החשבון להזמנה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already have an empty space, with no partner and no saved date. Joining removes that empty space and connects this account to the invite."
           }
         }
       }
@@ -746,6 +1148,12 @@
             "state": "translated",
             "value": "הקוד הזה עובד פעם אחת. ההצטרפות מחברת את החשבון למרחב שלהם, ורק לשלהם."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This code works once. Joining connects this account to their space, and only theirs."
+          }
         }
       }
     },
@@ -756,6 +1164,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "לחשבון הזה כבר יש מרחב עם היסטוריה. הזמנה לא יכולה להחליף אותו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This account already shares a space that has history. An invite can't replace it."
           }
         }
       }
@@ -768,6 +1182,12 @@
             "state": "translated",
             "value": "רוצים לדעת כשהם מצטרפים?"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Want a heads-up when they join?"
+          }
         }
       }
     },
@@ -778,6 +1198,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "נבקש מהמערכת רק אם תגידו כן. אפשר לשנות אחר כך."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We'll only ask the system if you say yes. You can change this later."
           }
         }
       }
@@ -790,6 +1216,12 @@
             "state": "translated",
             "value": "כן, תנדנדו לי"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, nudge me"
+          }
         }
       }
     },
@@ -800,6 +1232,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "לא עכשיו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
           }
         }
       }
@@ -812,6 +1250,12 @@
             "state": "translated",
             "value": "ההתראות כבויות. אפשר להדליק אותן בהגדרות."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications stay off. You can turn them on in Settings."
+          }
         }
       }
     },
@@ -822,6 +1266,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "השבוע"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This week"
           }
         }
       }
@@ -834,6 +1284,12 @@
             "state": "translated",
             "value": "זיכרונות"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memories"
+          }
         }
       }
     },
@@ -844,6 +1300,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אנחנו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Us"
           }
         }
       }
@@ -856,6 +1318,12 @@
             "state": "translated",
             "value": "השבוע, רק שלנו"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This week, just us"
+          }
         }
       }
     },
@@ -866,6 +1334,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "פתק, רק בשבילם"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A note, just for them"
           }
         }
       }
@@ -878,6 +1352,12 @@
             "state": "translated",
             "value": "פתיחת הצ'אט"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open chat"
+          }
         }
       }
     },
@@ -888,6 +1368,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "רק שניכם יכולים לקרוא את זה. התראה אומרת שהגיעה הודעה, לא מה כתוב בה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the two of you can read these. A notification says a message arrived, not what it says."
           }
         }
       }
@@ -900,6 +1386,12 @@
             "state": "translated",
             "value": "הצ'אט נפתח כששניכם כאן."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat opens once you're both here."
+          }
         }
       }
     },
@@ -910,6 +1402,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "עדיין אין כאן כלום."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing here yet."
           }
         }
       }
@@ -922,6 +1420,12 @@
             "state": "translated",
             "value": "הודעה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message"
+          }
         }
       }
     },
@@ -932,6 +1436,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שליחה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
           }
         }
       }
@@ -944,6 +1454,12 @@
             "state": "translated",
             "value": "הודעה יכולה להיות עד 1,000 תווים, או 5,600 בתים."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A message can be at most 1,000 characters, or 5,600 bytes."
+          }
         }
       }
     },
@@ -954,6 +1470,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "המפתח שלהם השתנה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your partner's key changed."
           }
         }
       }
@@ -966,6 +1488,12 @@
             "state": "translated",
             "value": "הטלפון הזה לא יכול לקרוא את ההודעה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This phone can't read that message."
+          }
         }
       }
     },
@@ -976,6 +1504,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תמונה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo"
           }
         }
       }
@@ -988,6 +1522,12 @@
             "state": "translated",
             "value": "מצלמה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera"
+          }
         }
       }
     },
@@ -998,6 +1538,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ספריית התמונות"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo library"
           }
         }
       }
@@ -1010,6 +1556,12 @@
             "state": "translated",
             "value": "הוספת תמונה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a photo"
+          }
         }
       }
     },
@@ -1020,6 +1572,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "צפייה אחת"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View once"
           }
         }
       }
@@ -1032,6 +1590,12 @@
             "state": "translated",
             "value": "לשמור"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep"
+          }
         }
       }
     },
@@ -1042,6 +1606,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "איך לשמור את התמונה?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How should this photo be kept?"
           }
         }
       }
@@ -1054,6 +1624,12 @@
             "state": "translated",
             "value": "אפשר לפתוח אותה פעם אחת. היא לא נשמרת בגלריה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They can open it once. It isn't saved to the camera roll."
+          }
         }
       }
     },
@@ -1064,6 +1640,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "היא נשארת בצ'אט עד שאחד מכם מוחק אותה. היא לא נשמרת בגלריה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It stays in this chat until either of you deletes it. It isn't saved to the camera roll."
           }
         }
       }
@@ -1076,6 +1658,12 @@
             "state": "translated",
             "value": "תמונה, לחיצה לצפייה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo, tap to view"
+          }
         }
       }
     },
@@ -1086,6 +1674,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "נפתחה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opened"
           }
         }
       }
@@ -1098,6 +1692,12 @@
             "state": "translated",
             "value": "התמונה פגה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This photo expired"
+          }
         }
       }
     },
@@ -1108,6 +1708,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "לא נשלח, לחיצה לניסיון נוסף"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't send, tap to retry"
           }
         }
       }
@@ -1120,6 +1726,12 @@
             "state": "translated",
             "value": "נשלח"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending"
+          }
         }
       }
     },
@@ -1130,6 +1742,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הודעה חדשה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New message"
           }
         }
       }
@@ -1142,6 +1760,12 @@
             "state": "translated",
             "value": "לא הצלחנו לפתוח את התמונה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open that photo."
+          }
         }
       }
     },
@@ -1152,6 +1776,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "התמונה גדולה מדי."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That photo is too large."
           }
         }
       }
@@ -1164,6 +1794,12 @@
             "state": "translated",
             "value": "התמונה מוסתרת בזמן צילום המסך."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The photo is hidden while the screen is captured."
+          }
         }
       }
     },
@@ -1174,6 +1810,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מחיקת התמונה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete photo"
           }
         }
       }
@@ -1186,6 +1828,12 @@
             "state": "translated",
             "value": "סגירה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
         }
       }
     },
@@ -1196,6 +1844,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שליחת תמונת דוגמה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send a sample photo"
           }
         }
       }
@@ -1208,6 +1862,12 @@
             "state": "translated",
             "value": "הטלפון שלהם צריך לפתוח את האפליקציה פעם אחת לפני שאפשר לנעול הודעה אליהם."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Their phone needs to open the app once before a message can be locked to them."
+          }
         }
       }
     },
@@ -1218,6 +1878,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "בחרו מצב רוח. מי שמתכנן שומר את ההפתעה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a mood. Whoever is planning keeps the surprise."
           }
         }
       }
@@ -1230,6 +1896,12 @@
             "state": "translated",
             "value": "דייטים ביחד"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dates together"
+          }
         }
       }
     },
@@ -1240,6 +1912,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שלושה בפנים, אחד בחוץ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Three in, one out"
           }
         }
       }
@@ -1252,6 +1930,12 @@
             "state": "translated",
             "value": "תכנון"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planning"
+          }
         }
       }
     },
@@ -1262,6 +1946,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מצב הרוח שלי"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your mood"
           }
         }
       }
@@ -1274,6 +1964,12 @@
             "state": "translated",
             "value": "מחכים לבחירה שלהם"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for their pick"
+          }
         }
       }
     },
@@ -1284,6 +1980,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מחכים שהם יצטרפו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for them to join"
           }
         }
       }
@@ -1296,6 +1998,12 @@
             "state": "translated",
             "value": "איפה הפעם?"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where this time?"
+          }
         }
       }
     },
@@ -1306,6 +2014,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "לפי המסורת"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By tradition"
           }
         }
       }
@@ -1318,6 +2032,12 @@
             "state": "translated",
             "value": "בבית"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At home"
+          }
         }
       }
     },
@@ -1328,6 +2048,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "בחוץ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Out"
           }
         }
       }
@@ -1340,6 +2066,12 @@
             "state": "translated",
             "value": "שלושה ערבים בבית, ואז אחד בחוץ."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Three evenings at home, then one out."
+          }
         }
       }
     },
@@ -1350,6 +2082,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הבחירה הזו יוצאת מהקצב."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This choice steps off the rhythm."
           }
         }
       }
@@ -1362,6 +2100,12 @@
             "state": "translated",
             "value": "החלפת מתכנן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swap planner"
+          }
         }
       }
     },
@@ -1372,6 +2116,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תפתיעו אותנו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Surprise us"
           }
         }
       }
@@ -1384,6 +2134,12 @@
             "state": "translated",
             "value": "רעיון אחר"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another idea"
+          }
         }
       }
     },
@@ -1394,6 +2150,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תאריך"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
           }
         }
       }
@@ -1406,6 +2168,12 @@
             "state": "translated",
             "value": "שעה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
         }
       }
     },
@@ -1416,6 +2184,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "רמז שהם יכולים לראות"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A hint they can see"
           }
         }
       }
@@ -1428,6 +2202,12 @@
             "state": "translated",
             "value": "רמז"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hint"
+          }
         }
       }
     },
@@ -1438,6 +2218,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מה ללבוש"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What to wear"
           }
         }
       }
@@ -1450,6 +2236,12 @@
             "state": "translated",
             "value": "הערות פרטיות, רק למתכנן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private notes, only for the planner"
+          }
         }
       }
     },
@@ -1460,6 +2252,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שמירת הרמז"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save hint"
           }
         }
       }
@@ -1472,6 +2270,12 @@
             "state": "translated",
             "value": "אפשר לשנות את הרמז עד שחושפים את ההפתעה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can change the hint until you reveal the surprise."
+          }
         }
       }
     },
@@ -1482,6 +2286,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שמירת הדייט"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save our date"
           }
         }
       }
@@ -1494,6 +2304,12 @@
             "state": "translated",
             "value": "דילוג על השבוע"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip this week"
+          }
         }
       }
     },
@@ -1504,6 +2320,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "בואו רעבים"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come hungry"
           }
         }
       }
@@ -1516,6 +2338,12 @@
             "state": "translated",
             "value": "פיג'מה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pajamas"
+          }
         }
       }
     },
@@ -1526,6 +2354,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "להתלבש יפה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dress up"
           }
         }
       }
@@ -1538,6 +2372,12 @@
             "state": "translated",
             "value": "ערב בדרך"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A night is on the way"
+          }
         }
       }
     },
@@ -1548,6 +2388,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אפשר לראות מתי, איפה, ואת הרמז. לא את ההפתעה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can see when, where, and the hint. Not the surprise."
           }
         }
       }
@@ -1560,6 +2406,12 @@
             "state": "translated",
             "value": "הערב הבא מחכה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your next night is waiting"
+          }
         }
       }
     },
@@ -1570,6 +2422,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "בחרו מצבי רוח, ואז בקשו הפתעה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick moods, then ask for a surprise."
           }
         }
       }
@@ -1582,6 +2440,12 @@
             "state": "translated",
             "value": "הרעיון"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The idea"
+          }
         }
       }
     },
@@ -1592,6 +2456,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שמור לשניכם"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved for both of you"
           }
         }
       }
@@ -1604,6 +2474,12 @@
             "state": "translated",
             "value": "נחשף"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revealed"
+          }
         }
       }
     },
@@ -1614,6 +2490,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הכנה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prepare"
           }
         }
       }
@@ -1626,6 +2508,12 @@
             "state": "translated",
             "value": "הטוויסט הקטן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The small twist"
+          }
         }
       }
     },
@@ -1636,6 +2524,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שאלה לסיום"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A question to end on"
           }
         }
       }
@@ -1648,6 +2542,12 @@
             "state": "translated",
             "value": "הערה פרטית"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private note"
+          }
         }
       }
     },
@@ -1658,6 +2558,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "חשיפת ההפתעה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal the surprise"
           }
         }
       }
@@ -1670,6 +2576,12 @@
             "state": "translated",
             "value": "חזרה לטיוטה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to draft"
+          }
         }
       }
     },
@@ -1680,6 +2592,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הזזת השעה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move the time"
           }
         }
       }
@@ -1692,6 +2610,12 @@
             "state": "translated",
             "value": "עדיין אין רמז. ההפתעה עוד מתבשלת."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hint yet. The surprise is still cooking."
+          }
         }
       }
     },
@@ -1702,6 +2626,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אין מה מיוחד ללבוש."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing special to wear."
           }
         }
       }
@@ -1714,6 +2644,12 @@
             "state": "translated",
             "value": "איך היה?"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How was it?"
+          }
         }
       }
     },
@@ -1724,6 +2660,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שמרו רגע אחד. הרעיון המלא נשאר חבוי עד שהערב נסגר, אלא אם הוא נחשף."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep one moment. The full idea stays hidden until the night is closed, unless it was revealed."
           }
         }
       }
@@ -1736,6 +2678,12 @@
             "state": "translated",
             "value": "רגע לשמור"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A moment to keep"
+          }
         }
       }
     },
@@ -1746,6 +2694,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "עשינו את זה. שמירת הזיכרון"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We did it. Save the memory"
           }
         }
       }
@@ -1758,6 +2712,12 @@
             "state": "translated",
             "value": "הוספה ליומן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to calendar"
+          }
         }
       }
     },
@@ -1768,6 +2728,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "פתיחת השבוע"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open this week"
           }
         }
       }
@@ -1780,6 +2746,12 @@
             "state": "translated",
             "value": "אין ערב פתוח. אפשר להתחיל את הבא בלי לאבד זיכרונות."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No evening is open. You can start the next one without losing memories."
+          }
         }
       }
     },
@@ -1790,6 +2762,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הדייטים שלנו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Our dates"
           }
         }
       }
@@ -1802,6 +2780,12 @@
             "state": "translated",
             "value": "הערבים שסיימתם, מהחדש לישן, עם התמונה מהערב."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The nights you finished, newest first, with the photo from that night."
+          }
         }
       }
     },
@@ -1812,6 +2796,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "עדיין אין כלום שמור. הערב הראשון בדרך."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing saved yet. Your first night is on the way."
           }
         }
       }
@@ -1824,6 +2814,12 @@
             "state": "translated",
             "value": "הוספת הרגע"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your moment"
+          }
         }
       }
     },
@@ -1834,6 +2830,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שמירה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
           }
         }
       }
@@ -1846,6 +2848,12 @@
             "state": "translated",
             "value": "עריכה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
         }
       }
     },
@@ -1856,6 +2864,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מחיקת הרגע"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this moment"
           }
         }
       }
@@ -1868,6 +2882,12 @@
             "state": "translated",
             "value": "היינו ביחד. זה מספיק."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We were together. That is enough."
+          }
         }
       }
     },
@@ -1878,6 +2898,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הוספת תמונה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a photo"
           }
         }
       }
@@ -1890,6 +2916,12 @@
             "state": "translated",
             "value": "נסו שוב את התמונה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try the photo again"
+          }
         }
       }
     },
@@ -1900,6 +2932,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "התמונה לא נשמרה. הזיכרון לא השתנה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The photo didn't save. The memory is unchanged."
           }
         }
       }
@@ -1912,6 +2950,12 @@
             "state": "translated",
             "value": "תמונת דוגמה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use sample photo"
+          }
         }
       }
     },
@@ -1922,6 +2966,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שפה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
           }
         }
       }
@@ -1934,6 +2984,12 @@
             "state": "translated",
             "value": "מערכת"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
         }
       }
     },
@@ -1941,6 +2997,12 @@
       "extractionState": "manual",
       "localizations": {
         "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        },
+        "en": {
           "stringUnit": {
             "state": "translated",
             "value": "English"
@@ -1956,6 +3018,12 @@
             "state": "translated",
             "value": "עברית"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עברית"
+          }
         }
       }
     },
@@ -1966,6 +3034,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שנינו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The two of us"
           }
         }
       }
@@ -1978,6 +3052,12 @@
             "state": "translated",
             "value": "שמות, הקצב השבועי, הזמנות והתראות."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names, the weekly rhythm, invites, and notifications."
+          }
         }
       }
     },
@@ -1988,6 +3068,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שמירה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
           }
         }
       }
@@ -2000,6 +3086,12 @@
             "state": "translated",
             "value": "התראות"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
         }
       }
     },
@@ -2010,6 +3102,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "כשהם בוחרים מצב רוח"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When they pick a mood"
           }
         }
       }
@@ -2022,6 +3120,12 @@
             "state": "translated",
             "value": "כשדייט מוכן לחשיפה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a date is ready to reveal"
+          }
         }
       }
     },
@@ -2032,6 +3136,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "כשהם מצטרפים"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When they join"
           }
         }
       }
@@ -2044,6 +3154,12 @@
             "state": "translated",
             "value": "התזכורת השבועית"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The weekly reminder"
+          }
         }
       }
     },
@@ -2054,6 +3170,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הם כבר כאן. אין צורך בקישור חדש."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They're already here. No new link is needed."
           }
         }
       }
@@ -2066,6 +3188,12 @@
             "state": "translated",
             "value": "יצירת קישור הזמנה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create an invite link"
+          }
         }
       }
     },
@@ -2076,6 +3204,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ייצוא זיכרונות"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export memories"
           }
         }
       }
@@ -2088,6 +3222,12 @@
             "state": "translated",
             "value": "ייבוא גיבוי ישן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import an older backup"
+          }
         }
       }
     },
@@ -2098,6 +3238,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ניתוק"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlink me"
           }
         }
       }
@@ -2110,6 +3256,12 @@
             "state": "translated",
             "value": "זה סוגר את המרחב לשניכם, כולל הערבים והזיכרונות."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This closes the space for both of you, including the nights and memories."
+          }
         }
       }
     },
@@ -2120,6 +3272,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מחיקת החשבון"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete my account"
           }
         }
       }
@@ -2132,6 +3290,12 @@
             "state": "translated",
             "value": "זה סוגר את המרחב המשותף, כולל הערבים והזיכרונות, ומוחק את הכניסה. הקלידו מחיקה לאישור."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This closes your shared space, including the nights and memories, and removes your login. Type delete to confirm."
+          }
         }
       }
     },
@@ -2142,6 +3306,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "המרחב נסגר"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your space was closed"
           }
         }
       }
@@ -2154,6 +3324,12 @@
             "state": "translated",
             "value": "מחיקה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "delete"
+          }
         }
       }
     },
@@ -2164,6 +3340,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אישור"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmation"
           }
         }
       }
@@ -2176,6 +3358,12 @@
             "state": "translated",
             "value": "מדיניות פרטיות"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
         }
       }
     },
@@ -2186,6 +3374,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "תמיכה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
           }
         }
       }
@@ -2198,6 +3392,12 @@
             "state": "translated",
             "value": "יציאה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign out"
+          }
         }
       }
     },
@@ -2208,6 +3408,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אין רשת. מציגים את מה שנשמר לאחרונה. שום דבר חדש לא ילך לאיבוד ולא יישלח פעמיים."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're offline. Showing what we last saved. Nothing new will be lost or duplicated."
           }
         }
       }
@@ -2220,6 +3426,12 @@
             "state": "translated",
             "value": "נסו שוב"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
         }
       }
     },
@@ -2230,6 +3442,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ביטול שינויים שלא נשמרו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard unsynced changes"
           }
         }
       }
@@ -2242,6 +3460,12 @@
             "state": "translated",
             "value": "המשך"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
         }
       }
     },
@@ -2252,6 +3476,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "רגע"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One moment"
           }
         }
       }
@@ -2264,6 +3494,12 @@
             "state": "translated",
             "value": "משהו השתבש."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong."
+          }
         }
       }
     },
@@ -2274,6 +3510,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "נשמר"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved"
           }
         }
       }
@@ -2286,6 +3528,12 @@
             "state": "translated",
             "value": "דילוג לתוכן"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip to content"
+          }
         }
       }
     },
@@ -2296,6 +3544,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ראשי התיבות שלך"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your initials"
           }
         }
       }
@@ -2308,6 +3562,12 @@
             "state": "translated",
             "value": "סגירה"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
         }
       }
     },
@@ -2318,6 +3578,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ביטול"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
           }
         }
       }
@@ -2330,6 +3596,12 @@
             "state": "translated",
             "value": "צחוקים"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laughs"
+          }
         }
       }
     },
@@ -2340,6 +3612,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "רומנטיקה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Romance"
           }
         }
       }
@@ -2352,6 +3630,12 @@
             "state": "translated",
             "value": "שיחה אמיתית"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A real talk"
+          }
         }
       }
     },
@@ -2362,6 +3646,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "קירבה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closeness"
           }
         }
       }
@@ -2374,6 +3664,12 @@
             "state": "translated",
             "value": "משהו חדש"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something new"
+          }
         }
       }
     },
@@ -2384,6 +3680,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שקט ביחד"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Easy together"
           }
         }
       }
@@ -2396,6 +3698,12 @@
             "state": "translated",
             "value": "מצב הרוח של %1$@ הוא %2$@"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@'s mood is %2$@"
+          }
         }
       }
     },
@@ -2406,6 +3714,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "חזרה"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
           }
         }
       }
@@ -2418,6 +3732,12 @@
             "state": "translated",
             "value": "צריך להיכנס לפני שמצטרפים למרחב."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in before joining a space."
+          }
         }
       }
     },
@@ -2428,6 +3748,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "כן, לנתק"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, unlink"
           }
         }
       }
@@ -2440,6 +3766,12 @@
             "state": "translated",
             "value": "תמונה מהערב"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo from the night"
+          }
         }
       }
     },
@@ -2450,6 +3782,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "מצב הרוח של %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@'s mood"
           }
         }
       }
@@ -2462,6 +3800,12 @@
             "state": "translated",
             "value": "%lld ביחד"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld together"
+          }
         }
       }
     },
@@ -2472,6 +3816,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "בואו אליי ל-Just Us. פתחו את הקישור, או הדביקו את הקוד.\n%@\n%@\n%@\n%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join me on Just Us. Open this link, or paste the code.\n%@\n%@\n%@\n%@"
           }
         }
       }
@@ -2484,6 +3834,12 @@
             "state": "translated",
             "value": "בואו אליי ל-Just Us. הדביקו את הקוד.\n%@\n%@\n%@"
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join me on Just Us. Paste the code.\n%@\n%@\n%@"
+          }
         }
       }
     },
@@ -2494,6 +3850,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld דק׳"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld min"
           }
         }
       }
@@ -2506,6 +3868,12 @@
             "state": "translated",
             "value": "אפשר לשלוח שוב בעוד שנייה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can resend in 1 second."
+          }
         }
       }
     },
@@ -2516,6 +3884,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אפשר לשלוח שוב בעוד שתי שניות."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can resend in 2 seconds."
           }
         }
       }
@@ -2528,6 +3902,12 @@
             "state": "translated",
             "value": "אפשר לשלוח שוב בעוד %lld שניות."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can resend in %lld seconds."
+          }
         }
       }
     },
@@ -2538,6 +3918,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ערב %lld"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Night %lld"
           }
         }
       }
@@ -2550,6 +3936,12 @@
             "state": "translated",
             "value": "האימייל הזה לא נראה תקין."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That email doesn't look right."
+          }
         }
       }
     },
@@ -2560,6 +3952,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "שם צריך בין תו אחד ל־24."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names need 1 to 24 characters."
           }
         }
       }
@@ -2572,6 +3970,12 @@
             "state": "translated",
             "value": "בדקו את השעה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the time."
+          }
         }
       }
     },
@@ -2582,6 +3986,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אזור הזמן לא מוכר."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That time zone isn't recognized."
           }
         }
       }
@@ -2594,6 +4004,12 @@
             "state": "translated",
             "value": "בחרו יום."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a day."
+          }
         }
       }
     },
@@ -2604,6 +4020,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "המשך צריך להיות בין 30 ל־360 דקות."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Length should be between 30 and 360 minutes."
           }
         }
       }
@@ -2616,6 +4038,12 @@
             "state": "translated",
             "value": "ההערה ריקה או ארוכה מדי."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That note is empty or too long."
+          }
         }
       }
     },
@@ -2626,6 +4054,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הרמז ארוך מדי."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That hint is too long."
           }
         }
       }
@@ -2638,6 +4072,12 @@
             "state": "translated",
             "value": "בדקו את התאריך."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the date."
+          }
         }
       }
     },
@@ -2648,6 +4088,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הקלידו את הספרות מהאימייל."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter the digits from the email."
           }
         }
       }
@@ -2660,6 +4106,12 @@
             "state": "translated",
             "value": "הקלידו מחיקה לאישור."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type delete to confirm."
+          }
         }
       }
     },
@@ -2670,6 +4122,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "זה לקח יותר מדי זמן. שום דבר לא סומן כנשמר."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That took too long. Nothing was marked as saved."
           }
         }
       }
@@ -2682,6 +4140,12 @@
             "state": "translated",
             "value": "החיבור פג. היכנסו שוב."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session expired. Sign in again."
+          }
         }
       }
     },
@@ -2692,6 +4156,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הקישור פג או שכבר השתמשו בו. שלחו לעצמכם קישור חדש."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That link expired or was already used. Email yourself a new one."
           }
         }
       }
@@ -2704,6 +4174,12 @@
             "state": "translated",
             "value": "הקוד לא תקין."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That code isn't valid."
+          }
         }
       }
     },
@@ -2714,6 +4190,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הקוד פג. שלחו חדש."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That code has expired. Resend a new one."
           }
         }
       }
@@ -2726,6 +4208,12 @@
             "state": "translated",
             "value": "היכנסו שוב."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in again."
+          }
         }
       }
     },
@@ -2736,6 +4224,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "יותר מדי ניסיונות. חכו כמה דקות."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too many tries. Wait a few minutes."
           }
         }
       }
@@ -2748,6 +4242,12 @@
             "state": "translated",
             "value": "החשבון הזה כבר במרחב משותף."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This account is already in a shared space."
+          }
         }
       }
     },
@@ -2758,6 +4258,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "במרחב כבר יש יותר מטיוטה ריקה, אז הזמנה לא יכולה להחליף אותו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your space already has more than an empty draft, so an invite can't replace it."
           }
         }
       }
@@ -2770,6 +4276,12 @@
             "state": "translated",
             "value": "ההזמנה לא תקינה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That invite isn't valid."
+          }
         }
       }
     },
@@ -2780,6 +4292,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ההזמנה בוטלה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That invite was canceled."
           }
         }
       }
@@ -2792,6 +4310,12 @@
             "state": "translated",
             "value": "ההזמנה כבר נוצלה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That invite was already used."
+          }
         }
       }
     },
@@ -2802,6 +4326,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ההזמנה פגה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That invite has expired."
           }
         }
       }
@@ -2814,6 +4344,12 @@
             "state": "translated",
             "value": "במרחב הזה כבר יש שני אנשים."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That space already has two people."
+          }
         }
       }
     },
@@ -2824,6 +4360,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אי אפשר לממש הזמנה שיצרת."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can't redeem an invite you created."
           }
         }
       }
@@ -2836,6 +4378,12 @@
             "state": "translated",
             "value": "רק מי שמתכנן השבוע יכול לעשות את זה."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only this week's planner can do that."
+          }
         }
       }
     },
@@ -2846,6 +4394,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אי אפשר לערוך את זה עכשיו."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That can't be edited now."
           }
         }
       }
@@ -2858,6 +4412,12 @@
             "state": "translated",
             "value": "קודם בחרו רעיון."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick an idea first."
+          }
         }
       }
     },
@@ -2868,6 +4428,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "צריך עדכון בשרת שעוד לא עלה. שום דבר לא השתנה."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That needs a server update that isn't on yet. Nothing was changed."
           }
         }
       }
@@ -2880,6 +4446,12 @@
             "state": "translated",
             "value": "לא הצלחנו לשמור. שום דבר לא סומן כבוצע."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We couldn't save. Nothing was marked as done."
+          }
         }
       }
     },
@@ -2890,6 +4462,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "אשרו לפני שמוסיפים לזיכרונות שכבר יש."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm before adding to memories you already have."
           }
         }
       }
@@ -2902,6 +4480,12 @@
             "state": "translated",
             "value": "יש שינויים שעוד לא נשמרו. נסו שוב כשיש רשת, או בטלו אותם."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You still have changes that aren't saved. Try again when you're online, or discard them."
+          }
         }
       }
     },
@@ -2912,6 +4496,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "הטלפון עדיין על החשבון, אז נשארתם מחוברים. נסו שוב."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This phone is still on the account, so you're still signed in. Try again."
           }
         }
       }
@@ -2924,6 +4514,12 @@
             "state": "translated",
             "value": "הטלפון עדיין על החשבון, אז החשבון לא נמחק. נסו שוב."
           }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This phone is still on the account, so the account was not deleted. Try again."
+          }
         }
       }
     },
@@ -2934,6 +4530,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "משהו השתבש (%@)."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something went wrong (%@)."
           }
         }
       }

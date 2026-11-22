@@ -97,7 +97,7 @@ final class AppLanguage {
 
   static func locale(for choice: Choice, preferred: [String] = Locale.preferredLanguages) -> Locale {
     if resolvedCode(choice: choice, preferred: preferred) == "he" {
-      return hebrewLocale
+      return Locale(identifier: "he_IL")
     }
     if choice == .en {
       let region = Locale.current.region?.identifier ?? "US"
@@ -106,10 +106,11 @@ final class AppLanguage {
     return .current
   }
 
-  /// Hebrew dates and clocks use he_IL and a 24-hour clock.
+  /// Hebrew dates and clocks use he_IL and a 24-hour clock. Strings stay on plain he_IL
+  /// so the catalog language matches.
   static func clockLocale(_ locale: Locale) -> Locale {
     guard locale.language.languageCode?.identifier == "he" else { return locale }
-    return hebrewLocale
+    return Locale(identifier: "he-IL-u-hc-h23")
   }
 
   /// CLDR Hebrew categories. English uses the same buckets and its own wording for each.
@@ -121,8 +122,4 @@ final class AppLanguage {
     return .other
   }
 
-  /// Unicode extension hc-h23 forces the 24-hour clock on he_IL.
-  private static var hebrewLocale: Locale {
-    Locale(identifier: "he-IL-u-hc-h23")
-  }
 }

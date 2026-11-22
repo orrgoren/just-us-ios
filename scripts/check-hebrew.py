@@ -36,7 +36,17 @@ for key, english in pairs:
         print(f"missing Hebrew: {key}")
         failed = True
         continue
-    if specifiers.findall(english) != specifiers.findall(hebrew):
+    catalog_english = (
+        entry.get("localizations", {})
+        .get("en", {})
+        .get("stringUnit", {})
+        .get("value", "")
+    )
+    expected = english.replace(r"\n", "\n").replace(r"\"", '"').replace(r"\\", "\\")
+    if catalog_english != expected:
+        print(f"English catalog drift: {key}")
+        failed = True
+    if specifiers.findall(expected) != specifiers.findall(hebrew):
         print(f"placeholder mismatch: {key}")
         failed = True
 

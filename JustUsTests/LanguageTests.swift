@@ -25,7 +25,7 @@ final class LanguageTests: XCTestCase {
   func testHebrewCatalogAndPlurals() {
     let hebrew = AppLanguage.locale(for: .he, preferred: ["en-US"])
     XCTAssertEqual(hebrew.language.languageCode?.identifier, "he")
-    XCTAssertEqual(hebrew.hourCycle, .zeroToTwentyThree)
+    XCTAssertEqual(AppLanguage.clockLocale(hebrew).hourCycle, .zeroToTwentyThree)
     XCTAssertEqual(L10n.lookup("settings.title", "The two of us", locale: hebrew), "שנינו")
     XCTAssertEqual(L10n.lookup("chat.arrived", "New message", locale: hebrew), "הודעה חדשה")
     XCTAssertEqual(L10n.lookup("field.done", "Done", locale: hebrew), "סיום")
