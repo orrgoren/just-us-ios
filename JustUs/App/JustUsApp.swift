@@ -26,6 +26,10 @@ struct AppRoot: View {
       .environment(\.locale, language.locale)
       .environment(\.layoutDirection, language.direction)
       .id(language.revision)
+      .onAppear { SystemSheetDirection.apply(language.direction) }
+      .onChange(of: language.direction) { _, direction in
+        SystemSheetDirection.apply(direction)
+      }
       .task { await model.start() }
       .onChange(of: scenePhase) { _, phase in
         guard phase == .active else { return }

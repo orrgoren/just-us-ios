@@ -145,6 +145,9 @@ end \$\$;
 reset role;
 do \$\$
 begin
+  if has_table_privilege('service_role', 'public.profiles', 'select') is not true then
+    raise exception 'service_role_cannot_read_profiles';
+  end if;
   if (select lang from public.profiles where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') is distinct from 'en' then
     raise exception 'profile_lang_not_saved';
   end if;

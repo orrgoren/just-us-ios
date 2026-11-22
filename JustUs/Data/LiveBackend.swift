@@ -278,7 +278,21 @@ final class LiveBackend: DateBackend {
   func syncLanguage(_ code: String) async {
     guard code == "en" || code == "he" else { return }
     guard let client, let user = cachedUser else { return }
-    _ = try? await client.from("profiles").upsert(ProfileLanguage(userId: user, lang: code)).execute()
+    let row = ProfileLanguage(
+      userId: user,
+      lang: code,
+      updatedAt: ISO8601DateFormatter().string(from: Date())
+    )
+    var lastError: Error?
+    for _ in 0..<2 {
+      do {
+        try await client.from("profiles").upsert(row, onConflict: "user_id").execute()
+        return
+      } catch {
+        lastError = error
+      }
+    }
+    if let lastError { LanguageLog.saveFailed(lastError) }
   }
 
   func registerDevice(token: String) async {
@@ -818,10 +832,20 @@ enum AuthStorageReset {
 struct ProfileLanguage: Encodable {
   var userId: UUID
   var lang: String
+  var updatedAt: String
 
   enum CodingKeys: String, CodingKey {
     case userId = "user_id"
     case lang
+    case updatedAt = "updated_at"
+  }
+}
+
+enum LanguageLog {
+  private static let logger = Logger(subsystem: "com.orrgoren.justus", category: "language")
+
+  static func saveFailed(_ error: Error) {
+    logger.error("profile language save failed: \(String(describing: error), privacy: .private)")
   }
 }
 

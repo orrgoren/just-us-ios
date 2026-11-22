@@ -449,7 +449,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "תורך. מלאו את זה, ואז שלחו להם קישור."
+            "value": "תורכם. מלאו את זה, ואז שלחו להם קישור."
           }
         },
         "en": {
@@ -466,7 +466,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "הם יראו את השם שבחרת כשיצטרפו."
+            "value": "הם יראו את השם שבחרתם כשיצטרפו."
           }
         },
         "en": {
@@ -551,7 +551,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "תורך"
+            "value": "תורכם"
           }
         },
         "en": {
@@ -568,7 +568,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "תורך לתכנן"
+            "value": "תורכם לתכנן"
           }
         },
         "en": {
@@ -925,7 +925,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "תורך. תגידו כן אם בא לכם נדנוד כשהם מצטרפים."
+            "value": "תורכם. תגידו כן אם בא לכם נדנוד כשהם מצטרפים."
           }
         },
         "en": {
@@ -959,7 +959,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "יש לי קוד, אני מצטרף"
+            "value": "יש לי קוד להצטרפות"
           }
         },
         "en": {
@@ -1112,7 +1112,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "נשארים איפה שאני"
+            "value": "נישאר איפה שאנחנו"
           }
         },
         "en": {
@@ -1724,7 +1724,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "נשלח"
+            "value": "שולח…"
           }
         },
         "en": {
@@ -2721,6 +2721,40 @@
         }
       }
     },
+    "calendar.summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just Us — הערב שלנו"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just Us — our evening"
+          }
+        }
+      }
+    },
+    "calendar.details": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דייט שבועי. שלושה בבית, אחד בחוץ. בלי טלפונים."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A weekly date. Three at home, one out. Phones away."
+          }
+        }
+      }
+    },
     "home.open": {
       "extractionState": "manual",
       "localizations": {
@@ -3118,7 +3152,7 @@
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "כשדייט מוכן לחשיפה"
+            "value": "כשהדייט מוכן לחשיפה"
           }
         },
         "en": {

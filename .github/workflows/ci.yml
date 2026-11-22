@@ -190,6 +190,7 @@ jobs:
               -only-testing:JustUsUITests/FlowUITests/testChatDraftSurvivesReopeningTheSheet
               -only-testing:JustUsUITests/FlowUITests/testChatBubbleOpensTheModal
               -only-testing:JustUsUITests/FlowUITests/testLanguageSwitchFlipsCopyWithoutRelaunch
+              -only-testing:JustUsUITests/FlowUITests/testHebrewChatSheetMirrorsOwnBubbles
             )
             if [ "${SCREENSHOTS}" = "true" ]; then
               only+=(-only-testing:JustUsUITests/ScreenshotUITests)

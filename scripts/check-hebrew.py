@@ -87,6 +87,32 @@ else:
             print(f"he.json drift: {key}")
             failed = True
 
+ui_literal = re.compile(r'(?:\bText|\bButton|\bLabel|\.navigationTitle)\s*\(\s*"')
+for path in Path("JustUs").rglob("*.swift"):
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if line.strip().startswith("//"):
+            continue
+        if ui_literal.search(line):
+            print(f"hardcoded copy: {path}:{number}: {line.strip()}")
+            failed = True
+
+calendar = Path("JustUs/Domain/CalendarFile.swift").read_text(encoding="utf-8")
+if not re.search(r"summary[^\n]*L10n\.", calendar) or not re.search(r"details[^\n]*L10n\.", calendar):
+    print("CalendarFile summary or details are not localized")
+    failed = True
+if re.search(r"(summary|details)\s*(?::\s*String\s*)?=\s*\"", calendar):
+    print("CalendarFile hardcodes summary or details")
+    failed = True
+
+push = Path("supabase/proposed/functions/send-push/push.mjs").read_text(encoding="utf-8")
+if re.search(r"[מל]\$\{", push):
+    print("send-push attaches מ or ל to a name")
+    failed = True
+for phrase in ("מאת ${who}", "עבור ${who}", "הודעה חדשה"):
+    if phrase not in push:
+        print(f"send-push missing Hebrew copy: {phrase}")
+        failed = True
+
 if failed:
     sys.exit(1)
-print(f"Hebrew covers {len(seen)} strings and the permission prompts.")
+print(f"Hebrew covers {len(seen)} strings, the permission prompts, CalendarFile, and send-push.")

@@ -626,7 +626,7 @@ extension SessionModel {
   private func chatScreenshot(_ name: String) async {
     await signedIn("alex@couple-a.test")
     if name == "chat" {
-      (backend as? FakeBackend)?.seedChatPreview()
+      (backend as? FakeBackend)?.seedChatPreview(includeMixed: AppLanguage.shared.code == "he")
       await loadMessages()
     } else if name == "chatPhoto" {
       (backend as? FakeBackend)?.seedChatPhotoPreview()

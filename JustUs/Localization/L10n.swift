@@ -180,6 +180,10 @@ enum L10n {
   static var moment: String { text("after.moment", "A moment to keep") }
   static var finish: String { text("after.finish", "We did it. Save the memory") }
   static var addCalendar: String { text("after.calendar", "Add to calendar") }
+  static var calendarSummary: String { text("calendar.summary", "Just Us — our evening") }
+  static var calendarDetails: String {
+    text("calendar.details", "A weekly date. Three at home, one out. Phones away.")
+  }
   static var openWeek: String { text("home.open", "Open this week") }
   static var noDate: String { text("home.noDate", "No evening is open. You can start the next one without losing memories.") }
   static var memoriesTitle: String { text("memories.title", "Our dates") }

@@ -19,6 +19,7 @@ struct ChatEntry: View {
         sendButton
       }
     }
+    .inAppLocale()
     .confirmationDialog(L10n.chatPhoto, isPresented: $showAttach, titleVisibility: .hidden) {
       Button(L10n.chatCamera) {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else { return }

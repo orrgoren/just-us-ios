@@ -2,7 +2,8 @@
 --
 -- Each account stores the language its pushes should use. The client writes
 -- en or he for itself. send-push reads the recipient's row with the service
--- role, which bypasses RLS. A missing row stays English.
+-- role. That role bypasses RLS and still needs the select grant below.
+-- A missing row stays English.
 
 create table if not exists public.profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -32,3 +33,4 @@ create policy profiles_update_own on public.profiles
   with check (auth.uid() = user_id);
 
 grant select, insert, update on public.profiles to authenticated;
+grant select on public.profiles to service_role;

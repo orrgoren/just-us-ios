@@ -1,5 +1,7 @@
 import Foundation
+import PhotosUI
 import SwiftUI
+import UIKit
 
 /// The in-app language. System follows the phone, and only Hebrew and English have copy.
 /// A manual choice is stored on the device and wins over the phone language.
@@ -122,4 +124,43 @@ final class AppLanguage {
     return .other
   }
 
+}
+
+extension View {
+  /// A sheet or cover is a new presentation. It does not keep the presenter's locale or direction.
+  func inAppLocale() -> some View {
+    modifier(InAppLocaleModifier())
+  }
+}
+
+private struct InAppLocaleModifier: ViewModifier {
+  @State private var language = AppLanguage.shared
+
+  func body(content: Content) -> some View {
+    content
+      .environment(language)
+      .environment(\.locale, language.locale)
+      .environment(\.layoutDirection, language.direction)
+      .onAppear { SystemSheetDirection.apply(language.direction) }
+      .onChange(of: language.direction) { _, direction in
+        SystemSheetDirection.apply(direction)
+      }
+  }
+}
+
+/// System sheets are UIKit. Their direction follows the trait of those controllers,
+/// not the SwiftUI environment on the presenter.
+enum SystemSheetDirection {
+  static func apply(_ direction: LayoutDirection) {
+    let attribute: UISemanticContentAttribute = direction == .rightToLeft ? .forceRightToLeft : .forceLeftToRight
+    let kinds: [UIAppearanceContainer.Type] = [
+      UIImagePickerController.self,
+      PHPickerViewController.self,
+      UIAlertController.self,
+      UIActivityViewController.self
+    ]
+    for kind in kinds {
+      UIView.appearance(whenContainedInInstancesOf: [kind]).semanticContentAttribute = attribute
+    }
+  }
 }

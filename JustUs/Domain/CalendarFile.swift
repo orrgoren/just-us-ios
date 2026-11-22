@@ -1,8 +1,8 @@
 import Foundation
 
 enum CalendarFile {
-  static let summary = "Just Us — our evening"
-  static let details = "A weekly date. Three at home, one out. Phones away."
+  static var summary: String { L10n.calendarSummary }
+  static var details: String { L10n.calendarDetails }
 
   static func escape(_ value: String) -> String {
     value
