@@ -24,12 +24,6 @@ final class ScreenshotUITests: XCTestCase {
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryXS")
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryAccessibilityXXXL")
     }
-    let hebrew = ["-JustUsLanguage", "he"]
-    capture(screen: "chat", appearance: "light", size: nil, extra: hebrew, name: "rtl-chat")
-    capture(screen: "chatBadge", appearance: "light", size: nil, extra: hebrew, name: "rtl-chat-badge")
-    capture(screen: "homePlanner", appearance: "light", size: nil, extra: hebrew, name: "rtl-home")
-    capture(screen: "settings", appearance: "dark", size: nil, extra: hebrew, name: "rtl-settings")
-    capture(screen: "memories", appearance: "light", size: nil, extra: hebrew, name: "rtl-memories")
     for screen in ["login", "homePlanner", "settings", "chat", "memories"] {
       capture(screen: screen, appearance: "light", size: nil, extra: ["-JustUsLanguage", "he"], name: "he-\(screen)")
       capture(screen: screen, appearance: "dark", size: nil, extra: ["-JustUsLanguage", "he"], name: "he-\(screen)")
