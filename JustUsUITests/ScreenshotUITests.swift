@@ -29,6 +29,10 @@ final class ScreenshotUITests: XCTestCase {
     capture(screen: "homePlanner", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-home")
     capture(screen: "settings", appearance: "dark", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-settings")
     capture(screen: "memories", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-memories")
+    for screen in ["login", "homePlanner", "settings", "chat", "memories"] {
+      capture(screen: screen, appearance: "light", size: nil, extra: ["-JustUsLanguage", "he"], name: "he-\(screen)")
+      capture(screen: screen, appearance: "dark", size: nil, extra: ["-JustUsLanguage", "he"], name: "he-\(screen)")
+    }
   }
 
   private func capture(

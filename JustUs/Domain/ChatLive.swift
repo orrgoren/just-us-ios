@@ -85,9 +85,9 @@ enum ChatDay {
 
 /// The clock in the corner of a bubble. The locale chooses 12-hour or 24-hour.
 enum ChatTime {
-  static func label(_ date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+  static func label(_ date: Date, locale: Locale = AppLanguage.shared.locale, timeZone: TimeZone = .current) -> String {
     let formatter = DateFormatter()
-    formatter.locale = locale
+    formatter.locale = AppLanguage.clockLocale(locale)
     formatter.timeZone = timeZone
     formatter.setLocalizedDateFormatFromTemplate("jm")
     return formatter.string(from: date)

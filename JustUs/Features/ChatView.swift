@@ -88,7 +88,7 @@ struct ChatScreen: View {
             if model.messages.isEmpty {
               Text(L10n.chatEmpty)
             }
-            ForEach(ChatDay.rows(model.messages)) { row in
+            ForEach(ChatDay.rows(model.messages, calendar: AppLanguage.shared.calendar)) { row in
               switch row {
               case .divider(_, let label):
                 dayDivider(label)
@@ -195,7 +195,7 @@ struct ChatScreen: View {
             Task { await model.deleteChatPhoto(line.id) }
           }
         }
-        Text(ChatTime.label(line.createdAt))
+        Text(ChatTime.label(line.createdAt, locale: AppLanguage.shared.locale))
           .font(Theme.caption)
           .foregroundStyle(line.mine && line.notice == false ? Theme.canvas.opacity(0.8) : Theme.muted(scheme))
         if line.delivery == .sending {

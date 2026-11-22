@@ -275,6 +275,12 @@ final class LiveBackend: DateBackend {
     await notify("inviteAccepted")
   }
 
+  func syncLanguage(_ code: String) async {
+    guard code == "en" || code == "he" else { return }
+    guard let client, let user = cachedUser else { return }
+    _ = try? await client.from("profiles").upsert(ProfileLanguage(userId: user, lang: code)).execute()
+  }
+
   func registerDevice(token: String) async {
     var record = DeviceTokenStore.load()
     record.received(token)
@@ -806,6 +812,16 @@ enum AuthStorageReset {
 
   static func clearVerifier() {
     try? KeychainLocalStorage().remove(key: verifierKey)
+  }
+}
+
+struct ProfileLanguage: Encodable {
+  var userId: UUID
+  var lang: String
+
+  enum CodingKeys: String, CodingKey {
+    case userId = "user_id"
+    case lang
   }
 }
 

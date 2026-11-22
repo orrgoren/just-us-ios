@@ -6,6 +6,9 @@ enum Launch {
   static func prepare() {
     let arguments = ProcessInfo.processInfo.arguments
     guard arguments.contains("-uitest") else { return }
+    if argument(after: "-JustUsLanguage") == nil {
+      UserDefaults.standard.removeObject(forKey: "justus.language")
+    }
     UserDefaults.standard.removeObject(forKey: uitestKey)
     PendingInviteStore.clear()
     DeviceTokenStore.reset()

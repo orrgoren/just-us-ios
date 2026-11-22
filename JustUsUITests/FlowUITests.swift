@@ -103,6 +103,23 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(app.buttons["chatClose"].exists)
   }
 
+  func testLanguageSwitchFlipsCopyWithoutRelaunch() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "homePlanner", "-JustUsAppearance", "light", "-JustUsLanguage", "en"]
+    app.launch()
+    let bubble = app.buttons["chatBubble"]
+    XCTAssertTrue(bubble.waitForExistence(timeout: 10))
+    XCTAssertGreaterThan(bubble.frame.midX, app.frame.midX)
+    app.buttons["Us"].tap()
+    XCTAssertTrue(app.staticTexts["The two of us"].waitForExistence(timeout: 8))
+    let hebrew = app.buttons["עברית"]
+    XCTAssertTrue(hebrew.waitForExistence(timeout: 4))
+    hebrew.tap()
+    XCTAssertTrue(app.staticTexts["שנינו"].waitForExistence(timeout: 4))
+    XCTAssertFalse(app.staticTexts["The two of us"].exists)
+    XCTAssertLessThan(bubble.frame.midX, app.frame.midX)
+  }
+
   func testLaunchShowsLogin() {
     let app = launch()
     XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 12))

@@ -141,6 +141,9 @@ final class ChatLiveTests: XCTestCase {
     XCTAssertTrue(gb.contains("15:04"))
     XCTAssertFalse(gb.contains("PM"))
     XCTAssertNotEqual(us, gb)
+    let hebrew = ChatTime.label(date, locale: Locale(identifier: "he_IL"), timeZone: zone)
+    XCTAssertTrue(hebrew.contains("15:04"), hebrew)
+    XCTAssertFalse(hebrew.contains("PM"))
   }
 
   func testDayLinesGroupAcrossMidnightAndTimeZones() {
@@ -161,6 +164,7 @@ final class ChatLiveTests: XCTestCase {
     hebrew.locale = Locale(identifier: "he_IL")
     let hebrewToday = ChatDay.label(today, now: now, calendar: hebrew)
     let hebrewSunday = ChatDay.label(sunday, now: now, calendar: hebrew)
+    XCTAssertTrue(hebrewToday.contains("היום"), hebrewToday)
     XCTAssertFalse(hebrewToday.localizedCaseInsensitiveContains("today"))
     XCTAssertFalse(hebrewToday.isEmpty)
     XCTAssertFalse(hebrewSunday.localizedCaseInsensitiveContains("sun"))

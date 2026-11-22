@@ -22,7 +22,7 @@ struct SetupScreen: View {
       VStack(alignment: .leading, spacing: Theme.Space.stack) {
         Picker(L10n.ourDay, selection: $model.draft.weekday) {
           ForEach(0..<7, id: \.self) { day in
-            Text(ZonedTime.weekdaySymbol(day)).tag(day)
+            Text(ZonedTime.weekdaySymbol(day, locale: AppLanguage.shared.locale)).tag(day)
           }
         }
         .accessibilityIdentifier(A11y.weekday)

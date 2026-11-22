@@ -93,6 +93,7 @@ enum A11y {
   static let streak = "streakWeeks"
   static let loginRoot = "loginRoot"
   static let settingsRoot = "settingsRoot"
+  static let language = "languagePicker"
   static let memoriesRoot = "memoriesRoot"
   static let memoriesEmpty = "memoriesEmpty"
 

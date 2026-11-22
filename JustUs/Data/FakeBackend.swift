@@ -234,6 +234,12 @@ final class FakeBackend: DateBackend {
     store.save()
   }
 
+  var syncedLanguage: String?
+
+  func syncLanguage(_ code: String) async {
+    syncedLanguage = code
+  }
+
   func registerDevice(token: String) async {
     _ = token
   }

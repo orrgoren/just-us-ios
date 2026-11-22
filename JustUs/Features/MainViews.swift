@@ -132,7 +132,7 @@ struct RitualScreen: View {
         }
         Text(L10n.rhythm)
         if let date = ritual.date {
-          Text(ZonedTime.formatWhen(date.scheduledAt, timeZone: ritual.timezone))
+          Text(ZonedTime.formatWhen(date.scheduledAt, timeZone: ritual.timezone, locale: AppLanguage.shared.locale))
           Text(date.publicTeaser ?? L10n.noHint)
           Text(date.outfitHint ?? L10n.noOutfit)
         }
@@ -253,6 +253,12 @@ private struct DateMemoryCard: View {
   let memory: MemoryItem
   @State private var photo: PhotosPickerItem?
 
+  private var memoryWhen: String {
+    var style = Date.FormatStyle(date: .abbreviated, time: .omitted)
+    style.locale = AppLanguage.shared.clockLocale(AppLanguage.shared.locale)
+    return memory.when.formatted(style)
+  }
+
   var body: some View {
     HStack(alignment: .top, spacing: Theme.Space.stack) {
       Capsule()
@@ -260,7 +266,7 @@ private struct DateMemoryCard: View {
         .frame(width: 3)
       GlassCard {
         VStack(alignment: .leading, spacing: 8) {
-          Text(memory.when.formatted(date: .abbreviated, time: .omitted))
+          Text(memoryWhen)
             .font(Theme.caption)
           Text(L10n.memoryNumber(memory.number))
           Text(memory.title).font(Theme.title)
@@ -318,11 +324,22 @@ private struct DateMemoryCard: View {
 
 struct SettingsScreen: View {
   @Bindable var model: SessionModel
+  @Environment(AppLanguage.self) private var language
 
   var body: some View {
     VStack(alignment: .leading, spacing: Theme.Space.section) {
       Text(L10n.settingsTitle).font(Theme.display).accessibilityIdentifier(A11y.settingsRoot)
       Text(L10n.settingsBody)
+      Picker(L10n.language, selection: Bindable(language).choice) {
+        Text(L10n.languageSystem).tag(AppLanguage.Choice.system)
+        Text(L10n.languageEnglish).tag(AppLanguage.Choice.en)
+        Text(L10n.languageHebrew).tag(AppLanguage.Choice.he)
+      }
+      .pickerStyle(.segmented)
+      .accessibilityIdentifier(A11y.language)
+      .onChange(of: language.choice) { _, _ in
+        Task { await model.syncLanguage() }
+      }
       HelperText(text: L10n.settingsNext)
       if let settings = model.settings {
         Text(settings.selfName)

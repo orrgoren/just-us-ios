@@ -43,6 +43,7 @@ protocol DateBackend: AnyObject {
   func retryClosedPhotos() async
   func takeSpaceClosed() async -> Bool
   func registerDevice(token: String) async
+  func syncLanguage(_ code: String) async
   func setOffline(_ offline: Bool)
   func injectPartnerMood() async
   func preferences() -> PushPreferences

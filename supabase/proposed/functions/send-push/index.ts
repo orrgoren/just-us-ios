@@ -32,7 +32,7 @@
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected.
 
 import { isServiceCaller } from "../_shared/jwt-role.mjs";
-import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, chatPushBody, dropDeviceToken, flushDue, freshApnsToken, keepsSixHourDedupe, orderedDue, providerTokenRejected, retryableApns, safeErrorMessage, SIX_HOUR_DEDUPE_MS, skipsDailyCap } from "./push.mjs";
+import { apnsAttemptLog, CHAT_PUSH_WINDOW_MS, dropDeviceToken, flushDue, freshApnsToken, keepsSixHourDedupe, orderedDue, providerTokenRejected, pushAlert, recipientLanguage, retryableApns, safeErrorMessage, SIX_HOUR_DEDUPE_MS, skipsDailyCap } from "./push.mjs";
 
 const INVITE_TTL_HOURS = 7 * 24;
 const KINDS = ["partnerMood", "planReady", "inviteAccepted", "weeklyReminder", "inviteNudge", "chatMessage"] as const;
@@ -185,8 +185,9 @@ async function deliver(
   if (policy !== "send") return { status: 200, body: { decision: "suppress", reason: policy } };
 
   const nudgeIndex = history.filter((row) => row.kind === "inviteNudge").length + 1;
-  const text = message(kind, name, nudgeIndex);
-  if (forbidden(text)) return { status: 200, body: { decision: "suppress", reason: "secret" } };
+  const lang = await recipientLang(db, recipientId);
+  const alert = pushAlert(kind, name, nudgeIndex, lang);
+  if (forbidden(alert.body)) return { status: 200, body: { decision: "suppress", reason: "secret" } };
 
   const tokens = await loadTokens(db, recipientId);
   if (tokens.length === 0) return { status: 200, body: { decision: "suppress", reason: "no_device" } };
@@ -211,7 +212,7 @@ async function deliver(
       const sandbox = device.environment
         ? device.environment === "sandbox"
         : Deno.env.get("APNS_USE_SANDBOX") === "true";
-      const result = await send(device.token, text, kind, jwt, sandbox);
+      const result = await send(device.token, alert.title, alert.body, kind, jwt, sandbox);
       if (providerTokenRejected(result.status, result.reason)) {
         apnsCached = null;
         retry = true;
@@ -294,14 +295,16 @@ async function inviteAgeHours(db: Db, coupleId: string): Promise<number | null> 
   return INVITE_TTL_HOURS - (Date.parse(expires) - now.getTime()) / (60 * 60 * 1000);
 }
 
-function message(kind: Kind, name: string, nudge: number): string {
-  if (kind === "chatMessage") return chatPushBody();
-  if (kind === "planReady") return "Your date is ready to reveal.";
-  if (kind === "partnerMood") return `${name} picked a mood for your night.`;
-  if (kind === "inviteAccepted") return `${name} is in. This night is officially both of yours.`;
-  if (kind === "weeklyReminder") return `Tonight is yours, ${name}.`;
-  if (nudge >= 2) return `We'll leave the invite here for ${name}. No more reminders.`;
-  return `Your invite for ${name} is open whenever you both want it.`;
+async function recipientLang(db: Db, userId: string): Promise<string> {
+  try {
+    const rows = await db.select<{ lang?: string }[]>(
+      `profiles?user_id=eq.${userId}&select=lang&limit=1`,
+    );
+    return recipientLanguage(rows[0]?.lang);
+  } catch {
+    // The language table is proposed and not live yet. English keeps pushes moving.
+    return "en";
+  }
 }
 
 function forbidden(text: string): boolean {
@@ -424,6 +427,7 @@ async function flushOutbox(supabaseUrl: string, serviceKey: string): Promise<Rec
 
 async function send(
   token: string,
+  title: string,
   text: string,
   kind: Kind,
   jwt: string,
@@ -439,7 +443,7 @@ async function send(
       "apns-push-type": "alert",
     },
     body: JSON.stringify({
-      aps: { alert: { title: "Just Us", body: text }, sound: "default" },
+      aps: { alert: { title, body: text }, sound: "default" },
       type: kind,
     }),
   });

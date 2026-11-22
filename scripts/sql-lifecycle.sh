@@ -50,6 +50,7 @@ run -f supabase/proposed/019_mood_push_cap.sql
 run -f supabase/proposed/020_skip_keeps_planner.sql
 run -f supabase/proposed/021_chat_photos.sql
 run -f supabase/proposed/022_chat_open_and_notice.sql
+run -f supabase/proposed/023_profile_language.sql
 run -v ON_ERROR_STOP=1 -c "
 insert into auth.users (id) values ('10101010-1010-4010-8010-101010101010');
 insert into public.push_outbox (id, caller_user_id, recipient_user_id, kind, not_before) values
@@ -117,6 +118,41 @@ delete from public.push_outbox where caller_user_id = '10101010-1010-4010-8010-1
 delete from auth.users where id = '10101010-1010-4010-8010-101010101010';
 "
 run -f scripts/sql/lifecycle.sql
+
+# profiles.lang is self-write only. The owner bypasses RLS, so this runs as authenticated.
+run -v ON_ERROR_STOP=1 -c "
+grant usage on schema auth to authenticated;
+grant execute on function auth.uid() to authenticated;
+select set_config('request.jwt.claims', '{\"sub\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\",\"role\":\"authenticated\"}', false);
+set role authenticated;
+insert into public.profiles (user_id, lang) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'he');
+update public.profiles set lang = 'en' where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+do \$\$
+begin
+  insert into public.profiles (user_id, lang) values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'he');
+  raise exception 'profile_cross_write_succeeded';
+exception
+  when insufficient_privilege then
+    null;
+  when others then
+    if sqlerrm = 'profile_cross_write_succeeded' then
+      raise;
+    end if;
+    if sqlstate not in ('42501', '44000') then
+      raise;
+    end if;
+end \$\$;
+reset role;
+do \$\$
+begin
+  if (select lang from public.profiles where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') is distinct from 'en' then
+    raise exception 'profile_lang_not_saved';
+  end if;
+  if exists (select 1 from public.profiles where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') then
+    raise exception 'profile_other_row_written';
+  end if;
+end \$\$;
+"
 
 # Two account deletes at once. The first transaction holds the couple row
 # lock across pg_sleep. The second waits, then deletes the remaining login.

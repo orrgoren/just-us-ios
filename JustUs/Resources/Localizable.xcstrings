@@ -1,5 +1,2943 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {},
-  "version" : "1.0"
+  "sourceLanguage": "en",
+  "strings": {
+    "brand.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just Us"
+          }
+        }
+      }
+    },
+    "brand.tagline": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערב אחד. כל שבוע. רק שלנו."
+          }
+        }
+      }
+    },
+    "brand.wordmark": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just Us"
+          }
+        }
+      }
+    },
+    "auth.loginTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערב שרק שלכם"
+          }
+        }
+      }
+    },
+    "auth.loginBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר להיכנס עם Apple, או עם קישור שנשלח לאימייל באייפון הזה."
+          }
+        }
+      }
+    },
+    "auth.email": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אימייל"
+          }
+        }
+      }
+    },
+    "auth.emailPrompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "you@example.com"
+          }
+        }
+      }
+    },
+    "auth.sendCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שלחו לי קישור לכניסה"
+          }
+        }
+      }
+    },
+    "auth.newLink": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שלחו לי קישור חדש"
+          }
+        }
+      }
+    },
+    "auth.apple": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כניסה עם Apple"
+          }
+        }
+      }
+    },
+    "auth.haveInvite": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יש לי הזמנה"
+          }
+        }
+      }
+    },
+    "auth.codeTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדקו את האימייל"
+          }
+        }
+      }
+    },
+    "auth.codeBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדקו את האימייל ולחצו על קישור הכניסה באייפון הזה."
+          }
+        }
+      }
+    },
+    "auth.code": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קוד"
+          }
+        }
+      }
+    },
+    "auth.verify": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך"
+          }
+        }
+      }
+    },
+    "auth.resend": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שליחה מחדש"
+          }
+        }
+      }
+    },
+    "auth.another": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אימייל אחר"
+          }
+        }
+      }
+    },
+    "setup.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בואו נעשה את זה שלכם"
+          }
+        }
+      }
+    },
+    "setup.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השם שלך, השם שלהם, והערב שאתם רוצים לשמור."
+          }
+        }
+      }
+    },
+    "setup.myName": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השם שלי"
+          }
+        }
+      }
+    },
+    "setup.theirName": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השם שלהם"
+          }
+        }
+      }
+    },
+    "setup.day": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הערב שלנו"
+          }
+        }
+      }
+    },
+    "setup.time": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מתחילים ב"
+          }
+        }
+      }
+    },
+    "setup.zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אזור זמן"
+          }
+        }
+      }
+    },
+    "setup.duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משך"
+          }
+        }
+      }
+    },
+    "setup.durationHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדרך כלל שעה וחצי. אפשר לשנות אם אצלכם זה יותר."
+          }
+        }
+      }
+    },
+    "setup.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תורך. מלאו את זה, ואז שלחו להם קישור."
+          }
+        }
+      }
+    },
+    "setup.namesHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הם יראו את השם שבחרת כשיצטרפו."
+          }
+        }
+      }
+    },
+    "setup.settingUp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מכינים את המרחב שלכם…"
+          }
+        }
+      }
+    },
+    "field.required": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חובה"
+          }
+        }
+      }
+    },
+    "field.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סיום"
+          }
+        }
+      }
+    },
+    "field.optional": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא חובה"
+          }
+        }
+      }
+    },
+    "role.yours": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תורך"
+          }
+        }
+      }
+    },
+    "role.yourPlan": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תורך לתכנן"
+          }
+        }
+      }
+    },
+    "role.partnerTurn": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התור של %@ לתכנן"
+          }
+        }
+      }
+    },
+    "ritual.partnerPlanning": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ על התכנון הפעם. בחרו מצב רוח, והרמז יופיע כשזה מוכן."
+          }
+        }
+      }
+    },
+    "home.oneWeek": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שבוע אחד ביחד"
+          }
+        }
+      }
+    },
+    "home.twoWeeks": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שבועיים ברצף"
+          }
+        }
+      }
+    },
+    "home.weeksInARow": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld שבועות ברצף"
+          }
+        }
+      }
+    },
+    "role.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחכים להם"
+          }
+        }
+      }
+    },
+    "auth.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השלב הבא: כניסה. אחר כך פותחים מרחב, או מצטרפים לשלהם."
+          }
+        }
+      }
+    },
+    "auth.codeNext": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקישור הוא הדרך פנימה. הקוד כאן אם כבר יש לכם אותו."
+          }
+        }
+      }
+    },
+    "invite.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שלחו את קישור האפליקציה. הוא פותח את Just Us אצלם."
+          }
+        }
+      }
+    },
+    "invite.appLink": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נפתח באפליקציה"
+          }
+        }
+      }
+    },
+    "invite.joinNext": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הדביקו את הקוד שלהם. אתם מצטרפים למרחב שלהם, לא פותחים חדש."
+          }
+        }
+      }
+    },
+    "celebrate.space": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המרחב שלכם מוכן."
+          }
+        }
+      }
+    },
+    "celebrate.paired": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אתם מחוברים. השבוע שלכם."
+          }
+        }
+      }
+    },
+    "celebrate.night": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הערב נקבע."
+          }
+        }
+      }
+    },
+    "ritual.waitHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אין מה לעשות עד שהם יפתחו את הקישור."
+          }
+        }
+      }
+    },
+    "ritual.plannerHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אתם מתכננים. הם רואים את הרמז, לא את ההפתעה, עד שתחשפו."
+          }
+        }
+      }
+    },
+    "ritual.partnerPlan": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הם מתכננים. בחרו מצב רוח, וחכו לרמז."
+          }
+        }
+      }
+    },
+    "ritual.moodHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מצב רוח אחד. הם יראו את שלכם. התוכנית נשארת אצל מי שמתכנן."
+          }
+        }
+      }
+    },
+    "memories.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא חובה. שורה או תמונה, אחרי שהערב נגמר."
+          }
+        }
+      }
+    },
+    "settings.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמות חובה. התזכורות לא."
+          }
+        }
+      }
+    },
+    "push.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תורך. תגידו כן אם בא לכם נדנוד כשהם מצטרפים."
+          }
+        }
+      }
+    },
+    "setup.create": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניצור את המרחב שלנו"
+          }
+        }
+      }
+    },
+    "setup.join": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יש לי קוד, אני מצטרף"
+          }
+        }
+      }
+    },
+    "invite.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תזמינו אותם"
+          }
+        }
+      }
+    },
+    "invite.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שתפו קישור חד־פעמי, או תקריאו את הקוד. הוא תקף שבעה ימים."
+          }
+        }
+      }
+    },
+    "invite.share": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיתוף הזמנה"
+          }
+        }
+      }
+    },
+    "invite.showCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצגת הקוד"
+          }
+        }
+      }
+    },
+    "invite.skip": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אזמין אותם אחר כך"
+          }
+        }
+      }
+    },
+    "invite.paste": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קוד הזמנה או קישור"
+          }
+        }
+      }
+    },
+    "invite.join": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצטרפות למרחב"
+          }
+        }
+      }
+    },
+    "invite.replace": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצטרפות ומחיקת המרחב הריק שלי"
+          }
+        }
+      }
+    },
+    "invite.stay": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נשארים איפה שאני"
+          }
+        }
+      }
+    },
+    "invite.replaceBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כבר יש לך מרחב ריק, בלי בן או בת זוג ובלי ערב שמור. הצטרפות מוחקת את המרחב הריק ומחברת את החשבון להזמנה."
+          }
+        }
+      }
+    },
+    "invite.joinBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקוד הזה עובד פעם אחת. ההצטרפות מחברת את החשבון למרחב שלהם, ורק לשלהם."
+          }
+        }
+      }
+    },
+    "invite.keptBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לחשבון הזה כבר יש מרחב עם היסטוריה. הזמנה לא יכולה להחליף אותו."
+          }
+        }
+      }
+    },
+    "push.softTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רוצים לדעת כשהם מצטרפים?"
+          }
+        }
+      }
+    },
+    "push.softBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נבקש מהמערכת רק אם תגידו כן. אפשר לשנות אחר כך."
+          }
+        }
+      }
+    },
+    "push.yes": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כן, תנדנדו לי"
+          }
+        }
+      }
+    },
+    "push.no": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא עכשיו"
+          }
+        }
+      }
+    },
+    "push.denied": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההתראות כבויות. אפשר להדליק אותן בהגדרות."
+          }
+        }
+      }
+    },
+    "tab.week": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השבוע"
+          }
+        }
+      }
+    },
+    "tab.memories": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זיכרונות"
+          }
+        }
+      }
+    },
+    "tab.us": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אנחנו"
+          }
+        }
+      }
+    },
+    "home.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "השבוע, רק שלנו"
+          }
+        }
+      }
+    },
+    "chat.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פתק, רק בשבילם"
+          }
+        }
+      }
+    },
+    "chat.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פתיחת הצ'אט"
+          }
+        }
+      }
+    },
+    "chat.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רק שניכם יכולים לקרוא את זה. התראה אומרת שהגיעה הודעה, לא מה כתוב בה."
+          }
+        }
+      }
+    },
+    "chat.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הצ'אט נפתח כששניכם כאן."
+          }
+        }
+      }
+    },
+    "chat.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עדיין אין כאן כלום."
+          }
+        }
+      }
+    },
+    "chat.field": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הודעה"
+          }
+        }
+      }
+    },
+    "chat.send": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שליחה"
+          }
+        }
+      }
+    },
+    "chat.tooLong": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הודעה יכולה להיות עד 1,000 תווים, או 5,600 בתים."
+          }
+        }
+      }
+    },
+    "chat.keyChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המפתח שלהם השתנה."
+          }
+        }
+      }
+    },
+    "chat.unreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטלפון הזה לא יכול לקרוא את ההודעה."
+          }
+        }
+      }
+    },
+    "chat.photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמונה"
+          }
+        }
+      }
+    },
+    "chat.camera": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מצלמה"
+          }
+        }
+      }
+    },
+    "chat.library": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ספריית התמונות"
+          }
+        }
+      }
+    },
+    "chat.attach": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת תמונה"
+          }
+        }
+      }
+    },
+    "chat.viewOnce": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צפייה אחת"
+          }
+        }
+      }
+    },
+    "chat.keep": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לשמור"
+          }
+        }
+      }
+    },
+    "chat.photoChoice": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "איך לשמור את התמונה?"
+          }
+        }
+      }
+    },
+    "chat.viewOnceHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לפתוח אותה פעם אחת. היא לא נשמרת בגלריה."
+          }
+        }
+      }
+    },
+    "chat.keepHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "היא נשארת בצ'אט עד שאחד מכם מוחק אותה. היא לא נשמרת בגלריה."
+          }
+        }
+      }
+    },
+    "chat.photoTap": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמונה, לחיצה לצפייה"
+          }
+        }
+      }
+    },
+    "chat.opened": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נפתחה"
+          }
+        }
+      }
+    },
+    "chat.expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התמונה פגה"
+          }
+        }
+      }
+    },
+    "chat.sendFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא נשלח, לחיצה לניסיון נוסף"
+          }
+        }
+      }
+    },
+    "chat.sending": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נשלח"
+          }
+        }
+      }
+    },
+    "chat.arrived": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הודעה חדשה"
+          }
+        }
+      }
+    },
+    "chat.openFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא הצלחנו לפתוח את התמונה."
+          }
+        }
+      }
+    },
+    "chat.photoTooBig": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התמונה גדולה מדי."
+          }
+        }
+      }
+    },
+    "chat.photoHidden": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התמונה מוסתרת בזמן צילום המסך."
+          }
+        }
+      }
+    },
+    "chat.deletePhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת התמונה"
+          }
+        }
+      }
+    },
+    "chat.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סגירה"
+          }
+        }
+      }
+    },
+    "chat.samplePhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שליחת תמונת דוגמה"
+          }
+        }
+      }
+    },
+    "chat.partner": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטלפון שלהם צריך לפתוח את האפליקציה פעם אחת לפני שאפשר לנעול הודעה אליהם."
+          }
+        }
+      }
+    },
+    "home.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו מצב רוח. מי שמתכנן שומר את ההפתעה."
+          }
+        }
+      }
+    },
+    "home.dates": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דייטים ביחד"
+          }
+        }
+      }
+    },
+    "home.rhythm": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שלושה בפנים, אחד בחוץ"
+          }
+        }
+      }
+    },
+    "home.planner": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תכנון"
+          }
+        }
+      }
+    },
+    "ritual.yourMood": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מצב הרוח שלי"
+          }
+        }
+      }
+    },
+    "ritual.waitingChoice": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחכים לבחירה שלהם"
+          }
+        }
+      }
+    },
+    "ritual.waitingJoin": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחכים שהם יצטרפו"
+          }
+        }
+      }
+    },
+    "ritual.where": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "איפה הפעם?"
+          }
+        }
+      }
+    },
+    "ritual.tradition": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לפי המסורת"
+          }
+        }
+      }
+    },
+    "ritual.home": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בבית"
+          }
+        }
+      }
+    },
+    "ritual.out": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחוץ"
+          }
+        }
+      }
+    },
+    "ritual.traditionHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שלושה ערבים בבית, ואז אחד בחוץ."
+          }
+        }
+      }
+    },
+    "ritual.override": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הבחירה הזו יוצאת מהקצב."
+          }
+        }
+      }
+    },
+    "ritual.swap": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החלפת מתכנן"
+          }
+        }
+      }
+    },
+    "plan.surprise": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תפתיעו אותנו"
+          }
+        }
+      }
+    },
+    "plan.another": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רעיון אחר"
+          }
+        }
+      }
+    },
+    "plan.date": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תאריך"
+          }
+        }
+      }
+    },
+    "plan.time": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שעה"
+          }
+        }
+      }
+    },
+    "plan.teaserLegend": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רמז שהם יכולים לראות"
+          }
+        }
+      }
+    },
+    "plan.teaser": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רמז"
+          }
+        }
+      }
+    },
+    "plan.outfit": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מה ללבוש"
+          }
+        }
+      }
+    },
+    "plan.notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הערות פרטיות, רק למתכנן"
+          }
+        }
+      }
+    },
+    "plan.saveHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירת הרמז"
+          }
+        }
+      }
+    },
+    "plan.editHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לשנות את הרמז עד שחושפים את ההפתעה."
+          }
+        }
+      }
+    },
+    "plan.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירת הדייט"
+          }
+        }
+      }
+    },
+    "plan.skip": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דילוג על השבוע"
+          }
+        }
+      }
+    },
+    "plan.hungry": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בואו רעבים"
+          }
+        }
+      }
+    },
+    "plan.pajamas": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פיג'מה"
+          }
+        }
+      }
+    },
+    "plan.dress": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "להתלבש יפה"
+          }
+        }
+      }
+    },
+    "reveal.sealedTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערב בדרך"
+          }
+        }
+      }
+    },
+    "reveal.sealedBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לראות מתי, איפה, ואת הרמז. לא את ההפתעה."
+          }
+        }
+      }
+    },
+    "reveal.emptyTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הערב הבא מחכה"
+          }
+        }
+      }
+    },
+    "reveal.emptyBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו מצבי רוח, ואז בקשו הפתעה."
+          }
+        }
+      }
+    },
+    "reveal.idea": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הרעיון"
+          }
+        }
+      }
+    },
+    "reveal.saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמור לשניכם"
+          }
+        }
+      }
+    },
+    "reveal.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נחשף"
+          }
+        }
+      }
+    },
+    "reveal.prep": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הכנה"
+          }
+        }
+      }
+    },
+    "reveal.twist": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטוויסט הקטן"
+          }
+        }
+      }
+    },
+    "reveal.question": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שאלה לסיום"
+          }
+        }
+      }
+    },
+    "reveal.private": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הערה פרטית"
+          }
+        }
+      }
+    },
+    "reveal.button": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חשיפת ההפתעה"
+          }
+        }
+      }
+    },
+    "reveal.reopen": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזרה לטיוטה"
+          }
+        }
+      }
+    },
+    "reveal.move": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הזזת השעה"
+          }
+        }
+      }
+    },
+    "reveal.noHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עדיין אין רמז. ההפתעה עוד מתבשלת."
+          }
+        }
+      }
+    },
+    "reveal.noOutfit": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אין מה מיוחד ללבוש."
+          }
+        }
+      }
+    },
+    "after.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "איך היה?"
+          }
+        }
+      }
+    },
+    "after.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמרו רגע אחד. הרעיון המלא נשאר חבוי עד שהערב נסגר, אלא אם הוא נחשף."
+          }
+        }
+      }
+    },
+    "after.moment": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רגע לשמור"
+          }
+        }
+      }
+    },
+    "after.finish": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עשינו את זה. שמירת הזיכרון"
+          }
+        }
+      }
+    },
+    "after.calendar": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספה ליומן"
+          }
+        }
+      }
+    },
+    "home.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "פתיחת השבוע"
+          }
+        }
+      }
+    },
+    "home.noDate": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אין ערב פתוח. אפשר להתחיל את הבא בלי לאבד זיכרונות."
+          }
+        }
+      }
+    },
+    "memories.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הדייטים שלנו"
+          }
+        }
+      }
+    },
+    "memories.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הערבים שסיימתם, מהחדש לישן, עם התמונה מהערב."
+          }
+        }
+      }
+    },
+    "memories.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עדיין אין כלום שמור. הערב הראשון בדרך."
+          }
+        }
+      }
+    },
+    "memories.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת הרגע"
+          }
+        }
+      }
+    },
+    "memories.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירה"
+          }
+        }
+      }
+    },
+    "memories.edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עריכה"
+          }
+        }
+      }
+    },
+    "memories.delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת הרגע"
+          }
+        }
+      }
+    },
+    "memories.enough": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "היינו ביחד. זה מספיק."
+          }
+        }
+      }
+    },
+    "memories.photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הוספת תמונה"
+          }
+        }
+      }
+    },
+    "memories.retryPhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נסו שוב את התמונה"
+          }
+        }
+      }
+    },
+    "memories.photoFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התמונה לא נשמרה. הזיכרון לא השתנה."
+          }
+        }
+      }
+    },
+    "memories.sample": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמונת דוגמה"
+          }
+        }
+      }
+    },
+    "settings.language": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שפה"
+          }
+        }
+      }
+    },
+    "settings.languageSystem": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מערכת"
+          }
+        }
+      }
+    },
+    "settings.languageEnglish": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        }
+      }
+    },
+    "settings.languageHebrew": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "עברית"
+          }
+        }
+      }
+    },
+    "settings.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שנינו"
+          }
+        }
+      }
+    },
+    "settings.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמות, הקצב השבועי, הזמנות והתראות."
+          }
+        }
+      }
+    },
+    "settings.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שמירה"
+          }
+        }
+      }
+    },
+    "settings.notifications": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התראות"
+          }
+        }
+      }
+    },
+    "settings.notifyMood": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כשהם בוחרים מצב רוח"
+          }
+        }
+      }
+    },
+    "settings.notifyPlan": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כשדייט מוכן לחשיפה"
+          }
+        }
+      }
+    },
+    "settings.notifyInvite": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כשהם מצטרפים"
+          }
+        }
+      }
+    },
+    "settings.notifyWeek": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "התזכורת השבועית"
+          }
+        }
+      }
+    },
+    "settings.partnerHere": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הם כבר כאן. אין צורך בקישור חדש."
+          }
+        }
+      }
+    },
+    "settings.newInvite": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יצירת קישור הזמנה"
+          }
+        }
+      }
+    },
+    "settings.export": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייצוא זיכרונות"
+          }
+        }
+      }
+    },
+    "settings.import": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ייבוא גיבוי ישן"
+          }
+        }
+      }
+    },
+    "settings.unlink": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ניתוק"
+          }
+        }
+      }
+    },
+    "settings.unlinkBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זה סוגר את המרחב לשניכם, כולל הערבים והזיכרונות."
+          }
+        }
+      }
+    },
+    "settings.delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקת החשבון"
+          }
+        }
+      }
+    },
+    "settings.deleteBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זה סוגר את המרחב המשותף, כולל הערבים והזיכרונות, ומוחק את הכניסה. הקלידו מחיקה לאישור."
+          }
+        }
+      }
+    },
+    "setup.spaceClosed": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המרחב נסגר"
+          }
+        }
+      }
+    },
+    "settings.deleteWord": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מחיקה"
+          }
+        }
+      }
+    },
+    "settings.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אישור"
+          }
+        }
+      }
+    },
+    "settings.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מדיניות פרטיות"
+          }
+        }
+      }
+    },
+    "settings.support": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמיכה"
+          }
+        }
+      }
+    },
+    "settings.signOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יציאה"
+          }
+        }
+      }
+    },
+    "state.offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אין רשת. מציגים את מה שנשמר לאחרונה. שום דבר חדש לא ילך לאיבוד ולא יישלח פעמיים."
+          }
+        }
+      }
+    },
+    "state.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נסו שוב"
+          }
+        }
+      }
+    },
+    "state.discard": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול שינויים שלא נשמרו"
+          }
+        }
+      }
+    },
+    "common.continue": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך"
+          }
+        }
+      }
+    },
+    "state.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רגע"
+          }
+        }
+      }
+    },
+    "state.error": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משהו השתבש."
+          }
+        }
+      }
+    },
+    "state.saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "נשמר"
+          }
+        }
+      }
+    },
+    "a11y.skip": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "דילוג לתוכן"
+          }
+        }
+      }
+    },
+    "a11y.monogram": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ראשי התיבות שלך"
+          }
+        }
+      }
+    },
+    "common.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "סגירה"
+          }
+        }
+      }
+    },
+    "common.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ביטול"
+          }
+        }
+      }
+    },
+    "mood.fun": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צחוקים"
+          }
+        }
+      }
+    },
+    "mood.romance": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רומנטיקה"
+          }
+        }
+      }
+    },
+    "mood.deep": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שיחה אמיתית"
+          }
+        }
+      }
+    },
+    "mood.intimacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קירבה"
+          }
+        }
+      }
+    },
+    "mood.adventure": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משהו חדש"
+          }
+        }
+      }
+    },
+    "mood.chill": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שקט ביחד"
+          }
+        }
+      }
+    },
+    "ritual.partnerMoodLine": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מצב הרוח של %1$@ הוא %2$@"
+          }
+        }
+      }
+    },
+    "invite.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חזרה"
+          }
+        }
+      }
+    },
+    "invite.signInFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צריך להיכנס לפני שמצטרפים למרחב."
+          }
+        }
+      }
+    },
+    "settings.unlinkConfirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "כן, לנתק"
+          }
+        }
+      }
+    },
+    "memories.photoLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "תמונה מהערב"
+          }
+        }
+      }
+    },
+    "ritual.moodOf": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "מצב הרוח של %@"
+          }
+        }
+      }
+    },
+    "home.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ביחד"
+          }
+        }
+      }
+    },
+    "invite.shareText": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בואו אליי ל-Just Us. פתחו את הקישור, או הדביקו את הקוד.\n%@\n%@\n%@\n%@"
+          }
+        }
+      }
+    },
+    "invite.shareTextApp": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בואו אליי ל-Just Us. הדביקו את הקוד.\n%@\n%@\n%@"
+          }
+        }
+      }
+    },
+    "setup.minutes": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld דק׳"
+          }
+        }
+      }
+    },
+    "auth.cooldownOne": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לשלוח שוב בעוד שנייה."
+          }
+        }
+      }
+    },
+    "auth.cooldownTwo": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לשלוח שוב בעוד שתי שניות."
+          }
+        }
+      }
+    },
+    "auth.cooldown": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אפשר לשלוח שוב בעוד %lld שניות."
+          }
+        }
+      }
+    },
+    "memories.number": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ערב %lld"
+          }
+        }
+      }
+    },
+    "err.email": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "האימייל הזה לא נראה תקין."
+          }
+        }
+      }
+    },
+    "err.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "שם צריך בין תו אחד ל־24."
+          }
+        }
+      }
+    },
+    "err.time": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדקו את השעה."
+          }
+        }
+      }
+    },
+    "err.zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אזור הזמן לא מוכר."
+          }
+        }
+      }
+    },
+    "err.day": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בחרו יום."
+          }
+        }
+      }
+    },
+    "err.duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "המשך צריך להיות בין 30 ל־360 דקות."
+          }
+        }
+      }
+    },
+    "err.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההערה ריקה או ארוכה מדי."
+          }
+        }
+      }
+    },
+    "err.teaser": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הרמז ארוך מדי."
+          }
+        }
+      }
+    },
+    "err.date": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בדקו את התאריך."
+          }
+        }
+      }
+    },
+    "err.codeFormat": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקלידו את הספרות מהאימייל."
+          }
+        }
+      }
+    },
+    "err.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקלידו מחיקה לאישור."
+          }
+        }
+      }
+    },
+    "err.timeout": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "זה לקח יותר מדי זמן. שום דבר לא סומן כנשמר."
+          }
+        }
+      }
+    },
+    "err.session": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החיבור פג. היכנסו שוב."
+          }
+        }
+      }
+    },
+    "err.link": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקישור פג או שכבר השתמשו בו. שלחו לעצמכם קישור חדש."
+          }
+        }
+      }
+    },
+    "err.badCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקוד לא תקין."
+          }
+        }
+      }
+    },
+    "err.expiredCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הקוד פג. שלחו חדש."
+          }
+        }
+      }
+    },
+    "err.auth": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "היכנסו שוב."
+          }
+        }
+      }
+    },
+    "err.rate": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יותר מדי ניסיונות. חכו כמה דקות."
+          }
+        }
+      }
+    },
+    "err.already": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "החשבון הזה כבר במרחב משותף."
+          }
+        }
+      }
+    },
+    "err.solo": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "במרחב כבר יש יותר מטיוטה ריקה, אז הזמנה לא יכולה להחליף אותו."
+          }
+        }
+      }
+    },
+    "err.invite": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההזמנה לא תקינה."
+          }
+        }
+      }
+    },
+    "err.revoked": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההזמנה בוטלה."
+          }
+        }
+      }
+    },
+    "err.used": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההזמנה כבר נוצלה."
+          }
+        }
+      }
+    },
+    "err.inviteExpired": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ההזמנה פגה."
+          }
+        }
+      }
+    },
+    "err.full": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "במרחב הזה כבר יש שני אנשים."
+          }
+        }
+      }
+    },
+    "err.self": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אי אפשר לממש הזמנה שיצרת."
+          }
+        }
+      }
+    },
+    "err.planner": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "רק מי שמתכנן השבוע יכול לעשות את זה."
+          }
+        }
+      }
+    },
+    "err.notEditable": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אי אפשר לערוך את זה עכשיו."
+          }
+        }
+      }
+    },
+    "err.plan": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "קודם בחרו רעיון."
+          }
+        }
+      }
+    },
+    "err.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "צריך עדכון בשרת שעוד לא עלה. שום דבר לא השתנה."
+          }
+        }
+      }
+    },
+    "err.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "לא הצלחנו לשמור. שום דבר לא סומן כבוצע."
+          }
+        }
+      }
+    },
+    "err.needConfirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "אשרו לפני שמוסיפים לזיכרונות שכבר יש."
+          }
+        }
+      }
+    },
+    "err.unsynced": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "יש שינויים שעוד לא נשמרו. נסו שוב כשיש רשת, או בטלו אותם."
+          }
+        }
+      }
+    },
+    "err.signOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטלפון עדיין על החשבון, אז נשארתם מחוברים. נסו שוב."
+          }
+        }
+      }
+    },
+    "err.deleteAccount": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "הטלפון עדיין על החשבון, אז החשבון לא נמחק. נסו שוב."
+          }
+        }
+      }
+    },
+    "err.server": {
+      "extractionState": "manual",
+      "localizations": {
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "משהו השתבש (%@)."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
 }
