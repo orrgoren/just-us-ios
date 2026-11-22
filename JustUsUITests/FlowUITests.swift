@@ -44,8 +44,13 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(value.contains("\n"))
     XCTAssertTrue(value.contains("hi"))
     XCTAssertTrue(value.contains("there"))
+    app.buttons["dismissKeyboard"].tap()
+    let gone = NSPredicate(format: "exists == false")
+    _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: gone, object: app.keyboards.firstMatch)], timeout: 4)
     XCTAssertEqual(lines.count, before)
     XCTAssertTrue(app.buttons["chatSend"].exists)
+    let kept = field.value as? String ?? ""
+    XCTAssertTrue(kept.contains("\n"))
   }
 
   func testChatListTapDismissesTheKeyboard() {
