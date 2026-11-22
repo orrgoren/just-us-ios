@@ -5,7 +5,8 @@ final class ScreenshotUITests: XCTestCase {
     let screens = [
       "login", "code", "setup", "inviteShare", "softPrompt", "inviteRedeem",
       "inviteReplace", "inviteBlocked", "homeSolo", "homePlanner", "homePartner",
-      "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount",       "offline", "chat", "chatBadge",
+      "reveal", "memories", "memoriesEmpty", "settings", "deleteAccount",
+      "offline", "chat", "chatBadge",
       "chatPhoto", "chatPhotoChoice",
       "plannerTools", "settingsBottom", "photoMemory", "selectedMood", "revealedPlan", "editHint",
       "errorBanner", "unlinkConfirm", "postDeletion", "spaceClosed", "notificationTap", "signOut"
@@ -95,9 +96,12 @@ final class ScreenshotUITests: XCTestCase {
       let field = app.descendants(matching: .any)["chatField"]
       field.tap()
       XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 4))
+      field.typeText("hi")
+      XCTAssertTrue(app.buttons["chatSend"].waitForExistence(timeout: 4))
       addShot(app, screen: label, appearance: appearance, size: size, suffix: "keyboard")
       let done = app.buttons["dismissKeyboard"]
       XCTAssertTrue(done.waitForExistence(timeout: 4))
+      XCTAssertEqual(done.label, "Done")
       done.tap()
       let gone = NSPredicate(format: "exists == false")
       XCTAssertEqual(
@@ -105,9 +109,6 @@ final class ScreenshotUITests: XCTestCase {
         .completed
       )
       addShot(app, screen: label, appearance: appearance, size: size, suffix: "dismissed")
-      field.tap()
-      field.typeText("hi")
-      XCTAssertTrue(app.buttons["chatSend"].waitForExistence(timeout: 4))
     }
     app.terminate()
   }

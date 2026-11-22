@@ -243,7 +243,7 @@ enum AnalyticsEvent: Equatable, Sendable {
 }
 
 enum AppTab: String, Equatable, Hashable, Sendable {
-  case week, chat, memories, settings
+  case week, memories, settings
 }
 
 enum ChatDelivery: String, Equatable, Sendable {

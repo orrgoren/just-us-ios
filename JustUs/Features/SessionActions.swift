@@ -60,7 +60,6 @@ extension SessionModel {
   }
 
   func presentChat() {
-    if tab == .chat { tab = .week }
     chatPresented = true
     chatBanner = nil
     markChatSeen()

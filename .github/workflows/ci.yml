@@ -184,6 +184,9 @@ jobs:
               -only-testing:JustUsUITests/FlowUITests/testCreateCoupleAndInvite
               -only-testing:JustUsUITests/FlowUITests/testSignOutReturnsToLogin
               -only-testing:JustUsUITests/FlowUITests/testChatDoneDismissesTheKeyboard
+              -only-testing:JustUsUITests/FlowUITests/testChatReturnInsertsALine
+              -only-testing:JustUsUITests/FlowUITests/testChatListTapDismissesTheKeyboard
+              -only-testing:JustUsUITests/FlowUITests/testChatDraftSurvivesReopeningTheSheet
               -only-testing:JustUsUITests/FlowUITests/testChatBubbleOpensTheModal
             )
             if [ "${SCREENSHOTS}" = "true" ]; then

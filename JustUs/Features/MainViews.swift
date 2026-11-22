@@ -28,8 +28,6 @@ struct MainScreen: View {
       switch model.tab {
       case .week:
         RitualScreen(model: model)
-      case .chat:
-        RitualScreen(model: model)
       case .memories:
         MemoriesScreen(model: model)
       case .settings:
@@ -37,11 +35,6 @@ struct MainScreen: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    .onAppear {
-      guard model.tab == .chat else { return }
-      model.tab = .week
-      model.presentChat()
-    }
   }
 
   private var coupleIsLinked: Bool {
@@ -59,6 +52,7 @@ struct ChatBubble: View {
       Button(action: action) {
         Image(systemName: "message.fill")
           .font(.title2)
+          .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
           .foregroundStyle(bubbleInk)
           .frame(width: 56, height: 56)
           .background(bubbleFill, in: Circle())

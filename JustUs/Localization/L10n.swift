@@ -83,7 +83,6 @@ enum L10n {
   static var softNo: String { text("push.no", "Not now") }
   static var pushDenied: String { text("push.denied", "Notifications stay off. You can turn them on in Settings.") }
   static var tabWeek: String { text("tab.week", "This week") }
-  static var tabChat: String { text("tab.chat", "Chat") }
   static var tabMemories: String { text("tab.memories", "Memories") }
   static var tabUs: String { text("tab.us", "Us") }
   static var homeTitle: String { text("home.title", "This week, just us") }

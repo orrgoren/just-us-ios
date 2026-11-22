@@ -54,8 +54,6 @@ struct ChatEntry: View {
         .font(Theme.body)
         .foregroundStyle(Theme.ink(scheme))
         .accessibilityIdentifier(A11y.chatField)
-        .submitLabel(.send)
-        .onSubmit(send)
     }
     .padding(.leading, 4)
     .padding(.trailing, 12)

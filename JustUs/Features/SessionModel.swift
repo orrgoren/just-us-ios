@@ -633,7 +633,6 @@ final class SessionModel {
     case .settings:
       tab = .settings
     case .chat:
-      if tab == .chat { tab = .week }
       presentChat()
     case .invite(let token):
       presentInvite(token)

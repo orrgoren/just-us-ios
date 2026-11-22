@@ -19,9 +19,8 @@ struct ChatSheet: View {
           }
           ToolbarItemGroup(placement: .keyboard) {
             Spacer()
-            ActionButton(title: L10n.dismissKeyboard, identifier: A11y.dismissKeyboard, kind: .link) {
-              composerFocused = false
-            }
+            Button(L10n.dismissKeyboard) { composerFocused = false }
+              .accessibilityIdentifier(A11y.dismissKeyboard)
           }
         }
     }
@@ -117,6 +116,7 @@ struct ChatScreen: View {
         .onPreferenceChange(ThreadHeightKey.self) { threadHeight = $0 }
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
+        .accessibilityIdentifier(A11y.chatThread)
         .onChange(of: model.messages.count) { _, _ in
           follow(proxy)
         }
