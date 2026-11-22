@@ -19,19 +19,25 @@ struct RootView: View {
   var body: some View {
     JustScreen {
       ScrollViewReader { proxy in
-      ScrollView { page }
-        .scrollDismissesKeyboard(.immediately)
-        .accessibilityIdentifier(A11y.content)
-      .ignoresSafeArea(.keyboard, edges: .bottom)
-      .safeAreaInset(edge: .bottom, spacing: 0) {
+      VStack(spacing: 0) {
+        ScrollView { page }
+          .scrollDismissesKeyboard(.immediately)
+          .accessibilityIdentifier(A11y.content)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
         if showChatBubble {
           HStack {
             Spacer(minLength: 0)
             ChatBubble(unread: model.chatUnread) { model.presentChat() }
           }
-          .padding(.trailing, 20)
+          .padding(.horizontal, 20)
+          .padding(.top, 4)
           .padding(.bottom, 8)
-        } else if pinReplace {
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .ignoresSafeArea(.keyboard, edges: .bottom)
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        if pinReplace {
           PinnedReplaceActions(model: model)
             .padding(.bottom, keyboardOverlap)
         }
