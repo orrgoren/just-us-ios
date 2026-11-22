@@ -128,6 +128,7 @@ final class SessionModel {
     await restoreOrLogin()
     if signedIn {
       await backend.retryClosedPhotos()
+      await backend.syncLanguage(AppLanguage.shared.code)
     }
     await refreshPushRegistration(promptIfNeeded: true)
     if let raw = Launch.argument(after: "-JustUsURL"), let url = URL(string: raw) {
@@ -332,6 +333,11 @@ final class SessionModel {
   func discardAndSignOut() async {
     outbox = [:]
     await signOut()
+  }
+
+  func syncLanguage() async {
+    guard signedIn else { return }
+    await backend.syncLanguage(AppLanguage.shared.code)
   }
 
   func signOut() async {

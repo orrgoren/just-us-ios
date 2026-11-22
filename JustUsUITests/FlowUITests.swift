@@ -103,6 +103,50 @@ final class FlowUITests: XCTestCase {
     XCTAssertTrue(app.buttons["chatClose"].exists)
   }
 
+  func testLanguageSwitchFlipsCopyWithoutRelaunch() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "homePlanner", "-JustUsAppearance", "light", "-JustUsLanguage", "en"]
+    app.launch()
+    let bubble = app.buttons["chatBubble"]
+    XCTAssertTrue(bubble.waitForExistence(timeout: 10))
+    XCTAssertGreaterThan(bubble.frame.midX, app.frame.midX)
+    app.buttons["Us"].tap()
+    XCTAssertTrue(app.staticTexts["The two of us"].waitForExistence(timeout: 8))
+    let hebrew = app.buttons["עברית"]
+    XCTAssertTrue(hebrew.waitForExistence(timeout: 4))
+    hebrew.tap()
+    XCTAssertTrue(app.staticTexts["שנינו"].waitForExistence(timeout: 4))
+    XCTAssertFalse(app.staticTexts["The two of us"].exists)
+    XCTAssertLessThan(bubble.frame.midX, app.frame.midX)
+  }
+
+  func testHebrewChatSheetMirrorsOwnBubbles() {
+    let app = XCUIApplication()
+    app.launchArguments = ["-uitest", "-JustUsScreen", "chat", "-JustUsAppearance", "light", "-JustUsLanguage", "he"]
+    app.launch()
+    let close = app.buttons["chatClose"]
+    XCTAssertTrue(close.waitForExistence(timeout: 10))
+    XCTAssertGreaterThan(close.frame.midX, app.frame.midX)
+    let attach = app.buttons["chatAttach"]
+    XCTAssertTrue(attach.waitForExistence(timeout: 4))
+    XCTAssertGreaterThan(attach.frame.midX, app.frame.midX)
+    let mine = app.descendants(matching: .any).matching(identifier: "chat.line.mine")
+    XCTAssertTrue(mine.firstMatch.waitForExistence(timeout: 8))
+    XCTAssertGreaterThanOrEqual(mine.count, 1)
+    for index in 0..<mine.count {
+      let bubble = mine.element(boundBy: index)
+      guard bubble.frame.width > 1 else { continue }
+      XCTAssertLessThan(bubble.frame.midX, app.frame.midX)
+    }
+    let mixed = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label CONTAINS %@", "https://just.us/night")
+    ).firstMatch
+    XCTAssertTrue(mixed.waitForExistence(timeout: 4))
+    XCTAssertTrue(mixed.label.contains("ראו"), mixed.label)
+    XCTAssertTrue(mixed.label.contains("הערב"), mixed.label)
+    XCTAssertLessThan(mixed.frame.midX, app.frame.midX)
+  }
+
   func testLaunchShowsLogin() {
     let app = launch()
     XCTAssertTrue(app.textFields["emailField"].waitForExistence(timeout: 12))

@@ -234,6 +234,12 @@ final class FakeBackend: DateBackend {
     store.save()
   }
 
+  var syncedLanguage: String?
+
+  func syncLanguage(_ code: String) async {
+    syncedLanguage = code
+  }
+
   func registerDevice(token: String) async {
     _ = token
   }
@@ -471,17 +477,20 @@ final class FakeBackend: DateBackend {
     return line
   }
 
-  func seedChatPreview() {
+  func seedChatPreview(includeMixed: Bool = false) {
     guard let alex = member(SeedID.alex), let blairKey = try? ensureKey(userId: SeedID.blair),
           let alexKey = try? ensureKey(userId: SeedID.alex) else { return }
     let now = Date()
     let calendar = Calendar.current
     let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now))?
       .addingTimeInterval(12 * 60 * 60) ?? now
-    let lines = [
+    var lines = [
       (SeedID.blair, blairKey, "I'll bring tea.", yesterday),
       (SeedID.alex, alexKey, "Thursday still works.", now)
     ]
+    if includeMixed {
+      lines.append((SeedID.alex, alexKey, "ראו https://just.us/night הערב", now.addingTimeInterval(60)))
+    }
     for (userId, key, text, when) in lines {
       let keys = store.world.deviceKeys.filter { member($0.userId)?.coupleId == alex.coupleId }
       let targets = ChatRecipients.choose(

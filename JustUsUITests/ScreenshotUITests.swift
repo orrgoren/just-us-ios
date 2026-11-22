@@ -24,11 +24,16 @@ final class ScreenshotUITests: XCTestCase {
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryXS")
       capture(screen: screen, appearance: "light", size: "UICTContentSizeCategoryAccessibilityXXXL")
     }
-    capture(screen: "chat", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-chat")
-    capture(screen: "chatBadge", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-chat-badge")
-    capture(screen: "homePlanner", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-home")
-    capture(screen: "settings", appearance: "dark", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-settings")
-    capture(screen: "memories", appearance: "light", size: nil, extra: ["-NSForceRightToLeftWritingDirection", "YES"], name: "rtl-memories")
+    let hebrew = ["-JustUsLanguage", "he"]
+    capture(screen: "chat", appearance: "light", size: nil, extra: hebrew, name: "rtl-chat")
+    capture(screen: "chatBadge", appearance: "light", size: nil, extra: hebrew, name: "rtl-chat-badge")
+    capture(screen: "homePlanner", appearance: "light", size: nil, extra: hebrew, name: "rtl-home")
+    capture(screen: "settings", appearance: "dark", size: nil, extra: hebrew, name: "rtl-settings")
+    capture(screen: "memories", appearance: "light", size: nil, extra: hebrew, name: "rtl-memories")
+    for screen in ["login", "homePlanner", "settings", "chat", "memories"] {
+      capture(screen: screen, appearance: "light", size: nil, extra: ["-JustUsLanguage", "he"], name: "he-\(screen)")
+      capture(screen: screen, appearance: "dark", size: nil, extra: ["-JustUsLanguage", "he"], name: "he-\(screen)")
+    }
   }
 
   private func capture(
@@ -78,6 +83,9 @@ final class ScreenshotUITests: XCTestCase {
       let days = app.descendants(matching: .any).matching(identifier: "chatDay")
       XCTAssertTrue(days.firstMatch.waitForExistence(timeout: 8))
       XCTAssertGreaterThanOrEqual(days.count, 2)
+      if extra.contains("he") {
+        assertOwnBubblesLead(app)
+      }
     }
     let label = name ?? screen
     addShot(app, screen: label, appearance: appearance, size: size, suffix: nil)
@@ -111,6 +119,19 @@ final class ScreenshotUITests: XCTestCase {
       addShot(app, screen: label, appearance: appearance, size: size, suffix: "dismissed")
     }
     app.terminate()
+  }
+
+  private func assertOwnBubblesLead(_ app: XCUIApplication) {
+    let mine = app.descendants(matching: .any).matching(identifier: "chat.line.mine")
+    XCTAssertTrue(mine.firstMatch.waitForExistence(timeout: 8))
+    var checked = 0
+    for index in 0..<mine.count {
+      let bubble = mine.element(boundBy: index)
+      guard bubble.frame.width > 1 else { continue }
+      XCTAssertLessThan(bubble.frame.midX, app.frame.midX)
+      checked += 1
+    }
+    XCTAssertGreaterThan(checked, 0)
   }
 
   /// The system Cancel on a confirmation dialog is outside this app's button list.

@@ -43,6 +43,7 @@ enum A11y {
   static let chatViewer = "chatViewer"
   static let chatSamplePhoto = "chatSamplePhoto"
   static let chatLine = "chat.line"
+  static let chatLineMine = "chat.line.mine"
   static let chatRetry = "chat.retry"
   static let chatBanner = "chat.banner"
   static let chatNew = "chat.new"
@@ -93,6 +94,7 @@ enum A11y {
   static let streak = "streakWeeks"
   static let loginRoot = "loginRoot"
   static let settingsRoot = "settingsRoot"
+  static let language = "languagePicker"
   static let memoriesRoot = "memoriesRoot"
   static let memoriesEmpty = "memoriesEmpty"
 

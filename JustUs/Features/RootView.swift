@@ -78,6 +78,7 @@ struct RootView: View {
     .environment(\.keyboardDismiss, keyboardDismiss)
     .sheet(isPresented: $model.chatPresented) {
       ChatSheet(model: model)
+        .inAppLocale()
     }
     .preferredColorScheme(Launch.preferredScheme)
     .onOpenURL { url in Task { await model.open(url) } }

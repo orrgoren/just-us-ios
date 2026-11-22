@@ -31,9 +31,29 @@ export function skipsDailyCap(kind) {
   return kind === "chatMessage" || kind === "partnerMood";
 }
 
+// The server stores only en or he. Anything else, including a missing row, is English.
+export function recipientLanguage(value) {
+  return value === "he" ? "he" : "en";
+}
+
 // Chat and photo alerts share this body. It does not quote the chat or say that a photo was sent.
-export function chatPushBody() {
-  return "New message";
+export function chatPushBody(lang) {
+  return recipientLanguage(lang) === "he" ? "הודעה חדשה" : "New message";
+}
+
+// Title stays the product name. The body is the receiver's language.
+export function pushAlert(kind, name, nudge, lang) {
+  const he = recipientLanguage(lang) === "he";
+  const who = String(name ?? "");
+  let body;
+  if (kind === "chatMessage") body = chatPushBody(lang);
+  else if (kind === "planReady") body = he ? "הדייט מוכן לחשיפה." : "Your date is ready to reveal.";
+  else if (kind === "partnerMood") body = he ? `מצב רוח חדש מאת ${who} לערב שלכם.` : `${who} picked a mood for your night.`;
+  else if (kind === "inviteAccepted") body = he ? `${who} בפנים. הערב הזה רשמית של שניכם.` : `${who} is in. This night is officially both of yours.`;
+  else if (kind === "weeklyReminder") body = he ? `הערב שלכם, ${who}.` : `Tonight is yours, ${who}.`;
+  else if (nudge >= 2) body = he ? `נשאיר את ההזמנה כאן בשביל ${who}. בלי עוד תזכורות.` : `We'll leave the invite here for ${who}. No more reminders.`;
+  else body = he ? `ההזמנה עבור ${who} פתוחה, מתי שתרצו.` : `Your invite for ${who} is open whenever you both want it.`;
+  return { title: "Just Us", body };
 }
 
 export function chatPushDecision({ recentMessage, lastPushAt, now }) {

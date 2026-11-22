@@ -18,9 +18,18 @@ struct JustUsApp: App {
 struct AppRoot: View {
   @Environment(\.scenePhase) private var scenePhase
   @State private var model = SessionModel()
+  @State private var language = AppLanguage.shared
 
   var body: some View {
     RootView(model: model)
+      .environment(language)
+      .environment(\.locale, language.locale)
+      .environment(\.layoutDirection, language.direction)
+      .id(language.revision)
+      .onAppear { SystemSheetDirection.apply(language.direction) }
+      .onChange(of: language.direction) { _, direction in
+        SystemSheetDirection.apply(direction)
+      }
       .task { await model.start() }
       .onChange(of: scenePhase) { _, phase in
         guard phase == .active else { return }

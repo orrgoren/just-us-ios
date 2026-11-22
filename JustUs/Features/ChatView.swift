@@ -27,6 +27,7 @@ struct ChatSheet: View {
     .presentationDetents([.large])
     .presentationDragIndicator(.visible)
     .presentationBackground(Theme.canvas(scheme))
+    .inAppLocale()
     .onChange(of: keyboardDismiss) { _, _ in composerFocused = false }
   }
 }
@@ -60,8 +61,11 @@ struct ChatScreen: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    .sheet(isPresented: viewerPresented) { viewer }
-    .sheet(isPresented: $showCamera) { CameraCapture { model.stageChatPhoto($0) } }
+    .sheet(isPresented: viewerPresented) { viewer.inAppLocale() }
+    .sheet(isPresented: $showCamera) {
+      CameraCapture { model.stageChatPhoto($0) }
+        .inAppLocale()
+    }
     .onChange(of: libraryItem) { _, item in
       guard let item else { return }
       Task {
@@ -88,7 +92,7 @@ struct ChatScreen: View {
             if model.messages.isEmpty {
               Text(L10n.chatEmpty)
             }
-            ForEach(ChatDay.rows(model.messages)) { row in
+            ForEach(ChatDay.rows(model.messages, calendar: AppLanguage.shared.calendar)) { row in
               switch row {
               case .divider(_, let label):
                 dayDivider(label)
@@ -178,16 +182,18 @@ struct ChatScreen: View {
       if line.mine { Spacer(minLength: 48) }
       VStack(alignment: line.mine ? .trailing : .leading, spacing: 8) {
         if line.notice {
-          Text(line.text)
+          Text(spoken(line.text))
             .font(Theme.body)
             .foregroundStyle(Theme.ink(scheme))
+            .accessibilityLabel(line.text)
             .accessibilityIdentifier(A11y.chatScreenshot)
         } else {
           photoBody(line)
           if line.photo != .viewOnce && line.photo != .kept && line.text.isEmpty == false {
-            Text(line.text)
+            Text(spoken(line.text))
               .font(Theme.body)
               .foregroundStyle(foreground(mine: line.mine))
+              .accessibilityLabel(line.text)
           }
         }
         if line.photo == .kept {
@@ -195,7 +201,7 @@ struct ChatScreen: View {
             Task { await model.deleteChatPhoto(line.id) }
           }
         }
-        Text(ChatTime.label(line.createdAt))
+        Text(ChatTime.label(line.createdAt, locale: AppLanguage.shared.locale))
           .font(Theme.caption)
           .foregroundStyle(line.mine && line.notice == false ? Theme.canvas.opacity(0.8) : Theme.muted(scheme))
         if line.delivery == .sending {
@@ -283,10 +289,14 @@ struct ChatScreen: View {
     Task { await model.finishViewOnce(id) }
   }
 
+  private func spoken(_ text: String) -> String {
+    ChatBidi.display(text, rightToLeft: AppLanguage.shared.direction == .rightToLeft)
+  }
+
   private func lineIdentifier(_ line: ChatLine) -> String {
     if line.delivery == .failed { return A11y.chatRetry }
     if line.photo == .opened { return A11y.chatOpened }
-    return A11y.chatLine
+    return line.mine ? A11y.chatLineMine : A11y.chatLine
   }
 
   private func foreground(mine: Bool) -> Color {
@@ -389,10 +399,18 @@ struct CameraCapture: UIViewControllerRepresentable {
     let picker = UIImagePickerController()
     picker.sourceType = .camera
     picker.delegate = context.coordinator
+    applyDirection(picker)
     return picker
   }
 
-  func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+  func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
+    applyDirection(uiViewController)
+  }
+
+  private func applyDirection(_ picker: UIImagePickerController) {
+    let rtl = AppLanguage.shared.direction == .rightToLeft
+    picker.view.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+  }
 
   func makeCoordinator() -> Coordinator { Coordinator(self) }
 

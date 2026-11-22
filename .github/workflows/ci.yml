@@ -150,6 +150,7 @@ jobs:
         run: |
           swiftlint lint
           python3 scripts/check-literals.py
+          python3 scripts/check-hebrew.py
           python3 scripts/check-apple-docs.py
           python3 scripts/select-simulator.py --self-test
       - name: Test on iPhone SE
@@ -188,6 +189,8 @@ jobs:
               -only-testing:JustUsUITests/FlowUITests/testChatListTapDismissesTheKeyboard
               -only-testing:JustUsUITests/FlowUITests/testChatDraftSurvivesReopeningTheSheet
               -only-testing:JustUsUITests/FlowUITests/testChatBubbleOpensTheModal
+              -only-testing:JustUsUITests/FlowUITests/testLanguageSwitchFlipsCopyWithoutRelaunch
+              -only-testing:JustUsUITests/FlowUITests/testHebrewChatSheetMirrorsOwnBubbles
             )
             if [ "${SCREENSHOTS}" = "true" ]; then
               only+=(-only-testing:JustUsUITests/ScreenshotUITests)

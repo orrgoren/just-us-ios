@@ -10,6 +10,8 @@ import {
   freshApnsToken,
   isServiceCaller,
   chatPushBody,
+  pushAlert,
+  recipientLanguage,
   chatPushDecision,
   CHAT_PUSH_WINDOW_MS,
   keepsSixHourDedupe,
@@ -241,7 +243,23 @@ test("a chat push needs a recent message, coalesces for 60s, and skips the daily
   assert.equal(chatPushDecision({ recentMessage: true, lastPushAt: now - CHAT_PUSH_WINDOW_MS, now }), "send");
   assert.equal(skipsDailyCap("chatMessage"), true);
   assert.equal(chatPushBody(), "New message");
+  assert.equal(chatPushBody("he"), "הודעה חדשה");
   assert.equal(chatPushBody().toLowerCase().includes("photo"), false);
+  assert.equal(chatPushBody("he").includes("photo"), false);
+  assert.equal(recipientLanguage("he"), "he");
+  assert.equal(recipientLanguage("en"), "en");
+  assert.equal(recipientLanguage(undefined), "en");
+  const hebrewMood = pushAlert("partnerMood", "נועה", 1, "he");
+  assert.equal(hebrewMood.title, "Just Us");
+  assert.equal(hebrewMood.body, "מצב רוח חדש מאת נועה לערב שלכם.");
+  assert.equal(hebrewMood.body.includes("מנועה"), false);
+  assert.equal(hebrewMood.body.includes("outfit"), false);
+  assert.equal(pushAlert("chatMessage", "נועה", 1, "he").body, "הודעה חדשה");
+  assert.equal(pushAlert("planReady", "Noa", 1, "en").body, "Your date is ready to reveal.");
+  assert.equal(pushAlert("inviteNudge", "Noa", 1, "he").body, "ההזמנה עבור Noa פתוחה, מתי שתרצו.");
+  assert.equal(pushAlert("inviteNudge", "Noa", 1, "he").body.includes("לNoa"), false);
+  assert.equal(pushAlert("inviteNudge", "Noa", 2, "he").body, "נשאיר את ההזמנה כאן בשביל Noa. בלי עוד תזכורות.");
+  assert.equal(pushAlert("inviteNudge", "Noa", 2, "en").body, "We'll leave the invite here for Noa. No more reminders.");
   assert.equal(skipsDailyCap("partnerMood"), true);
   assert.equal(skipsDailyCap("planReady"), false);
 });

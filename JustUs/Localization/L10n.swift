@@ -1,7 +1,7 @@
 import Foundation
 
 /// Every user-facing string lives here, with English as the development language.
-/// Add Hebrew later by filling Localizable.xcstrings. Do not put copy in views.
+/// Hebrew lives in Localizable.xcstrings. Do not put copy in views.
 enum L10n {
   static var appName: String { text("brand.name", "Just Us") }
   static var tagline: String { text("brand.tagline", "One night. Every week. Just us.") }
@@ -38,14 +38,20 @@ enum L10n {
   static var yourTurn: String { text("role.yours", "Your turn") }
   static var yourTurnToPlan: String { text("role.yourPlan", "Your turn to plan") }
   static func partnerTurn(_ name: String) -> String {
-    String(format: text("role.partnerTurn", "%@'s turn to plan"), locale: .current, name)
+    String(format: text("role.partnerTurn", "%@'s turn to plan"), locale: AppLanguage.shared.locale, name)
   }
   static func partnerPlanning(_ name: String) -> String {
-    String(format: text("ritual.partnerPlanning", "%@ is planning this one. Pick a mood. The hint shows up when it's ready."), locale: .current, name)
+    String(format: text("ritual.partnerPlanning", "%@ is planning this one. Pick a mood. The hint shows up when it's ready."), locale: AppLanguage.shared.locale, name)
   }
   static func weeksInARow(_ count: Int) -> String {
-    if count == 1 { return text("home.oneWeek", "One week together") }
-    return String(format: text("home.weeksInARow", "%lld weeks in a row"), locale: .current, count)
+    switch AppLanguage.pluralCategory(count) {
+    case .one:
+      return text("home.oneWeek", "One week together")
+    case .two:
+      return text("home.twoWeeks", "2 weeks in a row")
+    case .many, .other:
+      return String(format: text("home.weeksInARow", "%lld weeks in a row"), locale: AppLanguage.shared.locale, count)
+    }
   }
   static var waitingOnThem: String { text("role.waiting", "Waiting on them") }
   static var loginNext: String { text("auth.next", "Next: sign in. Then make a space, or join theirs.") }
@@ -174,6 +180,10 @@ enum L10n {
   static var moment: String { text("after.moment", "A moment to keep") }
   static var finish: String { text("after.finish", "We did it. Save the memory") }
   static var addCalendar: String { text("after.calendar", "Add to calendar") }
+  static var calendarSummary: String { text("calendar.summary", "Just Us — our evening") }
+  static var calendarDetails: String {
+    text("calendar.details", "A weekly date. Three at home, one out. Phones away.")
+  }
   static var openWeek: String { text("home.open", "Open this week") }
   static var noDate: String { text("home.noDate", "No evening is open. You can start the next one without losing memories.") }
   static var memoriesTitle: String { text("memories.title", "Our dates") }
@@ -188,6 +198,10 @@ enum L10n {
   static var retryPhoto: String { text("memories.retryPhoto", "Try the photo again") }
   static var photoFailed: String { text("memories.photoFailed", "The photo didn't save. The memory is unchanged.") }
   static var samplePhoto: String { text("memories.sample", "Use sample photo") }
+  static var language: String { text("settings.language", "Language") }
+  static var languageSystem: String { text("settings.languageSystem", "System") }
+  static var languageEnglish: String { text("settings.languageEnglish", "English") }
+  static var languageHebrew: String { text("settings.languageHebrew", "עברית") }
   static var settingsTitle: String { text("settings.title", "The two of us") }
   static var settingsBody: String { text("settings.body", "Names, the weekly rhythm, invites, and notifications.") }
   static var saveSettings: String { text("settings.save", "Save") }
@@ -241,20 +255,20 @@ enum L10n {
   }
 
   static func partnerMoodLine(_ name: String, _ mood: String) -> String {
-    String(format: text("ritual.partnerMoodLine", "%1$@'s mood is %2$@"), locale: .current, name, mood)
+    String(format: text("ritual.partnerMoodLine", "%1$@'s mood is %2$@"), locale: AppLanguage.shared.locale, name, mood)
   }
 
   static var back: String { text("invite.back", "Back") }
   static var signInFirst: String { text("invite.signInFirst", "Sign in before joining a space.") }
   static var unlinkConfirm: String { text("settings.unlinkConfirm", "Yes, unlink") }
-  static var photo: String { text("memories.photo", "Photo from the night") }
+  static var photo: String { text("memories.photoLabel", "Photo from the night") }
 
   static func moodOf(_ name: String) -> String {
-    String(format: text("ritual.moodOf", "%@'s mood"), locale: .current, name)
+    String(format: text("ritual.moodOf", "%@'s mood"), locale: AppLanguage.shared.locale, name)
   }
 
   static func datesCount(_ count: Int) -> String {
-    String(format: text("home.count", "%lld together"), locale: .current, count)
+    String(format: text("home.count", "%lld together"), locale: AppLanguage.shared.locale, count)
   }
 
   static func inviteShareText(app: String, web: String?, code: String) -> String {
@@ -265,7 +279,7 @@ enum L10n {
           "invite.shareText",
           "Join me on Just Us. Open this link, or paste the code.\n%@\n%@\n%@\n%@"
         ),
-        locale: .current,
+        locale: AppLanguage.shared.locale,
         web,
         code,
         opens,
@@ -274,7 +288,7 @@ enum L10n {
     }
     return String(
       format: text("invite.shareTextApp", "Join me on Just Us. Paste the code.\n%@\n%@\n%@"),
-      locale: .current,
+      locale: AppLanguage.shared.locale,
       code,
       opens,
       app
@@ -282,15 +296,22 @@ enum L10n {
   }
 
   static func minutes(_ count: Int) -> String {
-    String(format: text("setup.minutes", "%lld min"), locale: .current, count)
+    String(format: text("setup.minutes", "%lld min"), locale: AppLanguage.shared.locale, count)
   }
 
   static func cooldown(_ seconds: Int) -> String {
-    String(format: text("auth.cooldown", "You can resend in %lld seconds."), locale: .current, seconds)
+    switch AppLanguage.pluralCategory(seconds) {
+    case .one:
+      return text("auth.cooldownOne", "You can resend in 1 second.")
+    case .two:
+      return text("auth.cooldownTwo", "You can resend in 2 seconds.")
+    case .many, .other:
+      return String(format: text("auth.cooldown", "You can resend in %lld seconds."), locale: AppLanguage.shared.locale, seconds)
+    }
   }
 
   static func memoryNumber(_ number: Int) -> String {
-    String(format: text("memories.number", "Night %lld"), locale: .current, number)
+    String(format: text("memories.number", "Night %lld"), locale: AppLanguage.shared.locale, number)
   }
 
   static func message(for error: AppError) -> String {
@@ -363,12 +384,37 @@ enum L10n {
     case .partnerNotReady: return chatPartner
     case .chatTooLong: return chatTooLong
     case .chatPhotoTooBig: return chatPhotoTooBig
-    case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: .current, code)
+    case .server(let code): return String(format: text("err.server", "Something went wrong (%@)."), locale: AppLanguage.shared.locale, code)
     default: return sessionMessage(error) ?? inviteMessage(error) ?? offline
     }
   }
 
-  private static func text(_ key: StaticString, _ value: String.LocalizationValue) -> String {
-    String(localized: key, defaultValue: value)
+  static func lookup(_ key: StaticString, _ value: String.LocalizationValue, locale: Locale) -> String {
+    let name = "\(key)"
+    if locale.language.languageCode?.identifier == "he", let translated = HebrewCopy.text(name) {
+      return translated
+    }
+    return String(localized: key, defaultValue: value, bundle: Bundle(for: LocalizationAnchor.self), locale: locale)
   }
+
+  private static func text(_ key: StaticString, _ value: String.LocalizationValue) -> String {
+    lookup(key, value, locale: AppLanguage.shared.locale)
+  }
+}
+
+private final class LocalizationAnchor {}
+
+/// Hebrew copy shipped in the app bundle. The string catalog is the source, and this
+/// table is what an in-app override reads without waiting for the phone language.
+enum HebrewCopy {
+  static func text(_ key: String) -> String? {
+    strings[key]
+  }
+
+  private static let strings: [String: String] = {
+    guard let url = Bundle(for: LocalizationAnchor.self).url(forResource: "he", withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let table = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+    return table
+  }()
 }
