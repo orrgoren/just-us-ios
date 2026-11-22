@@ -138,12 +138,12 @@ final class FlowUITests: XCTestCase {
       guard bubble.frame.width > 1 else { continue }
       XCTAssertLessThan(bubble.frame.midX, app.frame.midX)
     }
-    let mixed = app.descendants(matching: .any).containing(
+    let mixed = app.descendants(matching: .any).matching(
       NSPredicate(format: "label CONTAINS %@", "https://just.us/night")
     ).firstMatch
     XCTAssertTrue(mixed.waitForExistence(timeout: 4))
-    XCTAssertTrue(mixed.label.contains("ראו"))
-    XCTAssertTrue(mixed.label.contains("הערב"))
+    XCTAssertTrue(mixed.label.contains("ראו"), mixed.label)
+    XCTAssertTrue(mixed.label.contains("הערב"), mixed.label)
     XCTAssertLessThan(mixed.frame.midX, app.frame.midX)
   }
 
