@@ -44,7 +44,7 @@ final class LanguageTests: XCTestCase {
       ),
       "כבר יש לכם מרחב ריק, בלי בן או בת זוג ובלי ערב שמור. הצטרפות מוחקת אותו ומחברת אתכם להזמנה."
     )
-    XCTAssertEqual(L10n.lookup("settings.notifyPlan", "When a date is ready to reveal", locale: hebrew), "כשהדייט מוכן לחשוף")
+    XCTAssertEqual(L10n.lookup("settings.notifyPlan", "When a date is ready to reveal", locale: hebrew), "כשהדייט מוכן לחשיפה")
     XCTAssertEqual(
       L10n.lookup("calendar.summary", "Just Us — our evening", locale: hebrew),
       "הערב שלנו — \u{2066}Just Us\u{2069}"
