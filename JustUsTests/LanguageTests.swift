@@ -31,8 +31,8 @@ final class LanguageTests: XCTestCase {
     XCTAssertEqual(L10n.lookup("field.done", "Done", locale: hebrew), "סיום")
     XCTAssertEqual(L10n.lookup("home.twoWeeks", "2 weeks in a row", locale: hebrew), "שבועיים ברצף")
     XCTAssertEqual(L10n.lookup("auth.cooldownOne", "You can resend in 1 second.", locale: hebrew), "אפשר לשלוח שוב בעוד שנייה.")
-    XCTAssertEqual(L10n.lookup("chat.sending", "Sending", locale: hebrew), "שולח…")
-    XCTAssertEqual(L10n.lookup("setup.join", "Join with a code instead", locale: hebrew), "יש לי קוד להצטרפות")
+    XCTAssertEqual(L10n.lookup("chat.sending", "Sending", locale: hebrew), "שולחים…")
+    XCTAssertEqual(L10n.lookup("setup.join", "Join with a code instead", locale: hebrew), "הצטרפות עם קוד")
     XCTAssertEqual(L10n.lookup("role.yours", "Your turn", locale: hebrew), "תורכם")
     XCTAssertEqual(L10n.lookup("setup.namesHelp", "They'll see the name you chose when they join.", locale: hebrew), "הם יראו את השם שבחרתם כשיצטרפו.")
     XCTAssertEqual(L10n.lookup("invite.stay", "Stay where I am", locale: hebrew), "נישאר איפה שאנחנו")
@@ -42,10 +42,13 @@ final class LanguageTests: XCTestCase {
         "You already have an empty space, with no partner and no saved date. Joining removes that empty space and connects this account to the invite.",
         locale: hebrew
       ),
-      "כבר יש לכם מרחב ריק, בלי בן או בת זוג ובלי ערב שמור. הצטרפות מוחקת את המרחב הריק ומחברת את החשבון להזמנה."
+      "כבר יש לכם מרחב ריק, בלי בן או בת זוג ובלי ערב שמור. הצטרפות מוחקת אותו ומחברת אתכם להזמנה."
     )
     XCTAssertEqual(L10n.lookup("settings.notifyPlan", "When a date is ready to reveal", locale: hebrew), "כשהדייט מוכן לחשיפה")
-    XCTAssertEqual(L10n.lookup("calendar.summary", "Just Us — our evening", locale: hebrew), "Just Us — הערב שלנו")
+    XCTAssertEqual(
+      L10n.lookup("calendar.summary", "Just Us — our evening", locale: hebrew),
+      "הערב שלנו — \u{2066}Just Us\u{2069}"
+    )
     XCTAssertEqual(
       L10n.lookup(
         "calendar.details",

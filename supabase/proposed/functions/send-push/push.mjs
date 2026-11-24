@@ -47,12 +47,12 @@ export function pushAlert(kind, name, nudge, lang) {
   const who = String(name ?? "");
   let body;
   if (kind === "chatMessage") body = chatPushBody(lang);
-  else if (kind === "planReady") body = he ? "הדייט מוכן לחשיפה." : "Your date is ready to reveal.";
-  else if (kind === "partnerMood") body = he ? `מצב רוח חדש מאת ${who} לערב שלכם.` : `${who} picked a mood for your night.`;
-  else if (kind === "inviteAccepted") body = he ? `${who} בפנים. הערב הזה רשמית של שניכם.` : `${who} is in. This night is officially both of yours.`;
-  else if (kind === "weeklyReminder") body = he ? `הערב שלכם, ${who}.` : `Tonight is yours, ${who}.`;
-  else if (nudge >= 2) body = he ? `נשאיר את ההזמנה כאן בשביל ${who}. בלי עוד תזכורות.` : `We'll leave the invite here for ${who}. No more reminders.`;
-  else body = he ? `ההזמנה עבור ${who} פתוחה, מתי שתרצו.` : `Your invite for ${who} is open whenever you both want it.`;
+  else if (kind === "planReady") body = he ? "הדייט מוכן. אפשר לחשוף." : "Your date is ready to reveal.";
+  else if (kind === "partnerMood") body = he ? `מצב רוח לערב מאת ${who}.` : `${who} picked a mood for your night.`;
+  else if (kind === "inviteAccepted") body = he ? `${who} בפנים. הערב הזה של שניכם.` : `${who} is in. This night is officially both of yours.`;
+  else if (kind === "weeklyReminder") body = he ? `${who}, יש לכם ערב היום.` : `Tonight is yours, ${who}.`;
+  else if (nudge >= 2) body = he ? `נשאיר את ההזמנה כאן בשביל ${who}. בלי עוד נדנודים.` : `We'll leave the invite here for ${who}. No more reminders.`;
+  else body = he ? `ההזמנה עבור ${who} עדיין פתוחה.` : `Your invite for ${who} is open whenever you both want it.`;
   return { title: "Just Us", body };
 }
 
